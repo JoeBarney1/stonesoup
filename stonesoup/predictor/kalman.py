@@ -88,8 +88,75 @@ class KalmanPredictor(Predictor):
         """
         return self.transition_model.matrix(**kwargs) @ prior.state_vector
 
-    def _control_matrix(self, **kwargs):
-        r"""Convenience function which returns the control matrix
+        # Compute time_interval
+        try:
+            time_interval = timestamp - prior.timestamp
+        except TypeError as e:
+            # TypeError: (timestamp or prior.timestamp) is None
+            time_interval = None
+
+        # Transition model parameters
+        transition_matrix = self.transition_model.matrix(
+            timestamp=timestamp,
+            time_interval=time_interval,
+            **kwargs)
+        transition_noise_covar = self.transition_model.covar(
+            timestamp=timestamp,
+            time_interval=time_interval,
+            **kwargs)
+
+        # Control model parameters
+        if self.control_model is None:
+            control_matrix = np.zeros(prior.covar.shape)
+            contol_noise_covar = np.zeros(prior.covar.shape)
+            control_input = State(np.zeros(prior.state_vector.shape))
+        else:
+            # Extract control matrix
+            control_matrix = self.control_model.matrix(
+                timestamp=timestamp,
+                time_interval=time_interval,
+                **kwargs)
+            # Extract control noise covariance
+            try:
+                # covar() is implemented for control_model
+                contol_noise_covar = self.control_model.covar(
+                    timestamp=timestamp,
+                    time_interval=time_interval,
+                    **kwargs)
+            except AttributeError as e:
+                # covar() is NOT implemented for control_model
+                contol_noise_covar = np.zeros(self.control_model.ndim_ctrl)
+            if control_input is None:
+                control_input = np.zeros((self.control_model.ndim_ctrl, 1))
+
+        # Perform prediction
+        prediction_mean, prediction_covar = self.predict_lowlevel(
+            prior.mean, prior.covar, transition_matrix,
+            transition_noise_covar, control_input.state_vector,
+            control_matrix, contol_noise_covar)
+
+        return GaussianState(prediction_mean, prediction_covar, timestamp)
+
+    @staticmethod
+    def predict_lowlevel(x, P, F, Q, u, B, Qu):
+        """Low-level Kalman Filter state prediction
+
+        Parameters
+        ----------
+        x : :class:`numpy.ndarray` of shape (Ns,1)
+            The prior state mean
+        P : :class:`numpy.ndarray` of shape (Ns,Ns)
+            The prior state covariance
+        F : :class:`numpy.ndarray` of shape (Ns,Ns)
+            The state transition matrix
+        Q : :class:`numpy.ndarray` of shape (Ns,Ns)
+            The process noise covariance matrix
+        u : :class:`numpy.ndarray` of shape (Nu,1)
+            The control input
+        B : :class:`numpy.ndarray` of shape (Ns,Nu)
+            The control gain matrix
+        Qu : :class:`numpy.ndarray` of shape (Ns,Ns)
+            The control process covariance matrix
 
         Returns
         -------
@@ -466,12 +533,11 @@ class SqrtKalmanPredictor(ExtendedKalmanPredictor):
             sqrt_ctrl_noi = la.sqrtm(self.control_model.covar(time_interval=predict_over_interval,
                                                               **kwargs))
 
-        if self.qr_method:
-            # Note that the control matrix aspect of this hasn't been tested
-            m_sq_trans_cov = np.block([[trans_m @ sqrt_prior_cov, sqrt_trans_cov,
-                                        ctrl_mat@sqrt_ctrl_noi]])
-            _, pred_sqrt_cov = np.linalg.qr(m_sq_trans_cov.T)
-            return pred_sqrt_cov.T
+        # Control model parameters
+        if self.control_model is None:
+            control_matrix = np.zeros(prior.covar.shape)
+            contol_noise_covar = np.zeros(prior.covar.shape)
+            control_input = State(np.zeros(prior.state_vector.shape))
         else:
             return np.linalg.cholesky(trans_m@sqrt_prior_cov@sqrt_prior_cov.T@trans_m.T +
                                       sqrt_trans_cov@sqrt_trans_cov.T +
