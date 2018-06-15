@@ -4,35 +4,10 @@ import numpy as np
 import pytest
 from pytest import approx
 
-from ..base import ParticleInitiator
-from ...hypothesiser.probability import PDAHypothesiser
-from ...models.base import LinearModel, ReversibleModel
-from ...models.measurement.linear import LinearGaussian
-from ...models.measurement.nonlinear import CartesianToBearingRange, Cartesian2DToBearing, \
-    CombinedReversibleGaussianMeasurementModel
-from ...models.transition.linear import \
-    CombinedLinearGaussianTransitionModel, ConstantVelocity, RandomWalk
-from ...types.array import StateVectors
-from ...types.mixture import GaussianMixture
-from ...types.track import Track
-from ...updater.kalman import KalmanUpdater, ExtendedKalmanUpdater
-from ...predictor.kalman import KalmanPredictor
-from ...deleter.time import UpdateTimeDeleter, UpdateTimeStepsDeleter
-from ...hypothesiser.distance import DistanceHypothesiser
-from ...dataassociator.neighbour import NearestNeighbour
-from ...measures import Mahalanobis
-from ...types.detection import Detection, TrueDetection
-from ...types.hypothesis import SingleHypothesis
-from ...types.prediction import Prediction
-from ...types.state import GaussianState, ParticleState
-from ...types.update import ParticleStateUpdate, Update, GaussianMixtureUpdate, \
-    ASDGaussianStateUpdate, EnsembleStateUpdate
-from ..simple import (
-    SinglePointInitiator, SimpleMeasurementInitiator,
-    MultiMeasurementInitiator, GaussianParticleInitiator, GaussianMixtureInitiator,
-    ASDGaussianInitiator, EnsembleInitiator,
-    NoHistoryMultiMeasurementInitiator, ParticleGaussianInitiator
-)
+from stonesoup.models import LinearGaussian
+from stonesoup.updater import KalmanUpdater
+from stonesoup.types import GaussianState, Detection
+from stonesoup.initiator import SinglePointInitiator
 
 
 @pytest.mark.parametrize(
@@ -48,11 +23,8 @@ def test_spi(measurement_model):
         np.array([[0], [0]]),
         np.array([[100, 0], [0, 1]]))
 
-    # Create the Kalman updater
-    if isinstance(measurement_model, LinearModel):
-        kup = KalmanUpdater(measurement_model)
-    else:
-        kup = ExtendedKalmanUpdater(measurement_model)
+    # Define a measurement model
+    measurement_model = LinearGaussian(2, [0], np.array([[1]]))
 
     # Define the Initiator
     initiator = SinglePointInitiator(
@@ -75,8 +47,17 @@ def test_spi(measurement_model):
     evaluated_tracks = [False, False]
     for detection in detections:
 
-        hypo = SingleHypothesis(prediction=prior_state, measurement=detection)
-        eval_track_state = kup.update(hypo)
+        post_state_vec, post_state_covar, _ =\
+            KalmanUpdater.update_lowlevel(prior_state.state_vector,
+                                          prior_state.covar,
+                                          measurement_model.matrix(),
+                                          measurement_model.covar(),
+                                          detection.state_vector)
+
+        eval_track_state = GaussianState(
+            post_state_vec,
+            post_state_covar,
+            timestamp=detection.timestamp)
 
         # Compare against both tracks
         for track_idx, track in enumerate(tracks):
