@@ -2,13 +2,9 @@ import datetime
 import pytest
 import numpy as np
 
-from ...models.transition.linear import ConstantVelocity
-from ...predictor.kalman import (
-    KalmanPredictor, ExtendedKalmanPredictor, UnscentedKalmanPredictor,
-    SqrtKalmanPredictor, CubatureKalmanPredictor)
-from ...types.prediction import GaussianStatePrediction
-from ...types.state import GaussianState, SqrtGaussianState
-from ...types.track import Track
+from stonesoup.models.transition.linear import ConstantVelocity
+from stonesoup.predictor.kalman import KalmanPredictor, ExtendedKalmanPredictor
+from stonesoup.types import GaussianState, GaussianStatePrediction
 
 
 @pytest.mark.parametrize(
@@ -63,8 +59,15 @@ def test_kalman(PredictorClass, transition_model,
     transition_model_covar = transition_model.covar(time_interval=time_interval)
     # Calculate evaluation variables
     eval_prediction = GaussianStatePrediction(
-        transition_model_matrix @ prior.mean,
-        transition_model_matrix@prior.covar@transition_model_matrix.T + transition_model_covar)
+        cv.matrix(timestamp=new_timestamp,
+                  time_interval=time_interval)@prior.mean,
+        cv.matrix(timestamp=new_timestamp,
+                  time_interval=time_interval)
+        @prior.covar
+        @cv.matrix(timestamp=new_timestamp,
+                   time_interval=time_interval).T
+        + cv.covar(timestamp=new_timestamp,
+                   time_interval=time_interval))
 
     # Initialise a kalman predictor
     predictor = PredictorClass(transition_model=transition_model)
@@ -121,7 +124,17 @@ def test_sqrt_kalman():
     sqrt_prior = SqrtGaussianState(prior_mean, sqrt_prior_covar,
                                    timestamp=timestamp)
 
-    transition_model = ConstantVelocity(noise_diff_coeff=0.1)
+    # Calculate evaluation variables
+    eval_prediction = GaussianStatePrediction(
+        cv.matrix(timestamp=new_timestamp,
+                  time_interval=time_interval)@prior.mean,
+        cv.matrix(timestamp=new_timestamp,
+                  time_interval=time_interval)
+        @prior.covar
+        @cv.matrix(timestamp=new_timestamp,
+                   time_interval=time_interval).T
+        + cv.covar(timestamp=new_timestamp,
+                   time_interval=time_interval))
 
     # Initialise a kalman predictor
     predictor = KalmanPredictor(transition_model=transition_model)

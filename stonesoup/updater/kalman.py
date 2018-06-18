@@ -6,14 +6,7 @@ from functools import lru_cache
 
 from ..base import Property
 from .base import Updater
-from ..types.array import CovarianceMatrix, StateVector
-from ..types.prediction import MeasurementPrediction
-from ..types.update import Update
-from ..models.base import LinearModel
-from ..models.measurement.linear import LinearGaussian
-from ..models.measurement import MeasurementModel
-from ..functions import gauss2sigma, unscented_transform, cubature_transform
-from ..measures import Measure, Euclidean
+from ..types import GaussianState, GaussianMeasurementPrediction
 
 
 class KalmanUpdater(Updater):
@@ -82,147 +75,71 @@ class KalmanUpdater(Updater):
 
         Parameters
         ----------
-        predicted_state : :class:`~.GaussianState`
-            The predicted state :math:`\mathbf{x}_{k|k-1}`, :math:`P_{k|k-1}`
-        measurement_model : :class:`~.MeasurementModel`
-            The measurement model. If omitted, the model in the updater object
-            is used
-        **kwargs : various
-            Passed to :meth:`~.MeasurementModel.matrix`
+        state_prediction : :class:`~.GaussianStatePrediction`
+            A predicted state object
 
         Returns
         -------
-        : :class:`numpy.ndarray`
-            The measurement matrix, :math:`H_k`
-
+        : :class:`~.GaussianMeasurementPrediction`
+            The measurement prediction
         """
         return self._check_measurement_model(
             measurement_model).matrix(**kwargs)
 
-    def _measurement_cross_covariance(self, predicted_state, measurement_matrix):
-        """
-        Return the measurement cross covariance matrix, :math:`P_{k~k-1} H_k^T`
+        # Measurement model parameters
+        measurement_matrix = self.measurement_model.matrix(**kwargs)
+        measurement_noise_covar = self.measurement_model.covar(**kwargs)
+
+        meas_pred_mean, meas_pred_covar, cross_covar = \
+            self.get_measurement_prediction_lowlevel(state_prediction.mean,
+                                                     state_prediction.covar,
+                                                     measurement_matrix,
+                                                     measurement_noise_covar)
+
+        return GaussianMeasurementPrediction(meas_pred_mean, meas_pred_covar,
+                                             state_prediction.timestamp,
+                                             cross_covar)
+
+    def update(self, prediction, measurement,
+               measurement_prediction=None, **kwargs):
+        """Kalman Filter update step
 
         Parameters
         ----------
-        predicted_state : :class:`GaussianState`
-            The predicted state which contains the covariance matrix :math:`P` as :attr:`.covar`
-            attribute
-        measurement_matrix : numpy.array
-            The measurement matrix, :math:`H`
-
-        Returns
-        -------
-        :  numpy.ndarray
-            The measurement cross-covariance matrix
-
-        """
-        return predicted_state.covar @ measurement_matrix.T
-
-    def _innovation_covariance(self, m_cross_cov, meas_mat, meas_mod, measurement_noise, **kwargs):
-        """Compute the innovation covariance
-
-        Parameters
-        ----------
-        m_cross_cov : numpy.ndarray
-            The measurement cross covariance matrix
-        meas_mat : numpy.ndarray
-            Measurement matrix
-        meas_mod : :class:~.MeasurementModel`
-            Measurement model
-        measurement_noise : bool
-            Include measurement noise or not
-
-        Returns
-        -------
-        : numpy.ndarray
-            The innovation covariance
-
-        """
-        innov_covar = meas_mat @ m_cross_cov
-        if measurement_noise:
-            innov_covar += meas_mod.covar(**kwargs)
-        return innov_covar
-
-    def _posterior_mean(self, predicted_state, kalman_gain, measurement, measurement_prediction):
-        r"""Compute the posterior mean, :math:`\mathbf{x}_{k|k} = \mathbf{x}_{k|k-1} + K_k
-        \mathbf{y}_k`, where the innovation :math:`\mathbf{y}_k = \mathbf{z}_k -
-        h(\mathbf{x}_{k|k-1}).
-
-        Parameters
-        ----------
-        predicted_state : :class:`State`, :class:`Prediction`
-            The predicted state
-        kalman_gain : numpy.ndarray
-            Kalman gain
-        measurement : :class:`Detection`
+        prediction : :class:`~.GaussianStatePrediction`
+            The state prediction
+        measurement : :class:`~.Detection`
             The measurement
-        measurement_prediction : :class:`MeasurementPrediction`
-            Predicted measurement
+        measurement_prediction : \
+        :class:`~.GaussianMeasurementPrediction`, optional
+            A measurement prediction (the default is ``None``, in which case\
+            it will be computed internally)
 
         Returns
         -------
-        : :class:`StateVector`
-            The posterior mean estimate
+        : :class:`~.GaussianState`
+            The computed state posterior
         """
         post_mean = predicted_state.state_vector + \
             kalman_gain @ (measurement.state_vector - measurement_prediction.state_vector)
         return post_mean.view(StateVector)
 
-    def _posterior_covariance(self, hypothesis):
-        """
-        Return the posterior covariance for a given hypothesis
+        if(measurement_prediction is None):
+            measurement_prediction = \
+                self.get_measurement_prediction(prediction)
 
-        Parameters
-        ----------
-        hypothesis: :class:`~.Hypothesis`
-            A hypothesised association between state prediction and measurement. It returns the
-            measurement prediction which in turn contains the measurement cross covariance,
-            :math:`P_{k|k-1} H_k^T and the innovation covariance,
-            :math:`S = H_k P_{k|k-1} H_k^T + R`
+        posterior_mean, posterior_covar, _ = \
+            self._update_on_measurement_prediction(
+                prediction.mean,
+                prediction.covar,
+                measurement.state_vector,
+                measurement_prediction.mean,
+                measurement_prediction.covar,
+                measurement_prediction.cross_covar)
 
-        Returns
-        -------
-        : :class:`~.CovarianceMatrix`
-            The posterior covariance matrix rendered via the Kalman update process.
-        : numpy.ndarray
-            The Kalman gain, :math:`K = P_{k|k-1} H_k^T S^{-1}`
-
-        """
-        if self.use_joseph_cov:
-            # Identity matrix
-            id_matrix = np.identity(hypothesis.prediction.ndim)
-
-            # Calculate Kalman gain
-            kalman_gain = hypothesis.measurement_prediction.cross_covar @ \
-                np.linalg.inv(hypothesis.measurement_prediction.covar)
-
-            measurement_model = self._check_measurement_model(
-                hypothesis.measurement.measurement_model)
-
-            # Calculate measurement matrix/jacobian matrix
-            meas_matrix = self._measurement_matrix(hypothesis.prediction,
-                                                   measurement_model)
-
-            # Calculate Prior covariance
-            prior_covar = hypothesis.prediction.covar
-
-            # Calculate measurement covariance
-            meas_covar = measurement_model.covar()
-
-            # Compute posterior covariance matrix
-            I_KH = id_matrix - kalman_gain @ meas_matrix
-            post_cov = I_KH @ prior_covar @ I_KH.T \
-                + kalman_gain @ meas_covar @ kalman_gain.T
-
-        else:
-            kalman_gain = hypothesis.measurement_prediction.cross_covar @ \
-                np.linalg.inv(hypothesis.measurement_prediction.covar)
-
-            post_cov = hypothesis.prediction.covar - kalman_gain @ \
-                hypothesis.measurement_prediction.covar @ kalman_gain.T
-
-        return post_cov.view(CovarianceMatrix), kalman_gain
+        return GaussianState(posterior_mean,
+                             posterior_covar,
+                             prediction.timestamp)
 
     @lru_cache()
     def predict_measurement(self, predicted_state, measurement_model=None, measurement_noise=True,
@@ -650,31 +567,27 @@ class IteratedKalmanUpdater(ExtendedKalmanUpdater):
 
         Parameters
         ----------
-        hypothesis : :class:`~.SingleHypothesis`
-            the prediction-measurement association hypothesis. This hypothesis
-            may carry a predicted measurement, or a predicted state. In the
-            latter case a predicted measurement will be calculated.
-        **kwargs : various
-            These are passed to the measurement model function
+        state_prediction : :class:`~.GaussianStatePrediction`
+            A predicted state object
 
         Returns
         -------
-        : :class:`~.GaussianStateUpdate`
-            The posterior state Gaussian with mean :math:`\mathbf{x}_{k|k}` and
-            covariance :math:`P_{k|k}`
-
+        : :class:`~.GaussianMeasurementPrediction`
+            The measurement prediction
         """
 
         # Get the measurement model
         measurement_model = self._check_measurement_model(hypothesis.measurement.measurement_model)
 
-        # The first iteration is just the application of the EKF
-        post_state = super().update(hypothesis, **kwargs)
+        meas_pred_mean, meas_pred_covar, cross_covar = \
+            self.get_measurement_prediction_lowlevel(state_prediction.mean,
+                                                     state_prediction.covar,
+                                                     measurement_matrix,
+                                                     measurement_noise_covar)
 
-        # Now update the measurement prediction mean and loop
-        iterations = 0
-        prev_state = None
-        while iterations == 0 or self.measure(prev_state, post_state) > self.tolerance:
+        return GaussianMeasurementPrediction(meas_pred_mean, meas_pred_covar,
+                                             state_prediction.timestamp,
+                                             cross_covar)
 
             if iterations > self.max_iterations:
                 warnings.warn("Iterated Kalman update did not converge")
@@ -782,28 +695,45 @@ class SchmidtKalmanUpdater(ExtendedKalmanUpdater):
 
         Parameters
         ----------
-        predicted_state : :class:`State`, :class:`Prediction`
-            The predicted state
-        kalman_gain : numpy.ndarray
-            The reduced form of the Kalman gain, :math:`K_s`
-         measurement : :class:`Detection`
+        prediction : :class:`~.GaussianStatePrediction`
+            The state prediction
+        measurement : :class:`~.Detection`
             The measurement
-        measurement_prediction : :class:`MeasurementPrediction`
-            Predicted measurement
+        measurement_prediction :\
+        :class:`~.GaussianMeasurementPrediction`, optional
+            A measurement prediction (the default is ``None``, in which case\
+            it will be computed internally)
 
         Returns
         -------
-        : :class:`StateVector`
-            The posterior mean estimate
+        : :class:`~.GaussianState`
+            The state posterior
         """
         post_mean = predicted_state.state_vector.copy()
         post_mean[np.ix_(~self.consider)] += \
             kalman_gain @ (measurement.state_vector - measurement_prediction.state_vector)
         return post_mean.view(StateVector)
 
-    def _posterior_covariance(self, hypothesis):
-        """
-        Return the posterior covariance for a given hypothesis
+        if(measurement_prediction is None):
+            measurement_prediction = \
+                self.get_measurement_prediction(prediction)
+
+        posterior_mean, posterior_covar, _ = \
+            self._update_on_measurement_prediction(
+                prediction.mean,
+                prediction.covar,
+                measurement.state_vector,
+                measurement_prediction.mean,
+                measurement_prediction.covar,
+                measurement_prediction.cross_covar)
+
+        return GaussianState(posterior_mean,
+                             posterior_covar,
+                             prediction.timestamp)
+
+    @staticmethod
+    def update_lowlevel(x_pred, P_pred, H, R, y):
+        """Low level Extended Kalman Filter update
 
         Parameters
         ----------

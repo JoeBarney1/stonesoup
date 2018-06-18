@@ -36,10 +36,11 @@ class Predictor(Base):
         Parameters
         ----------
         prior : :class:`~.State`
-            The prior state
-        timestamp : :class:`datetime.datetime`, optional
-            Time at which the prediction is made (used by the transition
-            model)
+            State
+        control_input : :class:`~.State`
+            State
+        timestamp : :class:`datetime.datetime`
+            Time which to predict to which will be passed to transition model
 
         Returns
         -------
