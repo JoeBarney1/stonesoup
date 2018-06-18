@@ -110,6 +110,12 @@ Time Types
 .. automodule:: stonesoup.types.time
     :show-inheritance:
 
+Prediction Types
+----------------
+
+.. automodule:: stonesoup.types.prediction
+    :show-inheritance:
+
 Track Types
 -----------
 
