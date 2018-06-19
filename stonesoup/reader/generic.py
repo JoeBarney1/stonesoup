@@ -115,24 +115,31 @@ class CSVDetectionReader(DetectionReader, _CSVReader):
     ----------
     """
 
-    @BufferedGenerator.generator_method
+    state_vector_fields = Property(
+        [str], doc='List of columns names to be used in state vector')
+    time_field = Property(
+        str, doc='Name of column to be used as time field')
+    time_field_format = Property(
+        str, default=None, doc='Optional datetime format')
+    timestamp = Property(
+        bool, default=False, doc='Treat time field as a timestamp from epoch')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._detections = set()
+
+    @property
+    def detections(self):
+        return self._detections.copy()
+
     def detections_gen(self):
         with self.path.open(encoding=self.encoding, newline='') as csv_file:
             detections = set()
             previous_time = None
             for row in csv.DictReader(csv_file, **self.csv_options):
 
-                time = self._get_time(row)
-                if previous_time is not None and previous_time != time:
-                    yield previous_time, detections
-                    detections = set()
-                previous_time = time
-
-                detections.add(Detection(
-                    np.array([[row[col_name]] for col_name in self.state_vector_fields],
-                             dtype=np.float64),
-                    timestamp=time,
-                    metadata=self._get_metadata(row)))
-
-            # Yield remaining
-            yield previous_time, detections
+                detect = Detection(np.array(
+                    [[row[col_name]] for col_name in self.state_vector_fields],
+                    dtype=np.float32), time_field_value)
+                self._detections = {detect}
+                yield time_field_value, self.detections

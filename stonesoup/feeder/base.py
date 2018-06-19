@@ -1,6 +1,4 @@
 """Base classes for Stone Soup feeder"""
-from abc import abstractmethod
-
 from ..base import Property
 from ..reader import Reader, DetectionReader, GroundTruthReader
 from ..buffered_generator import BufferedGenerator
@@ -28,6 +26,4 @@ class DetectionFeeder(Feeder, DetectionReader):
     modify the sequence, duplicate or drop data.
     """
 
-    @BufferedGenerator.generator_method
-    def detections_gen(self):
-        raise NotImplementedError
+    detector = Property(DetectionReader, doc="Source of detections")

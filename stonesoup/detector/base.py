@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from ..base import Property
 from ..reader import DetectionReader, SensorDataReader
 
@@ -10,7 +11,3 @@ class Detector(DetectionReader):
     """
 
     sensor = Property(SensorDataReader, doc="Source of sensor data")
-
-    @abstractmethod
-    def detections_gen(self):
-        raise NotImplementedError

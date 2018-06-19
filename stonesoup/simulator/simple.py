@@ -26,20 +26,26 @@ class SingleTargetGroundTruthSimulator(GroundTruthSimulator):
     timestep: datetime.timedelta = Property(
         default=datetime.timedelta(seconds=1),
         doc="Time step between each state. Default one second.")
-    number_steps: int = Property(default=100, doc="Number of time steps to run for")
+    number_steps = Property(
+        int, default=100, doc="Number of time steps to run for")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.index = 0
+        self._groundtruth_paths = set()
+
+    @property
+    def groundtruth_paths(self):
+        return self._groundtruth_paths.copy()
 
     @BufferedGenerator.generator_method
     def groundtruth_paths_gen(self):
+        self._groundtruth_paths = set()
         time = self.initial_state.timestamp or datetime.datetime.now()
 
         gttrack = GroundTruthPath([
-            GroundTruthState(self.initial_state.state_vector, timestamp=time,
-                             metadata={"index": self.index})])
-        yield time, {gttrack}
+            GroundTruthState(self.initial_state.state_vector, timestamp=time)])
+        self._groundtruth_paths.add(gttrack)
+        yield time, self.groundtruth_paths
 
         for _ in range(self.number_steps - 1):
             time += self.timestep
@@ -47,9 +53,9 @@ class SingleTargetGroundTruthSimulator(GroundTruthSimulator):
             trans_state_vector = self.transition_model.function(
                 gttrack[-1], noise=True, time_interval=self.timestep)
             gttrack.append(GroundTruthState(
-                trans_state_vector, timestamp=time,
-                metadata={"index": self.index}))
-            yield time, {gttrack}
+                trans_state_vector, timestamp=time))
+
+            yield time, self.groundtruth_paths
 
 
 class SwitchOneTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
@@ -102,49 +108,11 @@ class MultiTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
                        "simulated. These simulated targets will be made in addition to those "
                        "defined by :attr:`preexisting_states`.")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.seed is not None:
-            self.random_state = np.random.RandomState(self.seed)
-        else:
-            self.random_state = np.random.mtrand._rand
-
-    def _new_target(self, time, random_state, state_vector=None):
-        if state_vector is not None:
-            vector = state_vector
-        else:
-            vector = self.initial_state.state_vector + \
-                self.initial_state.covar @ \
-                random_state.randn(self.initial_state.ndim, 1)
-
-        gttrack = GroundTruthPath()
-        gttrack.append(GroundTruthState(
-            state_vector=vector,
-            timestamp=time,
-            metadata={"index": self.index})
-        )
-        return gttrack
-
-    @BufferedGenerator.generator_method
-    def groundtruth_paths_gen(self, random_state=None):
+    def groundtruth_paths_gen(self):
+        self._groundtruth_paths = set()
         time = self.initial_state.timestamp or datetime.datetime.now()
-        random_state = random_state if random_state is not None else self.random_state
-        number_steps_remaining = self.number_steps
 
-        if self.preexisting_states or self.initial_number_targets:
-            # Use preexisting_states to make some groundtruth paths
-            preexisting_paths = OrderedSet(
-                self._new_target(time, random_state, state) for state in self.preexisting_states)
-
-            # Simulate more groundtruth paths for the number of initial_simulated_states
-            initial_simulated_paths = OrderedSet(
-                self._new_target(time, random_state) for _ in range(self.initial_number_targets))
-
-            # Union the two sets
-            groundtruth_paths = preexisting_paths | initial_simulated_paths
-
-            number_steps_remaining -= 1
-            yield time, groundtruth_paths
+        for _ in range(self.number_steps):
             time += self.timestep
 
         else:
@@ -152,14 +120,13 @@ class MultiTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
 
         for _ in range(number_steps_remaining):
             # Random drop tracks
-            groundtruth_paths.difference_update(
+            self._groundtruth_paths.difference_update(
                 gttrack
-                for gttrack in groundtruth_paths.copy()
-                if random_state.rand() <= self.death_probability)
+                for gttrack in self.groundtruth_paths
+                if np.random.rand() <= self.death_probability)
 
             # Move tracks forward
-            for gttrack in groundtruth_paths:
-                self.index = gttrack[-1].metadata.get("index")
+            for gttrack in self.groundtruth_paths:
                 trans_state_vector = self.transition_model.function(
                     gttrack[-1], noise=True, time_interval=self.timestep)
                 gttrack.append(GroundTruthState(
@@ -167,34 +134,16 @@ class MultiTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
                     metadata={"index": self.index}))
 
             # Random create
-            for _ in range(random_state.poisson(self.birth_rate)):
-                self.index = 0
-                gttrack = self._new_target(time, random_state)
-                groundtruth_paths.add(gttrack)
+            for _ in range(np.random.poisson(self.birth_rate)):
+                gttrack = GroundTruthPath()
+                gttrack.append(GroundTruthState(
+                    self.initial_state.state_vector +
+                    np.sqrt(self.initial_state.covar) @
+                    np.random.randn(self.initial_state.ndim, 1),
+                    timestamp=time))
+                self._groundtruth_paths.add(gttrack)
 
-            yield time, groundtruth_paths
-            time += self.timestep
-
-
-class SwitchMultiTargetGroundTruthSimulator(MultiTargetGroundTruthSimulator):
-    """Functions identically to :class:`~.MultiTargetGroundTruthSimulator`,
-    but has the transition model switching ability from
-    :class:`.SwitchOneTargetGroundTruthSimulator`"""
-    transition_models: Sequence[TransitionModel] = Property(
-        doc="List of transition models to be used, ensure that they all have the same dimensions.")
-    model_probs: np.ndarray = Property(doc="A matrix of probabilities.\
-        The element in the ith row and the jth column is the probability of\
-         switching from the ith transition model in :attr:`transition_models`\
-         to the jth")
-    seed: Optional[int] = Property(default=None, doc="Seed for random number generation."
-                                                     " Default None")
-
-    @property
-    def transition_model(self, random_state=None):
-        random_state = random_state if random_state is not None else self.random_state
-        self.index = random_state.choice(range(0, len(self.transition_models)),
-                                         p=self.model_probs[self.index])
-        return self.transition_models[self.index]
+            yield time, self.groundtruth_paths
 
 
 class SimpleDetectionSimulator(DetectionSimulator):
@@ -241,12 +190,10 @@ class SimpleDetectionSimulator(DetectionSimulator):
                 return False
         return True
 
-    @BufferedGenerator.generator_method
-    def detections_gen(self, random_state=None):
-        for time, tracks in self.groundtruth:
+        for time, tracks in self.groundtruth.groundtruth_paths_gen():
             self.real_detections.clear()
             self.clutter_detections.clear()
-            random_state = random_state if random_state is not None else self.random_state
+
             for track in tracks:
                 self.index = track[-1].metadata.get("index")
                 if random_state.rand() < self.detection_probability:
@@ -263,41 +210,7 @@ class SimpleDetectionSimulator(DetectionSimulator):
                 detection = Clutter(
                     random_state.rand(self.measurement_model.ndim_meas, 1) *
                     np.diff(self.meas_range) + self.meas_range[:, :1],
-                    timestamp=time,
-                    measurement_model=self.measurement_model)
-                if self.__in_state_space(detection):
-                    self.clutter_detections.add(detection)
+                    timestamp=time)
+                self.clutter_detections.add(detection)
 
-            yield time, self.real_detections | self.clutter_detections
-
-
-class SwitchDetectionSimulator(SimpleDetectionSimulator):
-
-    """Functions identically as the :class:`SimpleDetectionSimulator`, but for
-    ground truth paths formed using multiple transition models it allows the
-    user to assign a detection probability to each transition models.
-    For example, if you wanted a higher detection probability when the
-    simulated object makes a turn"""
-
-    detection_probabilities: Sequence[Probability] = Property(
-        doc="List of probabilities that correspond to the detection probability of the simulated "
-            "object while undergoing each transition model")
-
-    @property
-    def detection_probability(self):
-        return self.detection_probabilities[self.index]
-
-
-class DummyGroundTruthSimulator(GroundTruthSimulator):
-    """A Dummy Ground Truth Simulator which allows simulations to be built
-     where platform, rather than ground truth objects, motions are simulated.
-
-     It returns an empty set at each time step.
-    """
-
-    times: Sequence[datetime.datetime] = Property(doc='list of times to return')
-
-    @BufferedGenerator.generator_method
-    def groundtruth_paths_gen(self):
-        for time in self.times:
-            yield time, set()
+            yield time, self.detections

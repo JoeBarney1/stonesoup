@@ -13,8 +13,15 @@ class DetectionReader(Reader):
     """Detection Reader base class"""
 
     @property
+    @abstractmethod
     def detections(self):
-        return self.current[1]
+        """The detections at the current time step.
+
+        This is the set of detections last returned by the
+        :meth:`detections_gen` generator, to allow other components, like
+        metrics, to access the data.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     @BufferedGenerator.generator_method
@@ -35,8 +42,15 @@ class GroundTruthReader(Reader):
     """Ground Truth Reader base class"""
 
     @property
+    @abstractmethod
     def groundtruth_paths(self):
-        return self.current[1]
+        """The groundtruth paths at the current time step.
+
+        This is the set of groundtruth paths last returned by the
+        :meth:`groundtruth_paths_gen` generator, to allow other components,
+        like metrics, to access the data.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     @BufferedGenerator.generator_method
@@ -57,11 +71,17 @@ class SensorDataReader(Reader):
     """Sensor Data Reader base class"""
 
     @property
+    @abstractmethod
     def sensor_data(self):
-        return self.current[1]
+        """The sensor data at the current time step.
+
+        This is the set of sensor data last returned by the
+        :meth:`sensor_data_gen` generator, to allow other components, like
+        metrics, to access the data.
+        """
+        raise NotImplementedError
 
     @abstractmethod
-    @BufferedGenerator.generator_method
     def sensor_data_gen(self):
         """Returns a generator of sensor data for each time step.
 

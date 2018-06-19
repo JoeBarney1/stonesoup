@@ -8,10 +8,8 @@ Enabling Components
 -------------------
 .. autoclass:: stonesoup.detector.Detector
     :inherited-members:
-    :noindex:
 .. autoclass:: stonesoup.feeder.Feeder
     :inherited-members:
-    :noindex:
 .. autoclass:: stonesoup.metricgenerator.MetricGenerator
     :noindex:
 .. autoclass:: stonesoup.tracker.Tracker
@@ -37,19 +35,10 @@ Simulation
 ^^^^^^^^^^
 .. autoclass:: stonesoup.simulator.DetectionSimulator
     :inherited-members:
-    :noindex:
 .. autoclass:: stonesoup.simulator.GroundTruthSimulator
     :inherited-members:
-    :noindex:
 .. autoclass:: stonesoup.simulator.SensorSimulator
     :inherited-members:
-    :noindex:
-.. autoclass:: stonesoup.platform.Platform
-    :inherited-members:
-    :noindex:
-.. autoclass:: stonesoup.sensor.sensor.Sensor
-    :inherited-members:
-    :noindex:
 
 
 Algorithm Components
