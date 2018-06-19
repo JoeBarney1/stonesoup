@@ -1,61 +1,60 @@
+# coding: utf-8
+
 import datetime
 
-from pytest import approx
-import numpy as np
 import scipy as sp
 from scipy.stats import multivariate_normal
 
-from ..linear import Singer
-from ..base import CombinedGaussianTransitionModel
-from ....types.state import State
+from stonesoup.models.transition.linear import \
+    (Singer, CombinedLinearGaussianTransitionModel)
 
 
 def test_singer1dmodel():
-    """ Singer 1D Transition Model test """
-    state = State(np.array([[3.0], [1.0], [0.1]]))
-    noise_diff_coeffs = np.array([0.01])
-    damping_coeffs = np.array([0.1])
-    base(state, noise_diff_coeffs, damping_coeffs)
+    """ ConstantAcceleration1D Transition Model test """
+    state_vec = sp.array([[3.0], [1.0], [0.1]])
+    noise_diff_coeffs = sp.array([[0.01]])
+    recips_decorr_times = sp.array([[0.1]])
+    base(state_vec, noise_diff_coeffs, recips_decorr_times)
 
 
 def test_singer2dmodel():
-    """ Singer 2D Transition Model test """
-    state = State(np.array([[3.0], [1.0], [0.1], [2.0], [2.0], [0.2]]))
-    noise_diff_coeffs = np.array([0.01, 0.02])
-    damping_coeffs = np.array([0.1, 0.1])
-
-    base(state, noise_diff_coeffs, damping_coeffs)
+    """ ConstantAcceleration2D Transition Model test """
+    state_vec = sp.array([[3.0], [1.0], [0.1],
+                          [2.0], [2.0], [0.2]])
+    noise_diff_coeffs = sp.array([[0.01], [0.02]])
+    recips_decorr_times = sp.array([[0.1], [0.1]])
+    base(state_vec, noise_diff_coeffs, recips_decorr_times)
 
 
 def test_singer3dmodel():
-    """ Singer 3D Transition Model test """
-    state = State(np.array([[3.0], [1.0], [0.1], [2.0], [2.0], [0.2], [4.0],
-                            [0.5], [0.05]]))
-    noise_diff_coeffs = np.array([0.01, 0.02, 0.005])
-    damping_coeffs = np.array([0.1, 0.1, 0.1])
-    base(state, noise_diff_coeffs, damping_coeffs)
+    """ ConstantAcceleration3D Transition Model test """
+    state_vec = sp.array([[3.0], [1.0], [0.1],
+                          [2.0], [2.0], [0.2],
+                          [4.0], [0.5], [0.05]])
+    noise_diff_coeffs = sp.array([[0.01], [0.02], [0.005]])
+    recips_decorr_times = sp.array([[0.1], [0.1], [0.1]])
+    base(state_vec, noise_diff_coeffs, recips_decorr_times)
 
 
-def base(state, noise_diff_coeffs, damping_coeffs, timediff=1.0):
+def base(state_vec, noise_diff_coeffs, recips_decorr_times):
     """ Base test for n-dimensional ConstantAcceleration Transition Models """
 
-    state_vec = state.state_vector
-
     # Create a 1D Singer or an n-dimensional
-    # CombinedGaussianTransitionModel object
+    # CombinedLinearGaussianTransitionModel object
     dim = len(state_vec) // 3  # pos, vel, acc for each dimension
     if dim == 1:
-        model_obj = Singer(noise_diff_coeff=noise_diff_coeffs[0],
-                           damping_coeff=damping_coeffs[0])
+        model_obj = Singer(noise_diff_coeff=noise_diff_coeffs,
+                           recip_decorr_time=recips_decorr_times)
     else:
         model_list = [Singer(noise_diff_coeff=noise_diff_coeffs[i],
-                             damping_coeff=damping_coeffs[i])
+                             recip_decorr_time=recips_decorr_times[i])
                       for i in range(0, dim)]
-        model_obj = CombinedGaussianTransitionModel(model_list)
+        model_obj = CombinedLinearGaussianTransitionModel(model_list)
 
     # State related variables
     state_vec = state_vec
     old_timestamp = datetime.datetime.now()
+    timediff = 1  # 1sec
     new_timestamp = old_timestamp + datetime.timedelta(seconds=timediff)
     time_interval = new_timestamp - old_timestamp
 
@@ -65,115 +64,100 @@ def base(state, noise_diff_coeffs, damping_coeffs, timediff=1.0):
     covar_list = []
 
     for i in range(0, dim):
-        damping_coeff = damping_coeffs[i]
-        damping_coeffdt = damping_coeff * timediff
+        recip_decorr_time = recips_decorr_times[i]
+        recip_decorr_timedt = recip_decorr_time * timediff
         noise_diff_coeff = noise_diff_coeffs[i]
+        constant_multiplier = 2 * recip_decorr_time *\
+            sp.power(noise_diff_coeff, 2)
 
-        mat_list.append(np.array(
+        mat_list.append(sp.array(
             [[1,
               timediff,
-              (damping_coeffdt - 1 + np.exp(-damping_coeffdt)) /
-              damping_coeff**2],
+              (recip_decorr_timedt - 1 + sp.exp(-recip_decorr_timedt)) /
+              sp.power(recip_decorr_time, 2)],
              [0,
               1,
-              (1 - np.exp(-damping_coeffdt)) / damping_coeff],
+              (1 - sp.exp(-recip_decorr_timedt)) / recip_decorr_time],
              [0,
               0,
-              np.exp(-damping_coeffdt)]]))
+              sp.exp(-recip_decorr_timedt)]]))
 
-        alpha_time = damping_coeff * timediff
-        e_neg_at = np.exp(-alpha_time)
-        e_neg2_at = np.exp(-2 * alpha_time)
-        covar_list.append(np.array(
-            [[((1 - e_neg2_at) +
-               2 * alpha_time +
-               (2 * alpha_time**3) / 3 -
-               2 * alpha_time**2 -
-               4 * alpha_time * e_neg_at) /
-              (2 * damping_coeff**5),
-              (alpha_time - (1 - e_neg_at))**2 /
-              (2 * damping_coeff**4),
-              ((1 - e_neg2_at) - 2 * alpha_time * e_neg_at) /
-              (2 * damping_coeff**3)],
-             [(alpha_time - (1 - e_neg_at))**2 /
-              (2 * damping_coeff**4),
-              (2 * alpha_time - 4 * (1 - e_neg_at) + (1 - e_neg2_at)) /
-              (2 * damping_coeff**3),
-              (1 - e_neg_at)**2 /
-              (2 * damping_coeff**2)],
-             [((1 - e_neg2_at) - 2 * alpha_time * e_neg_at) /
-              (2 * damping_coeff**3),
-              (1 - e_neg_at)**2 /
-              (2 * damping_coeff**2),
-              (1 - e_neg2_at) / (2 * damping_coeff)]]
-        ) * noise_diff_coeff)
+        covar_list.append(sp.array(
+            [[sp.power(timediff, 5) / 20,
+              sp.power(timediff, 4) / 8,
+              sp.power(timediff, 3) / 6],
+             [sp.power(timediff, 4) / 8,
+              sp.power(timediff, 3) / 3,
+              sp.power(timediff, 2) / 2],
+             [sp.power(timediff, 3) / 6,
+              sp.power(timediff, 2) / 2,
+              timediff]]) * constant_multiplier)
 
     F = sp.linalg.block_diag(*mat_list)
     Q = sp.linalg.block_diag(*covar_list)
 
     # Ensure ```model_obj.transfer_function(time_interval)``` returns F
-    assert np.allclose(F, model_obj.jacobian(
-        State(state_vec), time_interval=time_interval), rtol=1e-6)
+    assert sp.array_equal(F, model_obj.matrix(
+        timestamp=new_timestamp, time_interval=time_interval))
 
     # Ensure ```model_obj.covar(time_interval)``` returns Q
-    assert np.allclose(Q, model_obj.covar(
-        timestamp=new_timestamp, time_interval=time_interval), rtol=1e-6)
+    assert sp.array_equal(Q, model_obj.covar(
+        timestamp=new_timestamp, time_interval=time_interval))
 
-    # Propagate a state vector through the model
+    # Propagate a state vector throught the model
     # (without noise)
     new_state_vec_wo_noise = model_obj.function(
-        state,
+        state_vec,
         timestamp=new_timestamp,
-        time_interval=time_interval)
-    assert np.allclose(new_state_vec_wo_noise, F@state_vec, rtol=1e-6)
+        time_interval=time_interval,
+        noise=0)
+    assert sp.array_equal(new_state_vec_wo_noise, F@state_vec)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (without noise)
-    prob = model_obj.pdf(State(new_state_vec_wo_noise),
-                         state,
+    prob = model_obj.pdf(new_state_vec_wo_noise,
+                         state_vec,
                          timestamp=new_timestamp,
                          time_interval=time_interval)
-    assert approx(prob) == multivariate_normal.pdf(
+    assert sp.array_equal(prob, multivariate_normal.pdf(
         new_state_vec_wo_noise.T,
-        mean=np.array(F@state_vec).ravel(),
-        cov=Q)
+        mean=sp.array(F@state_vec).ravel(),
+        cov=Q).T)
 
     # Propagate a state vector throughout the model
     # (with internal noise)
     new_state_vec_w_inoise = model_obj.function(
-        state,
-        noise=True,
+        state_vec,
         timestamp=new_timestamp,
         time_interval=time_interval)
-    assert not np.allclose(new_state_vec_w_inoise, F@state_vec, rtol=1e-6)
+    assert not sp.array_equal(new_state_vec_w_inoise, F@state_vec)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
-    # (with noise)
-    prob = model_obj.pdf(State(new_state_vec_w_inoise),
-                         state,
+    prob = model_obj.pdf(new_state_vec_w_inoise,
+                         state_vec,
                          timestamp=new_timestamp,
                          time_interval=time_interval)
-    assert approx(prob) == multivariate_normal.pdf(
+    assert sp.array_equal(prob, multivariate_normal.pdf(
         new_state_vec_w_inoise.T,
-        mean=np.array(F@state_vec).ravel(),
-        cov=Q)
+        mean=sp.array(F@state_vec).ravel(),
+        cov=Q).T)
 
     # Propagate a state vector throught the model
     # (with external noise)
     noise = model_obj.rvs(timestamp=new_timestamp, time_interval=time_interval)
     new_state_vec_w_enoise = model_obj.function(
-        state,
+        state_vec,
         timestamp=new_timestamp,
         time_interval=time_interval,
         noise=noise)
-    assert np.allclose(new_state_vec_w_enoise, F@state_vec+noise, rtol=1e-6)
+    assert sp.array_equal(new_state_vec_w_enoise, F@state_vec+noise)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
-    prob = model_obj.pdf(State(new_state_vec_w_enoise), state,
+    prob = model_obj.pdf(new_state_vec_w_enoise, state_vec,
                          timestamp=new_timestamp, time_interval=time_interval)
-    assert approx(prob) == multivariate_normal.pdf(
+    assert sp.array_equal(prob, multivariate_normal.pdf(
         new_state_vec_w_enoise.T,
-        mean=np.array(F@state_vec).ravel(),
-        cov=Q)
+        mean=sp.array(F@state_vec).ravel(),
+        cov=Q).T)
