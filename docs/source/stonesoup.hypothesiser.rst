@@ -7,10 +7,10 @@ Hypothesiser
 .. automodule:: stonesoup.hypothesiser.base
     :show-inheritance:
 
-Simple
-------
+Distance
+--------
 
-.. automodule:: stonesoup.hypothesiser.simple
+.. automodule:: stonesoup.hypothesiser.distance
     :show-inheritance:
 
 Distance
