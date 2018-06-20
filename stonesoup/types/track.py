@@ -11,89 +11,31 @@ from ..base import Property
 class Track(StateMutableSequence):
     """Track type
 
-    A :class:`~.StateMutableSequence` representing a track.
+    Parameters
+    ----------
 
-    Notes:
-        Any manual modifications to :attr:`metadata` or :attr:`metadatas` will be overwritten if a
-        state is inserted at a point prior to where the modifications are made.
-        For example, inserting a state at the start of :attr:`states` will result in a
-        :attr:`metadatas` update that will update all subsequent metadata values, resulting in
-        manual metadata modifications being lost.
+    Attributes
+    ----------
+    state : State
+        Most recent state
+    state_vector : StateVector
+        Most recent state vector
+    covar : CovarianceMatrix
+        Most recent state covariance
+    timestamp : :class:`datetime.datetime`
+        Most recent state timestamp
     """
 
-    states: MutableSequence[State] = Property(
+    states = Property(
+        [State],
         default=None,
-        doc="The initial states of the track. Default `None` which initialises with empty list.")
+        doc="The initial states of the track. Default `None` which initialises"
+            "with empty list.")
 
-    id: str = Property(default=None, doc="The unique track ID")
-
-    init_metadata: MutableMapping = Property(
-        default={}, doc="Initial dictionary of metadata items for track. Default `None` which "
-                        "initialises track metadata as an empty dictionary.")
-
-    def __init__(self, *args, **kwargs):
-
-        super().__init__(*args, **kwargs)
-
-        self.metadatas = list()
-
-        for state in self.states:
-            self._update_metadata_from_state(state)
-        if self.id is None:
-            self.id = str(uuid.uuid4())
-
-    def __setitem__(self, index, value):
-        super().__setitem__(index, value)
-        if index < 0:
-            index = len(self.states) + index
-        self._update_metadatas(index)
-
-    def __copy__(self):
-        inst = super().__copy__()
-        inst.__dict__['metadatas'] = copy.copy(self.__dict__['metadatas'])
-        return inst
-
-    def insert(self, index, value):
-        """Insert value at index of :attr:`states`.
-
-        Parameters
-        ----------
-        index: int
-            Index of :attr:`states` to insert value at.
-        value: State
-            A state object to be inserted at the specified index of :attr:`states`.
-        """
-        super().insert(index, value)
-
-        if index < 0:
-            if index < -len(self.states):
-                index = 0
-            else:
-                index += len(self.states) - 1
-        elif index >= len(self.states):
-            index = len(self.states) - 1
-        self._update_metadatas(index)
-
-    def append(self, value):
-        """Add value at end of :attr:`states`.
-
-        Parameters
-        ----------
-        value: State
-            A state object to be added at the end of :attr:`states`.
-        """
-        # Update metadata
-        self._update_metadata_from_state(value)
-        return self.states.append(value)
-
-    @property
-    def metadata(self):
-        """Current metadata dictionary of track. If track contains no states, this is the initial
-        metadata dictionary :attr:`init_metadata`."""
-        if self.metadatas:
-            return self.metadatas[-1]
-        else:
-            return self.init_metadata
+    def __init__(self, states=None, *args, **kwargs):
+        if states is None:
+            states = []
+        super().__init__(states, *args, **kwargs)
 
     def _update_metadatas(self, index):
         """Update track :attr:`metadatas` property, starting at specified index.
