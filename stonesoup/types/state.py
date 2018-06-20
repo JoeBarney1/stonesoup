@@ -13,8 +13,45 @@ from scipy.stats import multivariate_normal
 from ..base import Property, clearable_cached_property
 from .array import StateVector, CovarianceMatrix, PrecisionMatrix, StateVectors
 from .base import Type
-from .particle import Particle, MultiModelParticle, RaoBlackwellisedParticle
-from .numeric import Probability
+
+
+class StateVector(np.ndarray):
+    """State vector wrapper for :class:`numpy.ndarray`
+
+    This class returns a view to a :class:`numpy.ndarray`, but ensures that
+    its initialised at a *Nx1* vector. It's called same as to
+    :func:`numpy.asarray`.
+    """
+
+    def __new__(cls, *args, **kwargs):
+        array = np.asarray(*args, **kwargs)
+        if not (array.ndim == 2 and array.shape[1] == 1):
+            raise ValueError(
+                "state vector shape should be Nx1 dimensions: got {}".format(
+                    array.shape))
+        return array.view(cls)
+
+    def __array_wrap__(self, array):
+        return np.asarray(array)
+
+
+class CovarianceMatrix(np.ndarray):
+    """Covariance matrix wrapper for :class:`numpy.ndarray`.
+
+    This class returns a view to a :class:`numpy.ndarray`, but ensures that
+    its initialised at a *NxN* matrix. It's called similar to
+    :func:`numpy.asarray`.
+    """
+
+    def __new__(cls, *args, **kwargs):
+        array = np.asarray(*args, **kwargs)
+        if not array.ndim == 2:
+            raise ValueError("Covariance should have ndim of 2: got {}"
+                             "".format(array.ndim))
+        return array.view(cls)
+
+    def __array_wrap__(self, array):
+        return np.asarray(array)
 
 
 class State(Type):
@@ -26,10 +63,7 @@ class State(Type):
     state_vector: StateVector = Property(doc='State vector.')
 
     def __init__(self, state_vector, *args, **kwargs):
-        # Don't cast away subtype of state_vector if not necessary
-        if state_vector is not None \
-                and not isinstance(state_vector, (StateVector, StateVectors)):
-            state_vector = StateVector(state_vector)
+        state_vector = state_vector.view(StateVector)
         super().__init__(state_vector, *args, **kwargs)
 
     @property
@@ -382,9 +416,7 @@ class GaussianState(State):
     covar: CovarianceMatrix = Property(doc='Covariance matrix of state.')
 
     def __init__(self, state_vector, covar, *args, **kwargs):
-        # Don't cast away subtype of covar if not necessary
-        if not isinstance(covar, CovarianceMatrix):
-            covar = CovarianceMatrix(covar)
+        covar = covar.view(CovarianceMatrix)
         super().__init__(state_vector, covar, *args, **kwargs)
         if self.state_vector.shape[0] != self.covar.shape[0]:
             raise ValueError(
