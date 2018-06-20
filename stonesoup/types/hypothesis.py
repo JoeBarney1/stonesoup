@@ -9,7 +9,8 @@ from .detection import Detection, MissedDetection, CompositeDetection
 from .prediction import MeasurementPrediction, Prediction, CompositePrediction, \
     CompositeMeasurementPrediction
 from ..base import Property
-from ..types.numeric import Probability
+from .detection import Detection
+from .prediction import MeasurementPrediction, Prediction
 
 
 class Hypothesis(Type):
@@ -25,6 +26,15 @@ class Hypothesis(Type):
     with it
     """
 
+    prediction = Property(
+        Prediction,
+        doc="Predicted track state")
+    measurement_prediction = Property(
+        MeasurementPrediction,
+        doc="Track prediction in measurement space")
+    detection = Property(
+        Detection,
+        doc="Detection used for hypothesis and updating")
 
 class ProbabilityHypothesis(Hypothesis):
     probability: Probability = Property(
