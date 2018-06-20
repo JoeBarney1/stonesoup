@@ -17,7 +17,7 @@ from ..types.update import GaussianStateUpdate
 from ..updater import Updater
 
 
-class SingleTargetTracker(_TrackerMixInNext, Tracker):
+class SingleTargetTracker(Tracker):
     """A simple single target tracker.
 
     Track a single object using Stone Soup components. The tracker works by
@@ -25,7 +25,7 @@ class SingleTargetTracker(_TrackerMixInNext, Tracker):
     either updating the track state with the result of the :attr:`updater` if
     a detection is associated, or with the prediction if no detection is
     associated to the track. The track is then checked for deletion by the
-    :attr:`deleter`, and if deleted the :attr:`initiator` is called to generate
+    :attr:`deletor`, and if deleted the :attr:`initiator` is called to generate
     a new track. Similarly if no track is present (i.e. tracker is initialised
     or deleted in previous iteration), only the :attr:`initiator` is called.
 
@@ -38,10 +38,17 @@ class SingleTargetTracker(_TrackerMixInNext, Tracker):
         Current track being maintained. Also accessible as the sole item in
         :attr:`tracks`
     """
-    initiator: Initiator = Property(doc="Initiator used to initialise the track.")
-    deleter: Deleter = Property(doc="Deleter used to delete tracks.")
-    detector: DetectionReader = Property(doc="Detector used to generate detection objects.")
-    data_associator: DataAssociator = Property(
+    initiator = Property(
+        Initiator,
+        doc="Initiator used to initialise the track.")
+    deletor = Property(
+        Deletor,
+        doc="Deletor used to delete the track")
+    detector = Property(
+        DetectionReader,
+        doc="Detector used to generate detection objects.")
+    data_associator = Property(
+        DataAssociator,
         doc="Association algorithm to pair predictions to detections")
     updater: Updater = Property(doc="Updater used to update the track object to the new state.")
 
