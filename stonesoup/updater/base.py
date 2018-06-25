@@ -84,7 +84,7 @@ class Updater(Base):
         : :class:`~.MeasurementPrediction`
             The predicted measurement
         """
-        raise NotImplemented
+        raise NotImplementedError
 
     @abstractmethod
     def update(self, prediction, measurement,

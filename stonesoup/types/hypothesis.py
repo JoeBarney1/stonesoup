@@ -41,23 +41,19 @@ class ProbabilityHypothesis(Hypothesis):
         doc="Probability that detection is true location of prediction")
 
     def __lt__(self, other):
-        return self.probability < other.probability
+        raise NotImplementedError
 
     def __le__(self, other):
-        return self.probability <= other.probability
+        raise NotImplementedError
 
     def __eq__(self, other):
-        return isinstance(other, ProbabilityHypothesis) and self.probability == other.probability
+        raise NotImplementedError
 
     def __gt__(self, other):
-        return self.probability > other.probability
+        raise NotImplementedError
 
     def __ge__(self, other):
-        return self.probability >= other.probability
-
-    @property
-    def weight(self):
-        return self.probability
+        raise NotImplementedError
 
 
 class SingleHypothesis(Hypothesis):
@@ -163,27 +159,6 @@ class JointHypothesis(Type, UserDict):
     @abstractmethod
     def __ge__(self, other):
         raise NotImplementedError
-
-
-class ProbabilityJointHypothesis(ProbabilityHypothesis, JointHypothesis):
-    """Probability-scored Joint Hypothesis subclass."""
-
-    probability: Probability = Property(
-        default=None,
-        doc="Probability that detection is true location of prediction. Defaults to `None`, "
-            "whereby the probability is calculated as being the product of the constituent "
-            "multiple-hypotheses' probabilities.")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.probability = Probability(np.prod(
-            [hypothesis.probability for hypothesis in self.hypotheses.values()]))
-
-    def normalise(self):
-        sum_probability = Probability.sum(
-            hypothesis.probability for hypothesis in self.hypotheses.values())
-        for hypothesis in self.hypotheses.values():
-            hypothesis.probability /= sum_probability
 
 
 class DistanceJointHypothesis(JointHypothesis):

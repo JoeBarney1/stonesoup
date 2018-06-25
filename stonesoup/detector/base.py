@@ -9,4 +9,8 @@ class Detector(DetectionReader):
     data.
     """
 
-    sensor: SensorDataReader = Property(doc="Source of sensor data")
+    sensor = Property(SensorDataReader, doc="Source of sensor data")
+
+    @abstractmethod
+    def detections_gen(self):
+        raise NotImplementedError

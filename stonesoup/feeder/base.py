@@ -30,16 +30,4 @@ class DetectionFeeder(Feeder, DetectionReader):
 
     @BufferedGenerator.generator_method
     def detections_gen(self):
-        yield from self.data_gen()
-
-
-class GroundTruthFeeder(Feeder, GroundTruthReader):
-    """Ground truth feeder base class
-
-    Feeder consumes and outputs :class:`.GroundTruthPath` data and can be used to
-    modify the sequence, duplicate or drop data.
-    """
-
-    @BufferedGenerator.generator_method
-    def groundtruth_paths_gen(self):
-        yield from self.data_gen()
+        raise NotImplementedError

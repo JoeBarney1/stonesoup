@@ -31,19 +31,3 @@ class Initiator(Base):
             Tracks generated from detections
         """
         raise NotImplementedError
-
-
-class GaussianInitiator(Initiator):
-    """Gaussian Initiator base class
-
-    Base class for initiator's which initialises tracks with a
-    :class:`~.GaussianState`
-    """
-
-
-class ParticleInitiator(Initiator):
-    """Particle Initiator base class
-
-    Base class for initiator's which initialises tracks with a
-    :class:`~.ParticleState`
-    """
