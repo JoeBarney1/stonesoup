@@ -1,57 +1,56 @@
-import weakref
-from typing import Sequence
+# -*- coding: utf-8 -*-
+import datetime
+
+import numpy as np
 
 from ..base import Property
-from .array import StateVector
+from .state import State
 from .base import Type
 
 
-class Particle(Type):
+class Particle(State):
     """
     Particle type
 
     A particle type which contains a state and weight
     """
-    state_vector: StateVector = Property(doc="State vector")
-    weight: float = Property(doc='Weight of particle')
-    parent: 'Particle' = Property(default=None, doc='Parent particle')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.parent and self.parent.parent:
-            self.parent.parent = weakref.ref(self.parent.parent)
-        if self.state_vector is not None and not isinstance(self.state_vector, StateVector):
-            self.state_vector = StateVector(self.state_vector)
+    weight = Property(float, doc='Weight of particle')
+    parent = Property(None, default=None, doc='Parent particle')
+
+    def __init__(self, state_vector, weight,
+                 timestamp=None, parent=None, *args, **kwargs):
+        if parent:
+            parent.parent = None
+        super().__init__(state_vector, weight, timestamp, parent, *args,
+                         **kwargs)
+
+
+class ParticleState(Type):
+    """Particle State type
+
+    This is a particle state object which describes the state as a
+    distribution of particles"""
+
+    timestamp = Property(datetime.datetime, default=None,
+                         doc="Timestamp of the state. Default None.")
+    particles = Property([Particle],
+                         doc='List of particles representing state')
 
     @property
-    def ndim(self):
-        return self.state_vector.shape[0]
+    def mean(self):
+        """The state mean, equivalent to state vector"""
+        return np.mean([p.state_vector for p in self.particles], axis=0)
 
-    @parent.getter
-    def parent(self):
-        if isinstance(self._property_parent, weakref.ReferenceType):
-            return self._property_parent()
-        else:
-            return self._property_parent
+    @property
+    def state_vector(self):
+        """The mean value of the particle states"""
+        return self.mean
 
-
-class MultiModelParticle(Particle):
-    """
-    Particle type
-
-    A MultiModelParticle type which contains a state, weight and the dynamic_model
-    """
-    dynamic_model: int = Property(doc='Assigned dynamic model')
-    parent: 'MultiModelParticle' = Property(default=None, doc='Parent particle')
-
-
-class RaoBlackwellisedParticle(Particle):
-    """
-    Particle type
-
-    A RaoBlackwellisedParticle type which contains a state, weight, dynamic_model and
-    associated model probabilities
-    """
-    model_probabilities: Sequence[float] = Property(
-        doc="The dynamic probabilities of changing models")
-    parent: 'RaoBlackwellisedParticle' = Property(default=None, doc='Parent particle')
+    @property
+    def covar(self):
+        cov = np.cov(np.hstack([p.state_vector for p in self.particles]))
+        # Fix one dimensional covariances being returned with zero dimension
+        if not cov.shape:
+            cov = cov.reshape(1, 1)
+        return cov
