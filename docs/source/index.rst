@@ -69,7 +69,13 @@ Contents
 .. toctree::
     :maxdepth: 2
 
-    design
+    dataflow
+    interface
+    types
+    stonesoup.config
+    stonesoup.base
+    stonesoup.functions
+    stonesoup.serialise
     stonesoup
     auto_tutorials/index
     auto_examples/index
