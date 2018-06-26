@@ -110,6 +110,12 @@ Time Types
 .. automodule:: stonesoup.types.time
     :show-inheritance:
 
+Particle Types
+--------------
+
+.. automodule:: stonesoup.types.particle
+    :show-inheritance:
+
 Prediction Types
 ----------------
 
