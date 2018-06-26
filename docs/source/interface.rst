@@ -44,9 +44,7 @@ Simulation
 Algorithm Components
 --------------------
 .. autoclass:: stonesoup.dataassociator.DataAssociator
-    :noindex:
 .. autoclass:: stonesoup.deleter.Deleter
-    :noindex:
 .. autoclass:: stonesoup.hypothesiser.Hypothesiser
     :noindex:
 .. autoclass:: stonesoup.gater.Gater
