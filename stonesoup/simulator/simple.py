@@ -113,12 +113,6 @@ class MultiTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
         time = self.initial_state.timestamp or datetime.datetime.now()
 
         for _ in range(self.number_steps):
-            time += self.timestep
-
-        else:
-            groundtruth_paths = OrderedSet()
-
-        for _ in range(number_steps_remaining):
             # Random drop tracks
             self._groundtruth_paths.difference_update(
                 gttrack
@@ -144,6 +138,7 @@ class MultiTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
                 self._groundtruth_paths.add(gttrack)
 
             yield time, self.groundtruth_paths
+            time += self.timestep
 
 
 class SimpleDetectionSimulator(DetectionSimulator):
