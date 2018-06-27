@@ -6,17 +6,8 @@ import pytest
 import scipy.linalg
 from scipy.stats import multivariate_normal
 
-from ..angle import Bearing
-from ..array import StateVector, StateVectors, CovarianceMatrix
-from ..groundtruth import GroundTruthState
-from ..numeric import Probability
 from ..particle import Particle
-from ..state import CreatableFromState, KernelParticleState
-from ..state import State, GaussianState, ParticleState, EnsembleState, \
-    StateMutableSequence, WeightedGaussianState, SqrtGaussianState, CategoricalState, \
-    CompositeState, InformationState, ASDState, ASDGaussianState, ASDWeightedGaussianState, \
-    MultiModelParticleState, RaoBlackwellisedParticleState, BernoulliParticleState
-from ...base import Property
+from ..state import State, GaussianState, ParticleState
 
 
 def test_state():
@@ -24,7 +15,7 @@ def test_state():
         State()
 
     # Test state initiation without timestamp
-    state_vector = StateVector([[0], [1]])
+    state_vector = np.array([[0], [1]])
     state = State(state_vector)
     assert np.array_equal(state.state_vector, state_vector)
 
@@ -36,7 +27,7 @@ def test_state():
 
 def test_state_invalid_vector():
     with pytest.raises(ValueError):
-        State(StateVector([[[1, 2, 3, 4]]]))
+        State(np.array([1, 2, 3, 4]))
 
 
 def test_gaussianstate():
@@ -806,79 +797,81 @@ def test_asd_gaussian_state():
 
     # Test state initiation with timestamp
     state = GaussianState(mean, covar, timestamp)
-
-    assert state.timestamp == timestamp
-
-    timestamp1 = datetime.datetime.now()
-    timestamp2 = datetime.datetime.now()
-    state_vector = np.array([[0], [1], [2], [3], [4], [5], [6], [7]])
-    covar = np.array([[2.2128, 0, 0, 0, 2.2128, 0, 0, 0],
-                      [0.0002, 2.2130, 0, 0, 0.0002, 2.2130, 0, 0],
-                      [0.3897, -0.00004, 0.0128, 0, 0.3897, -0.00004,
-                       0.0128, 0],
-                      [0, 0.3897, 0.0013, 0.0135, 0, 0.3897, 0.0013, 0.0135],
-                      [2.2128, 0, 0, 0, 2.2128, 0, 0, 0],
-                      [0.0002, 2.2130, 0, 0, 0.0002, 2.2130, 0, 0],
-                      [0.3897, -0.00004, 0.0128, 0,
-                       0.3897, -0.00004, 0.0128, 0],
-                      [0, 0.3897, 0.0013, 0.0135, 0, 0.3897, 0.0013, 0.0135]
-                      ]) * 1e3
-    state = ASDGaussianState(state_vector, multi_covar=covar,
-                             timestamps=[timestamp1, timestamp2], max_nstep=10)
-    assert state.timestamps == [timestamp1, timestamp2]
-    assert state.timestamp == timestamp1
-    assert np.array_equal(state_vector[0:4], state.mean)
-    assert np.array_equal(covar, state.multi_covar)
-    assert state.ndim == state_vector.shape[0]/2
-    assert state.nstep == 2
-    assert state.max_nstep == 10
-
-    assert np.array_equal(state[0].state_vector, np.array([[0], [1], [2], [3]]))
-    assert np.array_equal(state[0].covar, covar[:4, :4])
-    assert state[0].timestamp == timestamp1
-    assert np.array_equal(state[1].state_vector, np.array([[4], [5], [6], [7]]))
-    assert np.array_equal(state[0].covar, covar[4:, 4:])
-    assert state[1].timestamp == timestamp2
-
-    assert np.array_equal(state[-1].state_vector, state[1].state_vector)
-    assert np.array_equal(state[-1].covar, state[1].covar)
-
-    assert len(state.states) == 2
-
-    with pytest.raises(TypeError, match="'ASDGaussianState' only subscriptable by int"):
-        state[5.4]
+    assert(np.array_equal(mean, state.mean))
+    assert(np.array_equal(covar, state.covar))
+    assert(state.ndim == mean.shape[0])
+    assert(state.timestamp == timestamp)
 
 
-def test_asd_weighted_gaussian_state():
+def test_gaussianstate_invalid_covar():
     mean = np.array([[1], [2], [3], [4]])  # 4D
     covar = np.diag([1, 2, 3])  # 3D
-    weight = 0.3
+    with pytest.raises(ValueError):
+        GaussianState(mean, covar)
+
+
+def test_particlestate():
+    with pytest.raises(TypeError):
+        ParticleState()
+
+    # 1D
+    num_particles = 10
+    state_vector1 = np.array([[0]])
+    state_vector2 = np.array([[100]])
+    weight = 1/num_particles
+    particles = []
+    particles.extend(Particle(
+        state_vector1, weight=weight) for _ in range(num_particles//2))
+    particles.extend(Particle(
+        state_vector2, weight=weight) for _ in range(num_particles//2))
+
+    # Test state without timestamp
+    state = ParticleState(particles)
+    assert np.array_equal(state.state_vector, np.array([[50]]))
+    assert np.array_equal(state.covar, np.array([[2500]]))
+
+    # Test state with timestamp
     timestamp = datetime.datetime.now()
+    state = ParticleState(particles, timestamp=timestamp)
+    assert np.array_equal(state.state_vector, np.array([[50]]))
+    assert np.array_equal(state.covar, np.array([[2500]]))
+    assert state.timestamp == timestamp
 
-    a = ASDWeightedGaussianState(
-        mean, multi_covar=covar, weight=weight, timestamps=[timestamp])
-    assert a.weight == weight
+    # 2D
+    state_vector1 = np.array([[0], [0]])
+    state_vector2 = np.array([[100], [200]])
+    particles = []
+    particles.extend(Particle(
+        state_vector1, weight=weight) for _ in range(num_particles//2))
+    particles.extend(Particle(
+        state_vector2, weight=weight) for _ in range(num_particles//2))
+
+    state = ParticleState(particles)
+    assert np.array_equal(state.state_vector, np.array([[50], [100]]))
+    assert np.array_equal(state.covar, np.array([[2500, 5000], [5000, 10000]]))
 
 
-def test_kernel_particle_state():
-    number_particles = 5
-    weights = np.array([1 / number_particles] * number_particles)
+def test_particlestate_weighted():
+    num_particles = 10
 
-    samples = multivariate_normal.rvs([0, 0, 0, 0],
-                                      np.diag([0.01, 0.005, 0.1, 0.5]) ** 2,
-                                      size=number_particles)
-    state_vector = StateVectors(samples.T)
-    prior = KernelParticleState(state_vector=state_vector,
-                                weight=weights,
-                                )
-    prior_w_kernel_covar = KernelParticleState(
-        state_vector=state_vector,
-        weight=weights,
-        kernel_covar=CovarianceMatrix(np.diag(weights)))
+    # Half particles at high weight at 0
+    state_vector1 = np.array([[0]])
+    weight1 = 0.75 / (num_particles / 2)
 
-    assert np.array_equal(prior.weight, weights)
-    assert np.array_equal(prior.kernel_covar, prior_w_kernel_covar.kernel_covar)
-    assert number_particles == len(prior)
-    assert 4 == prior.ndim
-    assert np.array_equal(state_vector @ weights[:, np.newaxis], prior.mean)
-    assert np.array_equal(state_vector @ np.diag(weights) @ state_vector.T, prior.covar)
+    # Other half of particles low weight at 100
+    state_vector2 = np.array([[100]])
+    weight2 = 0.25 / (num_particles / 2)
+
+    particles = []
+    particles.extend(Particle(
+        state_vector1, weight=weight1) for _ in range(num_particles//2))
+    particles.extend(Particle(
+        state_vector2, weight=weight2) for _ in range(num_particles//2))
+
+    # Check particles sum to 1 still
+    assert sum(particle.weight for particle in particles) == pytest.approx(1)
+
+    # Test state vector is now weighted towards 0 from 50 (non-weighted mean)
+    state = ParticleState(particles)
+    assert np.array_equal(state.state_vector, np.array([[25]]))
+    assert np.array_equal(state.covar, np.array([[1875]]))
