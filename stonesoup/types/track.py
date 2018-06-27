@@ -55,30 +55,10 @@ class Track(StateMutableSequence):
         """Update :attr:`metadatas` with an updated metadata entry, accounting for extracted
         metadata from state.
 
-        Parameters
-        ----------
-        state: State
-            A state object from which to extract metadata. Metadata can only be extracted from
-            Update (or subclassed) objects. Calling this method with a non-Update (subclass) object
-            will NOT raise an error, but will have no effect on the metadata.
-        """
-        self.metadatas.append(self.metadata.copy())
+    @property
+    def mean(self):
+        return self.state.mean
 
-        if isinstance(state, Update):
-            if isinstance(state.hypothesis, MultipleHypothesis):
-                # Sort and iterate through multiple hypotheses such that most
-                # likely hypothesis comes last. This ensures that metadata
-                # from all hypotheses are retained, but more likely
-                # hypotheses will over-write the metadata set by less likely
-                # ones.
-                try:
-                    for hypothesis in sorted(state.hypothesis, reverse=True):
-                        if hypothesis \
-                                and hypothesis.measurement.metadata is not None:
-                            self.metadata.update(hypothesis.measurement.metadata)
-                except TypeError:
-                    pass
-            else:
-                hypothesis = state.hypothesis
-                if hypothesis and hypothesis.measurement.metadata is not None:
-                    self.metadata.update(hypothesis.measurement.metadata)
+    @property
+    def particles(self):
+        return self.state.particles
