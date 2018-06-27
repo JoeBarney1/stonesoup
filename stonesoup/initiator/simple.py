@@ -13,8 +13,8 @@ from ..types.particle import Particle
 from ..types.state import State, GaussianState, ParticleState, TaggedWeightedGaussianState, \
     ASDGaussianState, EnsembleState
 from ..types.track import Track
-from ..types.state import GaussianState
-from ..types.particle import Particle, ParticleState
+from ..types.state import GaussianState, ParticleState
+from ..types.particle import Particle
 
 
 class SinglePointInitiator(GaussianInitiator):

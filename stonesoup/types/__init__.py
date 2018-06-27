@@ -1,5 +1,6 @@
 from .base import Type
 
+from .array import *  # noqa:F401,F403
 from .detection import *  # noqa:F401,F403
 from .groundtruth import *  # noqa:F401,F403
 from .metric import *  # noqa:F401,F403

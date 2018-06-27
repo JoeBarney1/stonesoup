@@ -141,12 +141,11 @@ class LinearModel(Model):
 
         Parameters
         ----------
-        state: State
-            An input state
-        noise: :class:`numpy.ndarray` or bool
-            An externally generated random process noise sample (the default is
-            `False`, in which case no noise will be added
-            if 'True', the output of :meth:`~.Model.rvs` is added)
+        state_vector: :class:`~.StateVector`
+            An input state vector
+        noise: :class:`numpy.ndarray`
+            An externally generated random process noise sample (the default in
+            `None`, in which case process noise will be generated internally)
 
         Returns
         -------
