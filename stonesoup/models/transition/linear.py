@@ -662,11 +662,11 @@ class ConstantAcceleration(LinearGaussianTransitionModel, TimeVariantModel):
             :nowrap:
 
             \begin{eqnarray}
-                dx_{pos} & = & x_{vel}*d & | {Position \ on \
+                dx_{pos} & = & x_{vel} d & | {Position \ on \
                 X-axis (m)} \\
-                dx_{vel} & = & x_{acc}*d & | {Speed \
+                dx_{vel} & = & x_{acc} d & | {Speed \
                 on\ X-axis (m/s)} \\
-                dx_{acc} & = & q*W_t,\ W_t \sim
+                dx_{acc} & = & q W_t,\ W_t \sim
                 \mathcal{N}(0,q^2) & | {Acceleration \ on \ X-axis (m^2/s)}
 
             \end{eqnarray}
@@ -674,7 +674,7 @@ class ConstantAcceleration(LinearGaussianTransitionModel, TimeVariantModel):
     Or equivalently:
 
         .. math::
-            x_t = F_t*x_{t-1} + w_t,\ w_t \sim \mathcal{N}(0,Q_t)
+            x_t = F_t x_{t-1} + w_t,\ w_t \sim \mathcal{N}(0,Q_t)
 
     where:
 
@@ -697,7 +697,7 @@ class ConstantAcceleration(LinearGaussianTransitionModel, TimeVariantModel):
                         \frac{dt^5}{20} & \frac{dt^4}{8} & \frac{dt^3}{6} \\
                         \frac{dt^4}{8} & \frac{dt^3}{3} & \frac{dt^2}{2} \\
                         \frac{dt^3}{6} & \frac{dt^2}{2} & dt
-                      \end{bmatrix}*q^2
+                      \end{bmatrix} q^2
     """
 
     noise_diff_coeff = Property(
@@ -781,11 +781,11 @@ class Singer(LinearGaussianTransitionModel, TimeVariantModel):
             :nowrap:
 
             \begin{eqnarray}
-                dx_{pos} & = & x_{vel}*d & | {Position \ on \
+                dx_{pos} & = & x_{vel} d & | {Position \ on \
                 X-axis (m)} \\
-                dx_{vel} & = & x_{acc}*d & | {Speed \
+                dx_{vel} & = & x_{acc} d & | {Speed \
                 on\ X-axis (m/s)} \\
-                dx_{acc} & = & -\alpha*x_{acc}*d + q*W_t,\ W_t \sim
+                dx_{acc} & = & -\alpha x_{acc} d + q W_t,\ W_t \sim
                 \mathcal{N}(0,q^2) & | {Acceleration \ on \ X-axis (m^2/s)}
 
             \end{eqnarray}
@@ -793,7 +793,7 @@ class Singer(LinearGaussianTransitionModel, TimeVariantModel):
     Or equivalently:
 
         .. math::
-            x_t = F_t*x_{t-1} + w_t,\ w_t \sim \mathcal{N}(0,Q_t)
+            x_t = F_t x_{t-1} + w_t,\ w_t \sim \mathcal{N}(0,Q_t)
 
     where:
 
@@ -812,7 +812,7 @@ class Singer(LinearGaussianTransitionModel, TimeVariantModel):
                       \end{bmatrix}
 
         .. math::
-            Q_t & = & 2*\alpha*q^2*\begin{bmatrix}
+            Q_t & = & 2 \alpha q^2 \begin{bmatrix}
                         \frac{dt^5}{20} & \frac{dt^4}{8} & \frac{dt^3}{6} \\
                         \frac{dt^4}{8} & \frac{dt^3}{3} & \frac{dt^2}{2} \\
                         \frac{dt^3}{6} & \frac{dt^2}{2} & dt
@@ -915,20 +915,20 @@ class ConstantTurn(LinearGaussianTransitionModel, TimeVariantModel):
             :nowrap:
 
             \begin{eqnarray}
-                dx_{pos} & = & x_{vel}*d & | {Position \ on \
+                dx_{pos} & = & x_{vel} d & | {Position \ on \
                 X-axis (m)} \\
-                dx_{vel} & = &-\omega y_{pos}*d & | {Speed \
+                dx_{vel} & = &-\omega y_{pos} d & | {Speed \
                 on\ X-axis (m/s)} \\
-                dy_{pos} & = & y_{vel}*d & | {Position \ on \
+                dy_{pos} & = & y_{vel} d & | {Position \ on \
                 Y-axis (m)} \\
-                dy_{vel} & = & \omega x_{pos}*d & | {Speed \
+                dy_{vel} & = & \omega x_{pos} d & | {Speed \
                 on\ Y-axis (m/s)}
             \end{eqnarray}
 
     Or equivalently:
 
         .. math::
-            x_t = F_t*x_{t-1} + w_t,\ w_t \sim \mathcal{N}(0,Q_t)
+            x_t = F_t x_{t-1} + w_t,\ w_t \sim \mathcal{N}(0,Q_t)
 
     where:
 
@@ -952,12 +952,12 @@ class ConstantTurn(LinearGaussianTransitionModel, TimeVariantModel):
 
         .. math::
             Q_t & = & \begin{bmatrix}
-                          q_x^2* \frac{dt^3}{3} & q_x^2* \frac{dt^2}{2} &
+                          q_x^2 \frac{dt^3}{3} & q_x^2 \frac{dt^2}{2} &
                           0 & 0 \\
                           q_x^2 \frac{dt^2}{2} & q_x^2  dt &
                           0 & 0 \\
                           0 & 0 &
-                          q_y^2* \frac{dt^3}{3} & q_y^2* \frac{dt^2}{2}\\
+                          q_y^2 \frac{dt^3}{3} & q_y^2 \frac{dt^2}{2}\\
                           0 & 0 &
                           q_y^2 \frac{dt^2}{2} & q_y^2 dt
                       \end{bmatrix}
