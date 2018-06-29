@@ -148,13 +148,11 @@ class SimpleDetectionSimulator(DetectionSimulator):
     measurement_model : MeasurementModel
         Measurement model used in generating detections.
     """
-    groundtruth: GroundTruthReader = Property()
-    measurement_model: MeasurementModel = Property()
-    meas_range: np.ndarray = Property()
-    detection_probability: Probability = Property(default=0.9)
-    clutter_rate: float = Property(default=2.0)
-    seed: Optional[int] = Property(default=None, doc="Seed for random number generation."
-                                                     " Default None")
+    groundtruth = Property(GroundTruthReader)
+    measurement_model = Property(MeasurementModel)
+    meas_range = Property(np.ndarray)
+    detection_probability = Property(Probability, default=0.9)
+    clutter_rate = Property(float, default=2.0)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -187,13 +185,11 @@ class SimpleDetectionSimulator(DetectionSimulator):
             self.clutter_detections.clear()
 
             for track in tracks:
-                self.index = track[-1].metadata.get("index")
-                if random_state.rand() < self.detection_probability:
-                    detection = TrueDetection(
-                        self.measurement_model.function(track[-1], noise=True),
-                        timestamp=track[-1].timestamp,
-                        groundtruth_path=track,
-                        measurement_model=self.measurement_model)
+                if np.random.rand() < self.detection_probability:
+                    detection = Detection(
+                        H @ track[-1].state_vector +
+                        self.measurement_model.rvs(),
+                        timestamp=track[-1].timestamp)
                     detection.clutter = False
                     self.real_detections.add(detection)
 
