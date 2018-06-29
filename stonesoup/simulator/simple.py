@@ -9,11 +9,8 @@ from ..base import Property
 from ..models.measurement import MeasurementModel
 from ..models.transition import TransitionModel
 from ..reader import GroundTruthReader
-from ..types.detection import TrueDetection, Clutter
-from ..types.groundtruth import GroundTruthPath, GroundTruthState
-from ..types.numeric import Probability
-from ..types.state import GaussianState, State
-from ..types.array import StateVector
+from ..types import (Detection, Clutter, GaussianState, GroundTruthState,
+                     GroundTruthPath, Probability, State)
 from .base import DetectionSimulator, GroundTruthSimulator
 from stonesoup.buffered_generator import BufferedGenerator
 
@@ -201,9 +198,9 @@ class SimpleDetectionSimulator(DetectionSimulator):
                     self.real_detections.add(detection)
 
             # generate clutter
-            for _ in range(random_state.poisson(self.clutter_rate)):
+            for _ in range(np.random.poisson(self.clutter_rate)):
                 detection = Clutter(
-                    random_state.rand(self.measurement_model.ndim_meas, 1) *
+                    np.random.rand(H.shape[0], 1) *
                     np.diff(self.meas_range) + self.meas_range[:, :1],
                     timestamp=time)
                 self.clutter_detections.add(detection)
