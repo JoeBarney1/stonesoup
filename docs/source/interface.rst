@@ -8,9 +8,13 @@ Enabling Components
 -------------------
 .. autoclass:: stonesoup.detector.Detector
     :inherited-members:
+    :noindex:
 .. autoclass:: stonesoup.feeder.Feeder
     :inherited-members:
+    :noindex:
 .. autoclass:: stonesoup.metricgenerator.MetricGenerator
+    :noindex:
+.. autoclass:: stonesoup.smoother.Smoother
     :noindex:
 .. autoclass:: stonesoup.tracker.Tracker
     :noindex:
@@ -35,19 +39,22 @@ Simulation
 ^^^^^^^^^^
 .. autoclass:: stonesoup.simulator.DetectionSimulator
     :inherited-members:
+    :noindex:
 .. autoclass:: stonesoup.simulator.GroundTruthSimulator
     :inherited-members:
+    :noindex:
 .. autoclass:: stonesoup.simulator.SensorSimulator
     :inherited-members:
+    :noindex:
 
 
 Algorithm Components
 --------------------
 .. autoclass:: stonesoup.dataassociator.DataAssociator
-.. autoclass:: stonesoup.deleter.Deleter
-.. autoclass:: stonesoup.hypothesiser.Hypothesiser
     :noindex:
-.. autoclass:: stonesoup.gater.Gater
+.. autoclass:: stonesoup.deleter.Deleter
+    :noindex:
+.. autoclass:: stonesoup.hypothesiser.Hypothesiser
     :noindex:
 .. autoclass:: stonesoup.initiator.Initiator
     :noindex:
@@ -56,8 +63,6 @@ Algorithm Components
 .. autoclass:: stonesoup.predictor.Predictor
     :noindex:
 .. autoclass:: stonesoup.resampler.Resampler
-    :noindex:
-.. autoclass:: stonesoup.smoother.Smoother
     :noindex:
 .. autoclass:: stonesoup.updater.Updater
     :noindex:

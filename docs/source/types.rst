@@ -3,47 +3,23 @@ Base Data Types
 
 Stone Soup base data types.
 
-.. autoclass:: stonesoup.types.array.Matrix
+.. autoclass:: stonesoup.types.Detection
     :noindex:
-
-.. autoclass:: stonesoup.types.array.StateVector
+.. autoclass:: stonesoup.types.GroundTruthState
     :noindex:
-
-.. autoclass:: stonesoup.types.association.Association
+.. autoclass:: stonesoup.types.GroundTruthPath
     :noindex:
-
-.. autoclass:: stonesoup.types.detection.Detection
+.. autoclass:: stonesoup.types.Hypothesis
     :noindex:
-
-.. autoclass:: stonesoup.types.groundtruth.GroundTruthState
+.. autoclass:: stonesoup.types.Metric
     :noindex:
-
-.. autoclass:: stonesoup.types.groundtruth.GroundTruthPath
+.. autoclass:: stonesoup.types.Particle
     :noindex:
-
-.. autoclass:: stonesoup.types.hypothesis.Hypothesis
+.. autoclass:: stonesoup.types.Prediction
     :noindex:
-
-.. autoclass:: stonesoup.types.multihypothesis.MultipleHypothesis
+.. autoclass:: stonesoup.types.SensorData
     :noindex:
-
-.. autoclass:: stonesoup.types.metric.Metric
+.. autoclass:: stonesoup.types.State
     :noindex:
-
-.. autoclass:: stonesoup.types.particle.Particle
-    :noindex:
-
-.. autoclass:: stonesoup.types.prediction.Prediction
-    :noindex:
-
-.. autoclass:: stonesoup.types.sensordata.SensorData
-    :noindex:
-
-.. autoclass:: stonesoup.types.state.State
-    :noindex:
-
-.. autoclass:: stonesoup.types.track.Track
-    :noindex:
-
-.. autoclass:: stonesoup.types.update.Update
+.. autoclass:: stonesoup.types.Track
     :noindex:
