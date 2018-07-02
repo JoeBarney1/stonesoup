@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from abc import abstractmethod
 from collections import UserDict
 from typing import Sequence
@@ -36,22 +38,23 @@ class Hypothesis(Type):
         Detection,
         doc="Detection used for hypothesis and updating")
 
-class ProbabilityHypothesis(Hypothesis):
-    probability: Probability = Property(
-        doc="Probability that detection is true location of prediction")
-
+    @abstractmethod
     def __lt__(self, other):
         raise NotImplementedError
 
+    @abstractmethod
     def __le__(self, other):
         raise NotImplementedError
 
+    @abstractmethod
     def __eq__(self, other):
         raise NotImplementedError
 
+    @abstractmethod
     def __gt__(self, other):
         raise NotImplementedError
 
+    @abstractmethod
     def __ge__(self, other):
         raise NotImplementedError
 
