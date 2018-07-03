@@ -46,33 +46,8 @@ class Updater(Base):
         return measurement_model
 
     @abstractmethod
-    def predict_measurement(
-            self, predicted_state, measurement_model=None, measurement_noise=True, **kwargs):
+    def get_measurement_prediction(self, state_prediction, **kwargs):
         """Get measurement prediction from state prediction
-
-        Parameters
-        ----------
-        predicted_state : :class:`~.StatePrediction`
-            The state prediction
-        measurement_model: :class:`~.MeasurementModel`, optional
-            The measurement model used to generate the measurement prediction.
-            Should be used in cases where the measurement model is dependent
-            on the received measurement. The default is `None`, in which case
-            the updater will use the measurement model specified on
-            initialisation
-        measurement_noise : bool
-            Whether to include measurement noise predicted measurement. Default `True`
-
-        Returns
-        -------
-        : :class:`~.MeasurementPrediction`
-            The predicted measurement
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def update(self, hypothesis, **kwargs):
-        """Update state using prediction and measurement.
 
         Parameters
         ----------
