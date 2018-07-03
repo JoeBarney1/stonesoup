@@ -122,6 +122,19 @@ class CombinedLinearGaussianTransitionModel(LinearGaussianTransitionModel):
             model.matrix(**kwargs) for model in self.model_list]
         return block_diag(*transition_matrices)
 
+    def covar(self, **kwargs):
+        """Returns the transition model noise covariance matrix.
+
+        Returns
+        -------
+        : :class:`stonesoup.types.state.CovarianceMatrix` of shape\
+        (:py:attr:`~ndim_state`, :py:attr:`~ndim_state`)
+            The process noise covariance.
+        """
+
+        covar_list = [model.covar(**kwargs) for model in self.model_list]
+        return block_diag(*covar_list)
+
 
 class LinearGaussianTimeInvariantTransitionModel(LinearGaussianTransitionModel,
                                                  TimeInvariantModel):
