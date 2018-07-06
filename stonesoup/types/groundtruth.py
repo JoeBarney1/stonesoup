@@ -1,8 +1,9 @@
 import uuid
 from typing import MutableSequence, MutableMapping, Sequence
 
-from .state import State, StateMutableSequence, CategoricalState, CompositeState
 from ..base import Property
+from .base import Type
+from .state import State
 
 
 class GroundTruthState(State):
@@ -35,33 +36,28 @@ class GroundTruthPath(StateMutableSequence):
         doc="The unique path ID. Default `None` where random UUID is "
             "generated.")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.id is None:
-            self.id = str(uuid.uuid4())
+    states = Property(
+        [GroundTruthState],
+        default=None,
+        doc="List of groundtruth states to initialise path with. Default "
+            "`None` which initialises with an empty list.")
 
+    def __init__(self, states=None, *args, **kwargs):
+        if states is None:
+            states = []
+        super().__init__(states, *args, **kwargs)
 
-class CompositeGroundTruthState(CompositeState):
-    """Composite ground truth state type.
+    def __len__(self):
+        return len(self.states)
 
-    A composition of ordered sub-states (:class:`GroundTruthState`) existing at the same timestamp,
-    representing a true object with a state for (potentially) multiple, distinct state spaces.
-    """
+    def __setitem__(self, index, value):
+        return self.states.__setitem__(index, value)
 
-    sub_states: Sequence[GroundTruthState] = Property(
-        doc="Sequence of sub-states comprising the composite state. All sub-states must have "
-            "matching timestamp and `metadata` attributes. Must not be empty.")
+    def insert(self, index, value):
+        return self.states.insert(index, value)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __delitem__(self, index):
+        return self.states.__delitem__(index)
 
-    @property
-    def metadata(self):
-        """Combined metadata of all sub-detections."""
-        metadata = dict()
-        for sub_state in self.sub_states:
-            metadata.update(sub_state.metadata)
-        return metadata
-
-
-GroundTruthState.register(CompositeGroundTruthState)  # noqa: E305
+    def __getitem__(self, index):
+        return self.states.__getitem__(index)
