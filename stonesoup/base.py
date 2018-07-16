@@ -54,8 +54,7 @@ This is equivalent to the following:
 
 """
 import inspect
-import textwrap
-from reprlib import Repr
+import sys
 from abc import ABCMeta
 from collections import OrderedDict
 from copy import copy
@@ -111,6 +110,7 @@ class Property:
         Alias to :class:`inspect.Parameter.empty`
     """
     empty = inspect.Parameter.empty
+    _property_name = None
 
     def __init__(self, cls=None, *, default=inspect.Parameter.empty, doc=None,
                  readonly=False):
@@ -247,6 +247,22 @@ class BaseRepr(Repr):
             val = ''.join([val[0:excess], fixed_whitespace, self.fillvalue, line_end])
         return val
 
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        return getattr(instance, self._property_name)
+
+    def __set__(self, instance, value):
+        setattr(instance, self._property_name, value)
+
+    def __delete__(self, instance):
+        delattr(instance, self._property_name)
+
+    def __set_name__(self, owner, name):
+        if not isinstance(owner, BaseMeta):
+            raise AttributeError("Cannot use Property on this class type")
+        self._property_name = "_property_{}".format(name)
+
 
 class BaseMeta(ABCMeta):
     """Base metaclass for Stone Soup components.
@@ -335,6 +351,10 @@ class BaseMeta(ABCMeta):
         for base_class in cls.mro()[1:]:
             if type(base_class) is mcls:
                 base_class._subclasses.add(cls)
+
+        if sys.version_info <= (3, 6):  # pragma: no cover
+            for name, property_ in cls._properties.items():
+                property_.__set_name__(cls, name)
 
         cls._validate_init()
         cls._generate_signature()
