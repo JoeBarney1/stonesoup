@@ -98,18 +98,6 @@ State Types
     :show-inheritance:
     :inherited-members: stonesoup.types.state.StateMutableSequence
 
-OrbitalState Types
-##################
-
-.. automodule:: stonesoup.types.orbitalstate
-    :show-inheritance:
-
-Time Types
-----------------
-
-.. automodule:: stonesoup.types.time
-    :show-inheritance:
-
 Particle Types
 --------------
 
