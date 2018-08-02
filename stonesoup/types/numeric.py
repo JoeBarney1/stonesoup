@@ -1,7 +1,6 @@
+# -*- coding: utf-8 -*-
 from math import log, log1p, exp, trunc, ceil, floor
 from numbers import Real, Integral
-
-import numpy as np
 
 
 class Probability(Real):
@@ -10,13 +9,6 @@ class Probability(Real):
     Similar to a float, but value stored as natural log value internally.
     All operations are attempted with log values where possible, and failing
     that a float will be returned instead.
-
-    Parameters
-    ----------
-    value : float
-        Value for probability.
-    log_value : bool
-        Set to `True` if :attr:`value` already a log value. Default `False`.
     """
 
     def __init__(self, value, *, log_value=False):
@@ -40,14 +32,6 @@ class Probability(Real):
             return float("-inf")
         else:
             return log(other)
-
-    def __hash__(self):
-        value = float(self)
-        if value == 0 and self.log_value != float("-inf"):  # Too close to zero
-            # Add string so doesn't have same hash as the log value itself.
-            return hash(('log', self._log_value))
-        else:
-            return hash(value)
 
     def __eq__(self, other):
         if other < 0:
@@ -139,20 +123,10 @@ class Probability(Real):
         return Probability(log_l + log1p(-exp_diff),
                            log_value=True)
 
-    def __imul__(self, other):
+    def __mul__(self, other):
         try:
             return Probability(self.log_value + self._log(other),
                                log_value=True)
-        except ValueError:
-            return float(self) * other
-
-    def __mul__(self, other):
-        try:
-            if isinstance(other, Probability):
-                return Probability(self.log_value + self._log(other),
-                                   log_value=True)
-            else:
-                return exp(self.log_value + self._log(other))
         except ValueError:
             return float(self) * other
 
@@ -229,7 +203,7 @@ class Probability(Real):
         if value == 0 and self.log_value != float("-inf"):  # Too close to zero
             return "Probability({!r}, log_value=True)".format(self.log_value)
         else:
-            return "Probability({!r})".format(value)
+            return "Probability({!r})".format(float(self))
 
     def __str__(self):
         value = float(self)
@@ -249,33 +223,9 @@ class Probability(Real):
     @classmethod
     def sum(cls, values):
         """Carry out LogSumExp"""
-        log_values = np.array([cls._log(value) for value in values])
-        if len(log_values) == 0:
-            return Probability(0)
-
+        log_values = [cls._log(value) for value in values]
         max_log_value = max(log_values)
-        # Check if all values are zero
-        if max_log_value == float('-inf'):
-            return Probability(0)
-
-        value_sum = np.sum(np.exp(log_values - max_log_value))
+        value_sum = sum(exp(log_value - max_log_value)
+                        for log_value in log_values)
 
         return Probability(cls._log(value_sum) + max_log_value, log_value=True)
-
-    @classmethod
-    def from_log(cls, value):
-        """Create Probability type from a log value; same as Probability(value, log_value=True)
-
-        Parameters
-        ----------
-        value : float
-            Value for probability.
-
-        Returns
-        -------
-        Probability
-        """
-        return cls(value, log_value=True)
-
-
-Probability.from_log_ufunc = np.frompyfunc(Probability.from_log, 1, 1)
