@@ -6,7 +6,8 @@ from functools import lru_cache
 
 from ..base import Property
 from .base import Updater
-from ..types import GaussianState, GaussianMeasurementPrediction
+from ..types import (GaussianMeasurementPrediction,
+                     GaussianStateUpdate)
 
 
 class KalmanUpdater(Updater):
@@ -124,7 +125,7 @@ class KalmanUpdater(Updater):
             kalman_gain @ (measurement.state_vector - measurement_prediction.state_vector)
         return post_mean.view(StateVector)
 
-        if(measurement_prediction is None):
+        if (measurement_prediction is None):
             measurement_prediction = \
                 self.get_measurement_prediction(prediction)
 
@@ -137,9 +138,12 @@ class KalmanUpdater(Updater):
                 measurement_prediction.covar,
                 measurement_prediction.cross_covar)
 
-        return GaussianState(posterior_mean,
-                             posterior_covar,
-                             prediction.timestamp)
+        return GaussianStateUpdate(posterior_mean,
+                                   posterior_covar,
+                                   prediction,
+                                   measurement_prediction,
+                                   measurement,
+                                   prediction.timestamp)
 
     @lru_cache()
     def predict_measurement(self, predicted_state, measurement_model=None, measurement_noise=True,
@@ -208,15 +212,9 @@ class KalmanUpdater(Updater):
         # Get the predicted state out of the hypothesis
         predicted_state = hypothesis.prediction
 
-        # If there is no measurement prediction in the hypothesis then do the
-        # measurement prediction (and attach it back to the hypothesis).
-        if hypothesis.measurement_prediction is None:
-            # Get the measurement model out of the measurement if it's there.
-            # If not, use the one native to the updater (which might still be
-            # none)
-            measurement_model = hypothesis.measurement.measurement_model
-            measurement_model = self._check_measurement_model(
-                measurement_model)
+        y_pred = H @ x_pred
+        S = H @ P_pred @ H.T + R
+        Pxy = P_pred @ H.T
 
             # Attach the measurement prediction to the hypothesis
             hypothesis.measurement_prediction = self.predict_measurement(
@@ -230,14 +228,12 @@ class KalmanUpdater(Updater):
                                               hypothesis.measurement,
                                               hypothesis.measurement_prediction)
 
-        if self.force_symmetric_covariance:
-            posterior_covariance = \
-                (posterior_covariance + posterior_covariance.T)/2
+        K = Pxy @ np.linalg.inv(S)
 
-        return Update.from_state(
-            hypothesis.prediction,
-            posterior_mean, posterior_covariance,
-            timestamp=hypothesis.measurement.timestamp, hypothesis=hypothesis)
+        x_post = x_pred + K @ (y - y_pred)
+        P_post = P_pred - K @ S @ K.T
+
+        return x_post, P_post, K
 
 
 class ExtendedKalmanUpdater(KalmanUpdater):
@@ -714,7 +710,7 @@ class SchmidtKalmanUpdater(ExtendedKalmanUpdater):
             kalman_gain @ (measurement.state_vector - measurement_prediction.state_vector)
         return post_mean.view(StateVector)
 
-        if(measurement_prediction is None):
+        if (measurement_prediction is None):
             measurement_prediction = \
                 self.get_measurement_prediction(prediction)
 
@@ -727,9 +723,12 @@ class SchmidtKalmanUpdater(ExtendedKalmanUpdater):
                 measurement_prediction.covar,
                 measurement_prediction.cross_covar)
 
-        return GaussianState(posterior_mean,
-                             posterior_covar,
-                             prediction.timestamp)
+        return GaussianStateUpdate(posterior_mean,
+                                   posterior_covar,
+                                   prediction,
+                                   measurement_prediction,
+                                   measurement,
+                                   prediction.timestamp)
 
     @staticmethod
     def update_lowlevel(x_pred, P_pred, H, R, y):
