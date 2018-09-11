@@ -212,9 +212,9 @@ class KalmanUpdater(Updater):
         # Get the predicted state out of the hypothesis
         predicted_state = hypothesis.prediction
 
-        y_pred = H @ x_pred
-        S = H @ P_pred @ H.T + R
-        Pxy = P_pred @ H.T
+        y_pred = H@x_pred
+        S = H@P_pred@H.T + R
+        Pxy = P_pred@H.T
 
             # Attach the measurement prediction to the hypothesis
             hypothesis.measurement_prediction = self.predict_measurement(
@@ -228,10 +228,10 @@ class KalmanUpdater(Updater):
                                               hypothesis.measurement,
                                               hypothesis.measurement_prediction)
 
-        K = Pxy @ np.linalg.inv(S)
+        K = Pxy@np.linalg.inv(S)
 
-        x_post = x_pred + K @ (y - y_pred)
-        P_post = P_pred - K @ S @ K.T
+        x_post = x_pred + K@(y-y_pred)
+        P_post = P_pred - K@S@K.T
 
         return x_post, P_post, K
 
