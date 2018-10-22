@@ -1,10 +1,6 @@
-from typing import MutableMapping, Sequence
-
-from .groundtruth import GroundTruthPath
-from .state import CategoricalState, CompositeState
-from .state import State, GaussianState, StateVector
+# -*- coding: utf-8 -*-
 from ..base import Property
-from ..models.measurement import MeasurementModel
+from .state import State, GaussianState
 
 
 class Detection(State):
@@ -15,6 +11,15 @@ class Detection(State):
 
     metadata: MutableMapping = Property(
         default=None, doc='Dictionary of metadata items for Detections.')
+
+    def __init__(self, state_vector, *args, **kwargs):
+        super().__init__(state_vector, *args, **kwargs)
+        if self.metadata is None:
+            self.metadata = {}
+
+    metadata = Property(dict, default=None,
+                        doc='Non-standard metadata items for Detections. '
+                            'Default to empty dictionary.')
 
     def __init__(self, state_vector, *args, **kwargs):
         super().__init__(state_vector, *args, **kwargs)
