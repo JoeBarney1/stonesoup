@@ -1,12 +1,10 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 
 import numpy as np
 
-from .base import DetectionReader
-from .file import TextFileReader
-from ..types.detection import Detection
-from stonesoup.buffered_generator import BufferedGenerator
+from stonesoup.reader import DetectionReader, TextFileReader
+from stonesoup.types import Detection
 
 
 class JSON_AISDetectionReader(DetectionReader, TextFileReader):
@@ -40,8 +38,12 @@ class JSON_AISDetectionReader(DetectionReader, TextFileReader):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._detections = set()
 
-    @BufferedGenerator.generator_method
+    @property
+    def detections(self):
+        return self._detections.copy()
+
     def detections_gen(self):
 
         # read data from the JSON file
@@ -59,8 +61,8 @@ class JSON_AISDetectionReader(DetectionReader, TextFileReader):
                 lon_value = float(record['LONGITUDE'])/600000
 
                 # extract timestamp values from JSON record
-                time_value = datetime.fromtimestamp(float(
-                        record['TIME']), timezone.utc).replace(tzinfo=None)
+                time_value = datetime.utcfromtimestamp(float(
+                        record['TIME']))
 
                 # delete lat, lon, timestamp from JSON record;
                 # the rest is metadata
@@ -73,4 +75,5 @@ class JSON_AISDetectionReader(DetectionReader, TextFileReader):
                             np.array([[lon_value], [lat_value]],
                                      dtype=np.float32),
                             time_value, metadata=record)
-                yield time_value, {detect}
+                self._detections = {detect}
+                yield time_value, self.detections
