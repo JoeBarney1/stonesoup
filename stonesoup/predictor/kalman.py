@@ -456,8 +456,12 @@ class SqrtKalmanPredictor(ExtendedKalmanPredictor):
             sqrt_trans_cov = self.transition_model.sqrt_covar(time_interval=predict_over_interval,
                                                               **kwargs)
         except AttributeError:
-            sqrt_trans_cov = la.sqrtm(self.transition_model.covar(
-                time_interval=predict_over_interval, **kwargs))
+            # Else read jacobian from a NonLinearModel
+            transition_matrix = self.transition_model.jacobian(
+                state_vec=prior.state_vector,
+                timestamp=timestamp,
+                time_interval=time_interval,
+                **kwargs)
 
         # As this is Kalman-like, the control model must be capable of returning a control matrix
         # (B)

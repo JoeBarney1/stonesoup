@@ -572,8 +572,16 @@ class IteratedKalmanUpdater(ExtendedKalmanUpdater):
             The measurement prediction
         """
 
-        # Get the measurement model
-        measurement_model = self._check_measurement_model(hypothesis.measurement.measurement_model)
+        # Measurement model parameters
+        try:
+            # Attempt to extract matrix from a LinearModel
+            measurement_matrix = self.measurement_model.matrix(**kwargs)
+        except AttributeError:
+            # Else read jacobian from a NonLinearModel
+            measurement_matrix = \
+                self.measurement_model.jacobian(state_prediction.state_vector,
+                                                **kwargs)
+        measurement_noise_covar = self.measurement_model.covar(**kwargs)
 
         meas_pred_mean, meas_pred_covar, cross_covar = \
             self.get_measurement_prediction_lowlevel(state_prediction.mean,

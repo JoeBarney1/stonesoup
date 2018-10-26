@@ -18,15 +18,3 @@ NonLinear
 .. automodule:: stonesoup.models.measurement.nonlinear
     :show-inheritance:
     :inherited-members:
-
-Categorical
------------
-.. automodule:: stonesoup.models.measurement.categorical
-    :show-inheritance:
-    :inherited-members:
-
-Gas
----
-.. automodule:: stonesoup.models.measurement.gas
-    :show-inheritance:
-    :inherited-members:
