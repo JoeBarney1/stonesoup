@@ -13,15 +13,15 @@ def csv_gt_filename(tmpdir):
     csv_filename = tmpdir.join("test.csv")
     with csv_filename.open('w') as csv_file:
         csv_file.write(dedent("""\
-                x,y,z,identifier,t
-                10,20,30,22018332,2018-01-01T14:00:00Z
-                11,21,31,22018332,2018-01-01T14:01:00Z
-                12,22,32,22018332,2018-01-01T14:02:00Z
-                13,23,33,32018332,2018-01-01T14:03:00Z
-                14,24,34,32018332,2018-01-01T14:04:00Z
-                """))
-    return csv_filename
+            x,y,z,identifier,t
+            10,20,30,22018332,2018-01-01T14:00:00Z
+            11,21,31,22018332,2018-01-01T14:01:00Z
+            12,22,32,22018332,2018-01-01T14:02:00Z
+            """))
 
+    # run test with:
+    #   - 'metadata_field' for 'CSVDetectionReader' == default
+    #   - copy all metadata items
     csv_reader = CSVDetectionReader(csv_filename.strpath, ["x", "y"], "t")
     detections = [
         detection
@@ -41,18 +41,16 @@ def csv_gt_filename(tmpdir):
         assert int(detection.metadata['z']) == 30 + n
         assert detection.metadata['identifier'] == '22018332'
 
-
-def test_csv_metadata_time(csv_det_filename):
     # run test with:
-    #   - 'metadata_fields' for 'CSVDetectionReader' contains
+    #   - 'metadata_field' for 'CSVDetectionReader' contains
     #       'z' but not 'identifier'
     #   - 'time_field_format' is specified
-    csv_reader = CSVDetectionReader(csv_det_filename.strpath, ["x", "y"], "t",
+    csv_reader = CSVDetectionReader(csv_filename.strpath, ["x", "y"], "t",
                                     time_field_format="%Y-%m-%dT%H:%M:%SZ",
-                                    metadata_fields=["z"])
+                                    metadata_field=["z"])
     detections = [
         detection
-        for _, detections in csv_reader
+        for _, detections in csv_reader.detections_gen()
         for detection in detections]
 
     for n, detection in enumerate(detections):
@@ -66,14 +64,11 @@ def test_csv_metadata_time(csv_det_filename):
         assert 'z' in detection.metadata.keys()
         assert int(detection.metadata['z']) == 30 + n
 
-
-def test_csv_missing_metadata_timestamp(tmpdir):
     # run test with:
-    #   - 'metadata_fields' for 'CSVDetectionReader' contains
+    #   - 'metadata_field' for 'CSVDetectionReader' contains
     #       column names that do not exist in CSV file
     #   - 'time' field represented as a Unix epoch timestamp
-    csv_det_filename = tmpdir.join("test.csv")
-    with csv_det_filename.open('w') as csv_file:
+    with csv_filename.open('w') as csv_file:
         csv_file.write(dedent("""\
             x,y,z,identifier,t
             10,20,30,22018332,1514815200
@@ -81,12 +76,11 @@ def test_csv_missing_metadata_timestamp(tmpdir):
             12,22,32,22018332,1514815320
             """))
 
-    csv_reader = CSVDetectionReader(csv_det_filename.strpath, ["x", "y"], "t",
-                                    metadata_fields=["heading"],
-                                    timestamp=True)
+    csv_reader = CSVDetectionReader(csv_filename.strpath, ["x", "y"], "t",
+                                    metadata_field=["heading"], timestamp=True)
     detections = [
         detection
-        for _, detections in csv_reader
+        for _, detections in csv_reader.detections_gen()
         for detection in detections]
 
     for n, detection in enumerate(detections):
@@ -97,59 +91,3 @@ def test_csv_missing_metadata_timestamp(tmpdir):
         assert detection.timestamp.date() == datetime.date(2018, 1, 1)
         assert isinstance(detection.metadata, dict)
         assert len(detection.metadata) == 0
-
-
-def test_csv_multi_per_timestep(tmpdir):
-    csv_det_filename = tmpdir.join("test.csv")
-    with csv_det_filename.open('w') as csv_file:
-        csv_file.write(dedent("""\
-                x,y,z,identifier,t
-                10,20,30,22018332,2018-01-01T14:00:00Z
-                11,21,31,22018332,2018-01-01T14:01:00Z
-                12,22,32,22018332,2018-01-01T14:02:00Z
-                13,23,33,32018332,2018-01-01T14:02:00Z
-                14,24,34,32018332,2018-01-01T14:03:00Z
-                """))
-
-    csv_reader = CSVDetectionReader(csv_det_filename.strpath, ["x", "y"], "t")
-
-    for time, detections in csv_reader:
-        if time == datetime.datetime(2018, 1, 1, 14, 2):
-            assert len(detections) == 2
-        else:
-            assert len(detections) == 1
-
-
-def test_tsv(tmpdir):
-    csv_filename = tmpdir.join("test.csv")
-    with csv_filename.open('w') as csv_file:
-        csv_file.write(dedent("""\
-            x\ty\tz\tidentifier\tt
-            10\t20\t30\t22018332\t2018-01-01T14:00:00Z
-            11\t21\t31\t22018332\t2018-01-01T14:01:00Z
-            12\t22\t32\t22018332\t2018-01-01T14:02:00Z
-            """))
-
-    # run test with:
-    #   - 'metadata_fields' for 'CSVDetectionReader' == default
-    #   - copy all metadata items
-    csv_reader = CSVDetectionReader(csv_filename.strpath,
-                                    ["x", "y"], "t",
-                                    csv_options={'dialect': 'excel-tab'})
-    detections = [
-        detection
-        for _, detections in csv_reader
-        for detection in detections]
-
-    for n, detection in enumerate(detections):
-        assert np.array_equal(
-            detection.state_vector, np.array([[10 + n], [20 + n]]))
-        assert detection.timestamp.hour == 14
-        assert detection.timestamp.minute == n
-        assert detection.timestamp.date() == datetime.date(2018, 1, 1)
-        assert isinstance(detection.metadata, dict)
-        assert len(detection.metadata) == 2
-        assert 'z' in detection.metadata.keys()
-        assert 'identifier' in detection.metadata.keys()
-        assert int(detection.metadata['z']) == 30 + n
-        assert detection.metadata['identifier'] == '22018332'
