@@ -123,7 +123,7 @@ class CSVDetectionReader(DetectionReader, _CSVReader):
         str, default=None, doc='Optional datetime format')
     timestamp = Property(
         bool, default=False, doc='Treat time field as a timestamp from epoch')
-    metadata_field = Property(
+    metadata_fields = Property(
         [str], default=None, doc='List of columns to be saved as metadata, '
                                  'default all')
 
@@ -148,7 +148,7 @@ class CSVDetectionReader(DetectionReader, _CSVReader):
                 else:
                     time_field_value = parse(row[self.time_field])
 
-                if self.metadata_field is None:
+                if self.metadata_fields is None:
                     local_metadata = dict(row)
                     copy_local_metadata = dict(local_metadata)
                     for (key, value) in copy_local_metadata.items():
@@ -156,9 +156,9 @@ class CSVDetectionReader(DetectionReader, _CSVReader):
                                 (key in self.state_vector_fields):
                             del local_metadata[key]
                 else:
-                    local_metadata = {k: row[k]
-                                      for k in self.metadata_field
-                                      if k in row}
+                    local_metadata = {field: row[field]
+                                      for field in self.metadata_fields
+                                      if field in row}
 
                 detect = Detection(np.array(
                     [[row[col_name]] for col_name in self.state_vector_fields],
