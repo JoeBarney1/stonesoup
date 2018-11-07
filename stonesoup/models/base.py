@@ -5,17 +5,8 @@ from datetime import timedelta
 import numpy as np
 from scipy.stats import multivariate_normal
 
-from stonesoup.models.base_driver import ConditionallyGaussianDriver
-from stonesoup.models.driver import GaussianDriver
-from stonesoup.base import Base, Property
-from stonesoup.functions import jacobian as compute_jac
-from stonesoup.types.array import StateVector, StateVectors, CovarianceMatrix, CovarianceMatrices
-from stonesoup.types.numeric import Probability
-from stonesoup.types.state import State
-from scipy.integrate import quad_vec
-
-if TYPE_CHECKING:
-    from ..types.detection import Detection
+from ..base import Base
+from ..functions import jacobian as compute_jac
 
 
 class Model(Base):
@@ -185,23 +176,44 @@ class ReversibleModel(Model):
     Contains an inverse function which computes the reverse
     of the relevant linear-to-non-linear function"""
 
-    @abstractmethod
-    def inverse_function(self, detection: 'Detection', **kwargs) -> StateVector:
-        """Takes in the result of the function and
-        computes the inverse function, returning the initial
-        input of the function.
+    def jacobian(self, state_vector, **kwargs):
+        """Model jacobian matrix :math:`H_{jac}`
 
         Parameters
         ----------
-        detection: :class:`~.Detection`
-            Input state (non-linear format)
+        state_vector : :class:`~.StateVector`
+            An input state vector
 
         Returns
         -------
-        StateVector
-            The linear co-ordinates
+        :class:`numpy.ndarray` of shape (:py:attr:`~ndim_meas`, \
+        :py:attr:`~ndim_state`)
+            The model jacobian matrix evaluated around the given state vector.
         """
-        raise NotImplementedError
+
+        def fun(x):
+            return self.function(x, noise=0)
+
+        return compute_jac(fun, state_vector)
+
+    @abstractmethod
+    def function(self, state_vector, noise=None, **kwargs):
+        """Model function :math:`f(t,x(t),w(t))`
+
+        Parameters
+        ----------
+        state_vector: :class:`~.StateVector`
+            An input state vector
+        noise: :class:`numpy.ndarray`
+            An externally generated random process noise sample (the default in
+            `None`, in which case process noise will be generated internally)
+
+        Returns
+        -------
+        : :class:`numpy.ndarray`
+            The model function evaluated.
+        """
+        pass
 
 
 class TimeVariantModel(Model):
