@@ -9,8 +9,9 @@ from ..models.base import LinearModel, ReversibleModel
 from ..models.measurement import MeasurementModel
 from ..types.numeric import Probability
 from ..types.particle import Particle
-from ..types.state import GaussianState, ParticleState
+from ..types.state import GaussianState
 from ..types.track import Track
+from ..types.update import GaussianStateUpdate, ParticleStateUpdate
 
 
 class SinglePointInitiator(GaussianInitiator):
@@ -37,19 +38,14 @@ class SinglePointInitiator(GaussianInitiator):
             A list of new tracks with an initial :class:`~.GaussianState`
         """
 
+        updater = KalmanUpdater(self.measurement_model)
+        measurement_prediction = updater.get_measurement_prediction(
+            self.prior_state)
+
         tracks = set()
         for detection in unassociated_detections:
-            post_state_vec, post_state_covar, _ = \
-                KalmanUpdater.update_lowlevel(self.prior_state.state_vector,
-                                              self.prior_state.covar,
-                                              self.measurement_model.matrix(),
-                                              self.measurement_model.covar(),
-                                              detection.state_vector)
-
-            track_state = GaussianState(
-                post_state_vec,
-                post_state_covar,
-                timestamp=detection.timestamp)
+            track_state = updater.update(
+                self.prior_state, detection, measurement_prediction)
             track = Track([track_state])
             tracks.add(track)
 
@@ -85,10 +81,13 @@ class LinearMeasurementInitiator(GaussianInitiator):
         inv_model_matrix = np.linalg.pinv(model_matrix)
 
         for detection in detections:
-            tracks.add(Track([GaussianState(
+            tracks.add(Track([GaussianStateUpdate(
                 prior_state_vector + inv_model_matrix@detection.state_vector,
                 prior_covar
                 + inv_model_matrix@model_covar@model_matrix.astype(bool),
+                None,
+                None,
+                detection,
                 timestamp=detection.timestamp)
             ]))
         return tracks
@@ -130,7 +129,11 @@ class GaussianParticleInitiator(Initiator):
             particles = [
                 Particle(sample.reshape(-1, 1), weight=weight)
                 for sample in samples]
-            track[-1] = ParticleState(particles,
-                                      timestamp=track.timestamp)
+            track[-1] = ParticleStateUpdate(
+                particles,
+                track.state.prediction,
+                track.state.measurement_prediction,
+                track.state.measurement,
+                timestamp=track.timestamp)
 
         return tracks

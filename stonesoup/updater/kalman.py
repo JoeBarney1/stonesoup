@@ -143,7 +143,7 @@ class KalmanUpdater(Updater):
                                    prediction,
                                    measurement_prediction,
                                    measurement,
-                                   prediction.timestamp)
+                                   measurement.timestamp)
 
     @lru_cache()
     def predict_measurement(self, predicted_state, measurement_model=None, measurement_noise=True,
@@ -736,7 +736,7 @@ class SchmidtKalmanUpdater(ExtendedKalmanUpdater):
                                    prediction,
                                    measurement_prediction,
                                    measurement,
-                                   prediction.timestamp)
+                                   measurement.timestamp)
 
     @staticmethod
     def update_lowlevel(x_pred, P_pred, H, R, y):
