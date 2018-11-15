@@ -52,32 +52,20 @@ class KalmanUpdater(Updater):
     These are returned as a :class:`~.GaussianStateUpdate` object.
     """
 
-    # TODO: at present this will throw an error if a measurement model is not
-    # TODO: specified in either individual measurements or the Updater object
-    measurement_model: LinearGaussian = Property(
-        default=None,
-        doc="A linear Gaussian measurement model. This need not be defined if "
-            "a measurement model is provided in the measurement. If no model "
-            "specified on construction, or in the measurement, then error "
-            "will be thrown.")
-    force_symmetric_covariance: bool = Property(
-        default=False,
-        doc="A flag to force the output covariance matrix to be symmetric by way of a simple "
-            "geometric combination of the matrix and transpose. Default is False.")
-    use_joseph_cov: bool = Property(
-        default=False,
-        doc="Bool dictating the method of covariance calculation. If use_joseph_cov is True then "
-            "the Joseph form of the covariance equation is used.")
-
-    def _measurement_matrix(self, predicted_state=None, measurement_model=None,
-                            **kwargs):
-        r"""This is straightforward Kalman so just get the Matrix from the
-        measurement model.
+    def get_measurement_prediction(self, state_prediction,
+                                   measurement_model=None, **kwargs):
+        """Kalman Filter measurement prediction step
 
         Parameters
         ----------
         state_prediction : :class:`~.GaussianStatePrediction`
             A predicted state object
+        measurement_model: :class:`~.MeasurementModel`, optional
+            The measurement model used to generate the measurement prediction.\
+            Should be used in cases where the measurement model is dependent\
+            on the received measurement.\
+            (the default is ``None``, in which case the updater will use the\
+            measurement model specified on initialisation)
 
         Returns
         -------
@@ -88,8 +76,12 @@ class KalmanUpdater(Updater):
             measurement_model).matrix(**kwargs)
 
         # Measurement model parameters
-        measurement_matrix = self.measurement_model.matrix(**kwargs)
-        measurement_noise_covar = self.measurement_model.covar(**kwargs)
+        if (measurement_model is None):
+            measurement_matrix = self.measurement_model.matrix(**kwargs)
+            measurement_noise_covar = self.measurement_model.covar(**kwargs)
+        else:
+            measurement_matrix = measurement_model.matrix(**kwargs)
+            measurement_noise_covar = measurement_model.covar(**kwargs)
 
         meas_pred_mean, meas_pred_covar, cross_covar = \
             self.get_measurement_prediction_lowlevel(state_prediction.mean,
@@ -121,8 +113,9 @@ class KalmanUpdater(Updater):
 
         if hypothesis.measurement_prediction is None:
             hypothesis.measurement_prediction = \
-                self.get_measurement_prediction(hypothesis.prediction,
-                                                **kwargs)
+                self.get_measurement_prediction(
+                    hypothesis.prediction,
+                    hypothesis.measurement.measurement_model, **kwargs)
 
         posterior_mean, posterior_covar, _ = \
             self._update_on_measurement_prediction(
@@ -537,27 +530,20 @@ class IteratedKalmanUpdater(ExtendedKalmanUpdater):
     function via the :meth:`_measurement_matrix()` function.
     """
 
-    tolerance: float = Property(
-        default=1e-6,
-        doc="The value of the difference in the measure used as a stopping criterion.")
-    measure: Measure = Property(
-        default=Euclidean(),
-        doc="The measure to use to test the iteration stopping criterion. Defaults to the "
-            "Euclidean distance between current and prior posterior state estimate.")
-    max_iterations: int = Property(
-        default=1000,
-        doc="Number of iterations before while loop is exited and a non-convergence warning is "
-            "returned")
-
-    def update(self, hypothesis, **kwargs):
-        r"""The iterated Kalman update method. Given a hypothesised association between a predicted
-        state or predicted measurement and an actual measurement,
-        calculate the posterior state.
+    def get_measurement_prediction(self, state_prediction,
+                                   measurement_model=None, **kwargs):
+        """Extended Kalman Filter measurement prediction step
 
         Parameters
         ----------
         state_prediction : :class:`~.GaussianStatePrediction`
             A predicted state object
+        measurement_model: :class:`~.MeasurementModel`, optional
+            The measurement model used to generate the measurement prediction.\
+            Should be used in cases where the measurement model is dependent\
+            on the received measurement.\
+            (the default is ``None``, in which case the updater will use the\
+            measurement model specified on initialisation)
 
         Returns
         -------
@@ -566,15 +552,18 @@ class IteratedKalmanUpdater(ExtendedKalmanUpdater):
         """
 
         # Measurement model parameters
+        if measurement_model is None:
+            measurement_model = self.measurement_model
+
         try:
             # Attempt to extract matrix from a LinearModel
-            measurement_matrix = self.measurement_model.matrix(**kwargs)
+            measurement_matrix = measurement_model.matrix(**kwargs)
         except AttributeError:
             # Else read jacobian from a NonLinearModel
             measurement_matrix = \
-                self.measurement_model.jacobian(state_prediction.state_vector,
-                                                **kwargs)
-        measurement_noise_covar = self.measurement_model.covar(**kwargs)
+                measurement_model.jacobian(state_prediction.state_vector,
+                                           **kwargs)
+        measurement_noise_covar = measurement_model.covar(**kwargs)
 
         meas_pred_mean, meas_pred_covar, cross_covar = \
             self.get_measurement_prediction_lowlevel(state_prediction.mean,
@@ -607,8 +596,9 @@ class IteratedKalmanUpdater(ExtendedKalmanUpdater):
 
         if hypothesis.measurement_prediction is None:
             hypothesis.measurement_prediction = \
-                self.get_measurement_prediction(hypothesis.prediction,
-                                                **kwargs)
+                self.get_measurement_prediction(
+                    hypothesis.prediction,
+                    hypothesis.measurement.measurement_model, **kwargs)
 
         posterior_mean, posterior_covar, _ = \
             self._update_on_measurement_prediction(
