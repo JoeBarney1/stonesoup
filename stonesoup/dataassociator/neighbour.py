@@ -32,7 +32,7 @@ class NearestNeighbour(DataAssociator):
 
         associations = {}
         associated_measurements = set()
-        while associate_tracks > associations.keys():
+        while tracks > associations.keys():
             # Define a 'greedy' association
             best_hypothesis = None
             for track in associate_tracks - associations.keys():
@@ -47,7 +47,7 @@ class NearestNeighbour(DataAssociator):
                         best_hypothesis_track = track
 
             associations[best_hypothesis_track] = best_hypothesis
-            if best_hypothesis:
+            if best_hypothesis.measurement is not None:
                 associated_measurements.add(best_hypothesis.measurement)
 
         return associations

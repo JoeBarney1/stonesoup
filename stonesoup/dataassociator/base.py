@@ -79,10 +79,25 @@ class TrackToTrackAssociator(Associator):
 
         """
 
-    def associated_and_unassociated_tracks(self, *tracks_sets: Set[Track]) \
-            -> Tuple[AssociationSet, Tuple[Set[Track]]]:
-        """Associate n sets of tracks together. The unassociated tracks are returned with
-         the associated tracks.
+        number_hypotheses = len(joint_hypothesis)
+        unique_hypotheses = len(
+            {hyp.measurement for hyp in joint_hypothesis} - {None})
+        number_null_hypotheses = sum(
+            hyp.measurement is None for hyp in joint_hypothesis)
+
+        # joint_hypothesis is invalid if one detection is assigned to more than
+        # one prediction. Multiple missed detections are valid.
+        if unique_hypotheses + number_null_hypotheses == number_hypotheses:
+            return True
+        else:
+            return False
+
+    @classmethod
+    def enumerate_joint_hypotheses(cls, hypotheses):
+        """Enumerate the possible joint hypotheses.
+
+        Create a list of all possible joint hypotheses from the individual
+        hypotheses and determine whether each is valid.
 
         Parameters
         ----------

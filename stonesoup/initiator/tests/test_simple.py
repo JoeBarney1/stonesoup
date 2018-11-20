@@ -71,7 +71,8 @@ def test_spi(measurement_model):
     # Ensure both tracks have been evaluated
     assert(all(evaluated_tracks))
 
-    assert set(detections) == set(track.state.measurement for track in tracks)
+    assert set(detections) == set(track.state.hypothesis.measurement
+                                  for track in tracks)
 
 
 def test_linear_measurement():
@@ -93,13 +94,13 @@ def test_linear_measurement():
             assert np.array_equal(
                 measurement_model.matrix()@track.state_vector,
                 detections[0].state_vector)
-            assert track.state.measurement is detections[0]
+            assert track.state.hypothesis.measurement is detections[0]
         else:
             assert np.array_equal(track.state_vector, np.array([[-5], [0]]))
             assert np.array_equal(
                 measurement_model.matrix()@track.state_vector,
                 detections[1].state_vector)
-            assert track.state.measurement is detections[1]
+            assert track.state.hypothesis.measurement is detections[1]
 
         assert track.timestamp == timestamp
 
@@ -138,13 +139,13 @@ def test_linear_measurement_non_direct():
             assert np.array_equal(
                 measurement_model.matrix()@track.state_vector,
                 detections[0].state_vector)
-            assert track.state.measurement is detections[0]
+            assert track.state.hypothesis.measurement is detections[0]
         else:
             assert np.array_equal(track.state_vector, np.array([[4], [-5]]))
             assert np.array_equal(
                 measurement_model.matrix()@track.state_vector,
                 detections[1].state_vector)
-            assert track.state.measurement is detections[1]
+            assert track.state.hypothesis.measurement is detections[1]
 
         assert track.timestamp == timestamp
 
@@ -185,7 +186,7 @@ def test_linear_measurement_extra_state_dim():
             assert np.array_equal(
                 measurement_model.matrix()@track.state_vector,
                 detections[0].state_vector)
-            assert track.state.measurement is detections[0]
+            assert track.state.hypothesis.measurement is detections[0]
         else:
             assert np.array_equal(
                 track.state_vector,
@@ -193,7 +194,7 @@ def test_linear_measurement_extra_state_dim():
             assert np.array_equal(
                 measurement_model.matrix()@track.state_vector,
                 detections[1].state_vector)
-            assert track.state.measurement is detections[1]
+            assert track.state.hypothesis.measurement is detections[1]
 
         assert track.timestamp == timestamp
 
@@ -223,10 +224,10 @@ def test_gaussian_particle(gaussian_initiator):
         assert isinstance(track.state, ParticleState)
         if track.state_vector > 0:
             assert np.allclose(track.state_vector, np.array([[5]]), atol=0.4)
-            assert track.state.measurement is detections[0]
+            assert track.state.hypothesis.measurement is detections[0]
         else:
             assert np.allclose(track.state_vector, np.array([[-5]]), atol=0.4)
-            assert track.state.measurement is detections[1]
+            assert track.state.hypothesis.measurement is detections[1]
         assert track.timestamp == timestamp
 
         assert np.allclose(track.covar, np.array([[1]]), atol=0.4)

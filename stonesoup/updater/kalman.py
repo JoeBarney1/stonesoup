@@ -101,49 +101,37 @@ class KalmanUpdater(Updater):
                                              state_prediction.timestamp,
                                              cross_covar)
 
-    def update(self, prediction, measurement,
-               measurement_prediction=None, **kwargs):
+    def update(self, hypothesis):
         """Kalman Filter update step
 
         Parameters
         ----------
-        prediction : :class:`~.GaussianStatePrediction`
-            The state prediction
-        measurement : :class:`~.Detection`
-            The measurement
-        measurement_prediction : \
-        :class:`~.GaussianMeasurementPrediction`, optional
-            A measurement prediction (the default is ``None``, in which case\
-            it will be computed internally)
+        hypothesis : :class:`~.Hypothesis`
+            Hypothesis with predicted state and associated detection used for
+            updating.
 
         Returns
         -------
-        : :class:`~.GaussianState`
+        : :class:`~.GaussianStateUpaate`
             The computed state posterior
         """
         post_mean = predicted_state.state_vector + \
             kalman_gain @ (measurement.state_vector - measurement_prediction.state_vector)
         return post_mean.view(StateVector)
 
-        if (measurement_prediction is None):
-            measurement_prediction = \
-                self.get_measurement_prediction(prediction)
-
         posterior_mean, posterior_covar, _ = \
             self._update_on_measurement_prediction(
-                prediction.mean,
-                prediction.covar,
-                measurement.state_vector,
-                measurement_prediction.mean,
-                measurement_prediction.covar,
-                measurement_prediction.cross_covar)
+                hypothesis.prediction.mean,
+                hypothesis.prediction.covar,
+                hypothesis.measurement.state_vector,
+                hypothesis.measurement_prediction.mean,
+                hypothesis.measurement_prediction.covar,
+                hypothesis.measurement_prediction.cross_covar)
 
         return GaussianStateUpdate(posterior_mean,
                                    posterior_covar,
-                                   prediction,
-                                   measurement_prediction,
-                                   measurement,
-                                   measurement.timestamp)
+                                   hypothesis,
+                                   hypothesis.measurement.timestamp)
 
     @lru_cache()
     def predict_measurement(self, predicted_state, measurement_model=None, measurement_noise=True,
@@ -593,120 +581,14 @@ class IteratedKalmanUpdater(ExtendedKalmanUpdater):
                                              state_prediction.timestamp,
                                              cross_covar)
 
-            if iterations > self.max_iterations:
-                warnings.warn("Iterated Kalman update did not converge")
-                break
-
-            # These lines effectively bypass the predict_measurement function in update()
-            # by attaching new linearised quantities to the measurement_prediction. Those
-            # would otherwise be calculated (from the original prediction) by the update() method.
-            hh = self._measurement_matrix(post_state, measurement_model=measurement_model)
-
-            post_state.hypothesis.measurement_prediction.state_vector = \
-                measurement_model.function(post_state, noise=None) + \
-                hh@(hypothesis.prediction.state_vector - post_state.state_vector)
-
-            cross_cov = self._measurement_cross_covariance(hypothesis.prediction, hh)
-            post_state.hypothesis.measurement_prediction.cross_covar = cross_cov
-            post_state.hypothesis.measurement_prediction.covar = \
-                self._innovation_covariance(cross_cov, hh, measurement_model, True)
-
-            prev_state = post_state
-            post_state = super().update(post_state.hypothesis, **kwargs)
-
-            # increment counter
-            iterations += 1
-
-        return post_state
-
-
-class SchmidtKalmanUpdater(ExtendedKalmanUpdater):
-    r"""A class which extends the standard Kalman filter to employ the Schmidt-Kalman version of
-    the update. The key thing here is that the state vector is split into parameters to be
-    estimated, and those which are merely 'considered'. The consider parameters are not updated,
-    though their relative covariances are maintained through the process. The state vector,
-    covariance and measurement matrix are defined as,
-
-    .. math ::
-
-        \mathbf{x}^T &\triangleq [\mathbf{s}^T \ \mathbf{p}^T]
-
-        H &= [H_s \ H_p]
-
-    .. math ::
-
-        P &= \begin{bmatrix}
-        P_{ss} & P_{sp} \\
-        P_{ps} & P_{pp}
-        \end{bmatrix}
-
-
-    where the consider parameters are denoted :math:`p` and those to be estimated :math:`s`. Note
-    that though they are separated in the definition above, they may be interleaved in practice.
-    The update proceeds as:
-
-    .. math ::
-
-       K_s &= (P_{ss,k|k-1} H_s^T + P_{sp,k|k-1} H_p^T) S^{-1},
-
-       \mathbf{s}_{k|k} &= \mathbf{s}_{k|k-1} + K_s (\mathbf{z} - H_s \mathbf{s}_{k|k-1} - H_p
-       \mathbf{p}_{k|k-1}),
-
-       \mathbf{p}_{k|k} &= \mathbf{p}_{k|k-1},
-
-    .. math ::
-
-       P_{k|k} &= \begin{bmatrix}
-        P_{ss,k|k-1} - K_s S K_s^T &
-        P_{sp,k|k-1} - K_s H \begin{bmatrix} P_{sp,k|k-1} \\ P_{pp,k|k-1} \end{bmatrix} \\
-        P_{ps,k|k-1} - \begin{bmatrix} P_{sp,k|k-1} \\ P_{pp,k|k-1} \end{bmatrix}^T H^T K_s^T &
-        P_{pp,k|k-1}
-        \end{bmatrix}
-
-    Note
-    ----
-    Due to the excellent efficiency of NumPy's matrix algebra tools, the savings gained by
-    extracting a sub-matrix over performing the calculation on full matrices, are relatively
-    minor. This class therefore functions most effectively as a tutorial example of the
-    Schmidt-Kalman updater. Efficiencies could be made by enforcing view operations rather than
-    copies, using the square-root form or, most promisingly, by employing Cython.
-
-
-    References
-    ----------
-    [1] S. F. Schmidt, “Application of State-Space Methods to Navigation Problems,” Advances in
-    Control Systems, Vol. 3, 1966, pp. 293–340
-
-    [2] Zanetti, R. & D’Souza, C. (2013). Recursive Implementations of the Schmidt-Kalman
-    ‘Consider’   Filter. The Journal of the Astronautical Sciences. 60. 672-685.
-    10.1007/s40295-015-0068-7.
-
-    """
-    consider: np.ndarray = Property(default=None,
-                                    doc="The boolean vector of 'consider' parameters. True "
-                                        "indicates considered, False are state parameters to be "
-                                        "estimated. If undefined these default to all False, i.e."
-                                        "the standard Kalman filter.")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.consider is None:
-            self.consider = np.zeros(self.measurement_model.ndim_state, dtype=bool)
-
-    def _posterior_mean(self, predicted_state, kalman_gain, measurement, measurement_prediction):
-        """Compute the posterior mean, :math:`s_{k|k} = s_{k|k-1} + K_s (z - H_s s_{k|k-1} -
-        H_p p_{k|k-1})`, :math:`p_{k|k} = p_{k|k-1}.
+    def update(self, hypothesis, **kwargs):
+        """ Extended Kalman Filter update step
 
         Parameters
         ----------
-        prediction : :class:`~.GaussianStatePrediction`
-            The state prediction
-        measurement : :class:`~.Detection`
-            The measurement
-        measurement_prediction :\
-        :class:`~.GaussianMeasurementPrediction`, optional
-            A measurement prediction (the default is ``None``, in which case\
-            it will be computed internally)
+        hypothesis : :class:`~.Hypothesis`
+            Hypothesis with predicted state and associated detection used for
+            updating.
 
         Returns
         -------
@@ -718,25 +600,19 @@ class SchmidtKalmanUpdater(ExtendedKalmanUpdater):
             kalman_gain @ (measurement.state_vector - measurement_prediction.state_vector)
         return post_mean.view(StateVector)
 
-        if (measurement_prediction is None):
-            measurement_prediction = \
-                self.get_measurement_prediction(prediction)
-
         posterior_mean, posterior_covar, _ = \
             self._update_on_measurement_prediction(
-                prediction.mean,
-                prediction.covar,
-                measurement.state_vector,
-                measurement_prediction.mean,
-                measurement_prediction.covar,
-                measurement_prediction.cross_covar)
+                hypothesis.prediction.mean,
+                hypothesis.prediction.covar,
+                hypothesis.measurement.state_vector,
+                hypothesis.measurement_prediction.mean,
+                hypothesis.measurement_prediction.covar,
+                hypothesis.measurement_prediction.cross_covar)
 
         return GaussianStateUpdate(posterior_mean,
                                    posterior_covar,
-                                   prediction,
-                                   measurement_prediction,
-                                   measurement,
-                                   measurement.timestamp)
+                                   hypothesis,
+                                   hypothesis.measurement.timestamp)
 
     @staticmethod
     def update_lowlevel(x_pred, P_pred, H, R, y):
