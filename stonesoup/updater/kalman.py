@@ -101,7 +101,7 @@ class KalmanUpdater(Updater):
                                              state_prediction.timestamp,
                                              cross_covar)
 
-    def update(self, hypothesis):
+    def update(self, hypothesis, **kwargs):
         """Kalman Filter update step
 
         Parameters
@@ -118,6 +118,11 @@ class KalmanUpdater(Updater):
         post_mean = predicted_state.state_vector + \
             kalman_gain @ (measurement.state_vector - measurement_prediction.state_vector)
         return post_mean.view(StateVector)
+
+        if hypothesis.measurement_prediction is None:
+            hypothesis.measurement_prediction = \
+                self.get_measurement_prediction(hypothesis.prediction,
+                                                **kwargs)
 
         posterior_mean, posterior_covar, _ = \
             self._update_on_measurement_prediction(
@@ -599,6 +604,11 @@ class IteratedKalmanUpdater(ExtendedKalmanUpdater):
         post_mean[np.ix_(~self.consider)] += \
             kalman_gain @ (measurement.state_vector - measurement_prediction.state_vector)
         return post_mean.view(StateVector)
+
+        if hypothesis.measurement_prediction is None:
+            hypothesis.measurement_prediction = \
+                self.get_measurement_prediction(hypothesis.prediction,
+                                                **kwargs)
 
         posterior_mean, posterior_covar, _ = \
             self._update_on_measurement_prediction(

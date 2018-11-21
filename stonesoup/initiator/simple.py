@@ -46,7 +46,7 @@ class SinglePointInitiator(GaussianInitiator):
         tracks = set()
         for detection in unassociated_detections:
             track_state = updater.update(Hypothesis(
-                self.prior_state, measurement_prediction, detection))
+                self.prior_state, detection, measurement_prediction))
             track = Track([track_state])
             tracks.add(track)
 
@@ -86,7 +86,7 @@ class LinearMeasurementInitiator(GaussianInitiator):
                 prior_state_vector + inv_model_matrix@detection.state_vector,
                 prior_covar
                 + inv_model_matrix@model_covar@model_matrix.astype(bool),
-                Hypothesis(None, None, detection),
+                Hypothesis(None, detection),
                 timestamp=detection.timestamp)
             ]))
         return tracks
