@@ -39,6 +39,9 @@ class Hypothesis(Type):
         default=None,
         doc="Optional track prediction in measurement space")
 
+    def __bool__(self):
+        return self.measurement is not None
+
     def __lt__(self, other):
         return NotImplemented
 
