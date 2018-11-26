@@ -1,10 +1,10 @@
+# -*- coding: utf-8 -*-
 import datetime
 
 import numpy as np
 
-from ..error import CovarianceBasedDeleter
-from ...types.state import GaussianState
-from ...types.track import Track
+from stonesoup.types import Track, GaussianState
+from stonesoup.deleter import CovarianceBasedDeleter
 
 
 def test_cbd():
@@ -14,30 +14,23 @@ def test_cbd():
     state = GaussianState(
         np.array([[0], [0]]),
         np.array([[100, 0], [0, 1]]), timestamp)
-    track1 = Track(state)
+    track = Track()
+    track.append(state)
+    tracks = {track}
 
     state = GaussianState(
         np.array([[0], [0]]),
         np.array([[1, 0], [0, 1]]), timestamp)
-    track2 = Track(state)
+    track = Track()
+    track.append(state)
 
-    tracks = {track1, track2}
+    tracks.add(track)
 
     cover_deletion_thresh = 100
-    deleter = CovarianceBasedDeleter(covar_trace_thresh=cover_deletion_thresh)
+    deleter = CovarianceBasedDeleter(cover_deletion_thresh)
 
     deleted_tracks = deleter.delete_tracks(tracks)
     tracks -= deleted_tracks
 
-    assert len(tracks) == 1
-    assert len(deleted_tracks) == 1
-
-    deleter = CovarianceBasedDeleter(cover_deletion_thresh, mapping=[1])
-
-    tracks = {track1, track2}
-
-    deleted_tracks = deleter.delete_tracks(tracks)
-    tracks -= deleted_tracks
-
-    assert len(tracks) == 2
-    assert len(deleted_tracks) == 0
+    assert(len(tracks) == 1)
+    assert(len(deleted_tracks) == 1)
