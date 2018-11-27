@@ -76,7 +76,7 @@ class KalmanUpdater(Updater):
             measurement_model).matrix(**kwargs)
 
         # Measurement model parameters
-        if (measurement_model is None):
+        if measurement_model is None:
             measurement_matrix = self.measurement_model.matrix(**kwargs)
             measurement_noise_covar = self.measurement_model.covar(**kwargs)
         else:
@@ -567,7 +567,7 @@ class IteratedKalmanUpdater(ExtendedKalmanUpdater):
                                            **kwargs)
 
         def measurement_function(x):
-            return measurement_model.function(x, **kwargs)
+            return measurement_model.function(x, noise=0, **kwargs)
 
         measurement_noise_covar = measurement_model.covar(**kwargs)
 

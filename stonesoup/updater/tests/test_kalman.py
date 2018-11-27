@@ -121,7 +121,7 @@ def test_extendedkalman():
     sqrt_updater = SqrtKalmanUpdater(measurement_model=measurement_model, qr_method=False)
     qr_updater = SqrtKalmanUpdater(measurement_model=measurement_model, qr_method=True)
 
-    # Get and asser measurement prediction
+    # Get and assert measurement prediction
     measurement_prediction = updater.get_measurement_prediction(prediction)
     assert(np.array_equal(measurement_prediction.mean,
                           eval_measurement_prediction.mean))
