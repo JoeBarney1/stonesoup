@@ -63,7 +63,7 @@ def updater_class(request):
         prediction=prediction,
         measurement=measurement))
     assert(np.array_equal(posterior.mean, eval_posterior.mean))
-    assert(np.array_equal(posterior.covar, eval_posterior.covar))
+    assert(np.allclose(posterior.covar, eval_posterior.covar))
     assert(np.array_equal(posterior.hypothesis.prediction, prediction))
     assert (np.array_equal(
         posterior.hypothesis.measurement_prediction.state_vector,
@@ -79,7 +79,7 @@ def updater_class(request):
         measurement=measurement,
         measurement_prediction=measurement_prediction))
     assert(np.array_equal(posterior.mean, eval_posterior.mean))
-    assert(np.array_equal(posterior.covar, eval_posterior.covar))
+    assert(np.allclose(posterior.covar, eval_posterior.covar))
     assert(np.array_equal(posterior.hypothesis.prediction, prediction))
     assert (np.array_equal(
         posterior.hypothesis.measurement_prediction.state_vector,
@@ -135,7 +135,7 @@ def test_extendedkalman():
         prediction=prediction,
         measurement=measurement))
     assert(np.array_equal(posterior.mean, eval_posterior.mean))
-    assert(np.array_equal(posterior.covar, eval_posterior.covar))
+    assert(np.allclose(posterior.covar, eval_posterior.covar))
     assert(np.array_equal(posterior.hypothesis.prediction, prediction))
     assert (np.array_equal(
         posterior.hypothesis.measurement_prediction.state_vector,
@@ -151,7 +151,7 @@ def test_extendedkalman():
         measurement=measurement,
         measurement_prediction=measurement_prediction))
     assert(np.array_equal(posterior.mean, eval_posterior.mean))
-    assert(np.array_equal(posterior.covar, eval_posterior.covar))
+    assert(np.allclose(posterior.covar, eval_posterior.covar))
     assert(np.array_equal(posterior.hypothesis.prediction, prediction))
     assert (np.array_equal(
         posterior.hypothesis.measurement_prediction.state_vector,
