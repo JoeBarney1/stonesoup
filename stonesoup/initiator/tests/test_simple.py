@@ -49,7 +49,7 @@ def test_spi(measurement_model):
     evaluated_tracks = [False, False]
     for detection in detections:
 
-        post_state_vec, post_state_covar, _ =\
+        post_state_vec, post_state_covar, _, _, _, _ =\
             KalmanUpdater.update_lowlevel(prior_state.state_vector,
                                           prior_state.covar,
                                           measurement_model.matrix(),
@@ -63,10 +63,19 @@ def test_spi(measurement_model):
 
         # Compare against both tracks
         for track_idx, track in enumerate(tracks):
+            print(eval_track_state.covar-track.covar)
+            print(np.array_equal(eval_track_state.covar, track.covar))
+            print("---------")
+
+            if(np.array_equal(eval_track_state.mean, track.mean)
+               and np.array_equal(eval_track_state.covar, track.covar)):
 
             if (np.array_equal(eval_track_state.mean, track.mean)
                     and np.array_equal(eval_track_state.covar, track.covar)):
                 evaluated_tracks[track_idx] = True
+
+    print(evaluated_tracks)
+    # print(tracks)
 
     # Ensure both tracks have been evaluated
     assert(all(evaluated_tracks))
