@@ -1,6 +1,6 @@
 from .base import Hypothesiser
 from ..base import Property
-from ..measures import Measure
+from ..types import SingleMeasurementDistanceHypothesis
 from ..predictor import Predictor
 from ..types.detection import MissedDetection
 from ..types.hypothesis import SingleDistanceHypothesis
@@ -65,13 +65,13 @@ class DistanceHypothesiser(Hypothesiser):
                                    np.linalg.inv(measurement_prediction.covar))
 
             hypotheses.append(
-                DistanceHypothesis(
+                SingleMeasurementDistanceHypothesis(
                     prediction, detection, distance, measurement_prediction))
 
         # Missed detection hypothesis with distance as 'missed_distance'
         prediction = self.predictor.predict(track.state, timestamp=timestamp)
-        hypotheses.append(
-            DistanceHypothesis(prediction, None, self.missed_distance))
+        hypotheses.append(SingleMeasurementDistanceHypothesis(
+            prediction, None, self.missed_distance))
 
         # True detection hypotheses
         for detection in detections:

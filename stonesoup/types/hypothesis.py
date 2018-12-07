@@ -13,6 +13,7 @@ from .prediction import MeasurementPrediction, Prediction, CompositePrediction, 
 from ..base import Property
 from .detection import Detection
 from .prediction import MeasurementPrediction, Prediction
+from ..types.numeric import Probability
 
 
 class Hypothesis(Type):
@@ -27,20 +28,6 @@ class Hypothesis(Type):
     single Track and multiple Measurements of which one *might* be associated
     with it
     """
-
-    prediction = Property(
-        Prediction,
-        doc="Predicted track state")
-    measurement = Property(
-        Detection,
-        doc="Detection used for hypothesis and updating")
-    measurement_prediction = Property(
-        MeasurementPrediction,
-        default=None,
-        doc="Optional track prediction in measurement space")
-
-    def __bool__(self):
-        return self.measurement is not None
 
     def __lt__(self, other):
         return NotImplemented
@@ -58,21 +45,26 @@ class Hypothesis(Type):
         return NotImplemented
 
 
-class SingleHypothesis(Hypothesis):
+class SingleMeasurementHypothesis(Hypothesis):
     """A hypothesis based on a single measurement.
 
     """
-    prediction: Prediction = Property(doc="Predicted track state")
-    measurement: Detection = Property(doc="Detection used for hypothesis and updating")
-    measurement_prediction: MeasurementPrediction = Property(
-        default=None, doc="Optional track prediction in measurement space")
+    prediction = Property(
+        Prediction,
+        doc="Predicted track state")
+    measurement = Property(
+        Detection,
+        doc="Detection used for hypothesis and updating")
+    measurement_prediction = Property(
+        MeasurementPrediction,
+        default=None,
+        doc="Optional track prediction in measurement space")
 
     def __bool__(self):
-        return (not isinstance(self.measurement, MissedDetection)) and \
-               (self.measurement is not None)
+        return self.measurement is not None
 
 
-class SingleDistanceHypothesis(SingleHypothesis):
+class SingleMeasurementDistanceHypothesis(SingleMeasurementHypothesis):
     """Distance scored hypothesis subclass.
 
     Notes
@@ -110,7 +102,32 @@ class SingleProbabilityHypothesis(ProbabilityHypothesis, SingleHypothesis):
     """Single Measurement Probability scored hypothesis subclass."""
 
 
-class JointHypothesis(Type, UserDict):
+class SingleMeasurementProbabilityHypothesis(Hypothesis):
+    """Single Measurement Probability scored hypothesis subclass.
+
+    """
+
+    probability = Property(
+        Probability,
+        doc="Probability that detection is true location of prediction")
+
+    def __lt__(self, other):
+        return self.probability < other.probability
+
+    def __le__(self, other):
+        return self.probability <= other.probability
+
+    def __eq__(self, other):
+        return self.probability == other.probability
+
+    def __gt__(self, other):
+        return self.probability > other.probability
+
+    def __ge__(self, other):
+        return self.probability >= other.probability
+
+
+class SingleMeasurementJointHypothesis(Type, UserDict):
     """Joint Hypothesis base type
 
     A Joint Hypothesis consists of multiple Hypotheses, each with a single
@@ -129,12 +146,9 @@ class JointHypothesis(Type, UserDict):
     hypotheses: Hypothesis = Property(doc='Association hypotheses')
 
     def __new__(cls, hypotheses):
-        if all(isinstance(hypothesis, SingleDistanceHypothesis)
+        if all(isinstance(hypothesis, SingleMeasurementDistanceHypothesis)
                for hypothesis in hypotheses.values()):
-            return super().__new__(DistanceJointHypothesis)
-        elif all(isinstance(hypothesis, SingleProbabilityHypothesis)
-                 for hypothesis in hypotheses.values()):
-            return super().__new__(ProbabilityJointHypothesis)
+            return super().__new__(SingleMeasurementDistanceJointHypothesis)
         else:
             raise NotImplementedError
 
@@ -163,8 +177,9 @@ class JointHypothesis(Type, UserDict):
         raise NotImplementedError
 
 
-class DistanceJointHypothesis(JointHypothesis):
-    """Distance scored Joint Hypothesis subclass.
+class SingleMeasurementDistanceJointHypothesis(
+   SingleMeasurementJointHypothesis):
+    """Distance scored hypothesis subclass.
 
     Notes
     -----

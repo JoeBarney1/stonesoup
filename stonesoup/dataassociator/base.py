@@ -3,6 +3,7 @@ from abc import abstractmethod
 from typing import Set, Mapping, Tuple
 
 from ..base import Base, Property
+from ..types import SingleMeasurementJointHypothesis
 from ..hypothesiser import Hypothesiser
 from ..types.detection import Detection
 from ..types.hypothesis import Hypothesis
@@ -69,8 +70,8 @@ class TrackToTrackAssociator(Associator):
 
         Parameters
         ----------
-        tracks_sets : *n* sets of :class:`~.Track` objects
-            Tracks to associate to other track sets
+        joint_hypothesis : :class:`SingleMeasurementJointHypothesis`
+            A set of hypotheses linking each prediction to a single detection
 
         Returns
         -------
@@ -106,17 +107,17 @@ class TrackToTrackAssociator(Associator):
 
         Returns
         -------
-        AssociationSet
-            Contains a set of :class:`~.Association` objects
-        Tuple
-            *n* sets of tracks (that were input variables) minus any associated tracks
-
+        joint_hypotheses : list of :class:`SingleMeasurementJointHypothesis`
+            A list of all valid joint hypotheses with a score on each
         """
 
-        associations = self.associate_tracks(*tracks_sets)
-        associated_tracks = {track
-                             for assoc in associations.associations
-                             for track in assoc.objects}
+        # Create a list of dictionaries of valid track-hypothesis pairs
+        joint_hypotheses = [
+            SingleMeasurementJointHypothesis({
+                track: hypothesis
+                for track, hypothesis in zip(hypotheses, joint_hypothesis)})
+            for joint_hypothesis in itertools.product(*hypotheses.values())
+            if cls.isvalid(joint_hypothesis)]
 
         unassociated_tracks = tuple(tracks_set - associated_tracks for tracks_set in tracks_sets)
         return associations, unassociated_tracks
