@@ -3,7 +3,9 @@ import pytest
 import numpy as np
 
 from stonesoup.models.transition.linear import ConstantVelocity
-from stonesoup.predictor.kalman import KalmanPredictor, ExtendedKalmanPredictor
+from stonesoup.predictor.kalman import (KalmanPredictor,
+                                        ExtendedKalmanPredictor,
+                                        UnscentedKalmanPredictor)
 from stonesoup.types import GaussianState, GaussianStatePrediction
 
 
@@ -30,16 +32,9 @@ from stonesoup.types import GaussianState, GaussianStatePrediction
             np.array([[-6.45], [0.7]]),
             np.array([[4.1123, 0.0013],
                       [0.0013, 0.0365]])
-        ),
-        (   # cubature Kalman
-            CubatureKalmanPredictor,
-            ConstantVelocity(noise_diff_coeff=0.1),
-            np.array([[-6.45], [0.7]]),
-            np.array([[4.1123, 0.0013],
-                      [0.0013, 0.0365]])
         )
     ],
-    ids=["standard", "extended", "unscented", "cubature"]
+    ids=["standard", "extended", "unscented"]
 )
 def test_kalman(PredictorClass, transition_model,
                 prior_mean, prior_covar):
@@ -126,33 +121,27 @@ def test_sqrt_kalman():
 
     # Calculate evaluation variables
     eval_prediction = GaussianStatePrediction(
-        cv.matrix(timestamp=new_timestamp,
-                  time_interval=time_interval)@prior.mean,
-        cv.matrix(timestamp=new_timestamp,
-                  time_interval=time_interval)
+        transition_model.matrix(timestamp=new_timestamp,
+                                time_interval=time_interval)@prior.mean,
+        transition_model.matrix(timestamp=new_timestamp,
+                                time_interval=time_interval)
         @prior.covar
-        @cv.matrix(timestamp=new_timestamp,
-                   time_interval=time_interval).T
-        + cv.covar(timestamp=new_timestamp,
-                   time_interval=time_interval))
+        @transition_model.matrix(timestamp=new_timestamp,
+                                 time_interval=time_interval).T
+        + transition_model.covar(timestamp=new_timestamp,
+                                 time_interval=time_interval))
 
     # Initialise a kalman predictor
-    predictor = KalmanPredictor(transition_model=transition_model)
-    sqrt_predictor = SqrtKalmanPredictor(transition_model=transition_model)
-    # Can swap out this method
-    sqrt_predictor = SqrtKalmanPredictor(transition_model=transition_model, qr_method=True)
+    predictor = PredictorClass(transition_model=transition_model)
 
     # Perform and assert state prediction
-    prediction = predictor.predict(prior=prior, timestamp=new_timestamp)
-    sqrt_prediction = sqrt_predictor.predict(prior=sqrt_prior,
-                                             timestamp=new_timestamp)
+    prediction = predictor.predict(prior=prior,
+                                   timestamp=new_timestamp)
 
-    # Assert presence of transition model
-    assert hasattr(prediction, 'transition_model')
+    assert(np.allclose(prediction.mean,
+                       eval_prediction.mean, 0, atol=1.e-14))
+    assert(np.allclose(prediction.covar,
+                       eval_prediction.covar, 0, atol=1.e-14))
+    assert(prediction.timestamp == new_timestamp)
 
-    assert np.allclose(prediction.mean, sqrt_prediction.mean, 0, atol=1.e-14)
-    assert np.allclose(prediction.covar,
-                       sqrt_prediction.sqrt_covar@sqrt_prediction.sqrt_covar.T, 0,
-                       atol=1.e-14)
-    assert np.allclose(prediction.covar, sqrt_prediction.covar, 0, atol=1.e-14)
-    assert prediction.timestamp == sqrt_prediction.timestamp
+    # TODO: Test with Control Model
