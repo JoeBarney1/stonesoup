@@ -69,7 +69,7 @@ class KalmanPredictor(Predictor):
         # Compute time_interval
         try:
             time_interval = timestamp - prior.timestamp
-        except TypeError as e:
+        except TypeError:
             # TypeError: (timestamp or prior.timestamp) is None
             time_interval = None
 
@@ -101,7 +101,7 @@ class KalmanPredictor(Predictor):
                     timestamp=timestamp,
                     time_interval=time_interval,
                     **kwargs)
-            except AttributeError as e:
+            except AttributeError:
                 # covar() is NOT implemented for control_model
                 contol_noise_covar = np.zeros(self.control_model.ndim_ctrl)
             if control_input is None:
@@ -338,8 +338,12 @@ class UnscentedKalmanPredictor(KalmanPredictor):
             control
         """
 
-        return self.transition_model.function(prior_state, **kwargs) + \
-            self.control_model.function(**kwargs)
+        # Compute time_interval
+        try:
+            time_interval = timestamp - prior.timestamp
+        except TypeError:
+            # TypeError: (timestamp or prior.timestamp) is None
+            time_interval = None
 
     @predict_lru_cache()
     def predict(self, prior, timestamp=None, control_input=None, **kwargs):
@@ -480,9 +484,32 @@ class SqrtKalmanPredictor(ExtendedKalmanPredictor):
             contol_noise_covar = np.zeros(prior.covar.shape)
             control_input = State(np.zeros(prior.state_vector.shape))
         else:
-            return np.linalg.cholesky(trans_m@sqrt_prior_cov@sqrt_prior_cov.T@trans_m.T +
-                                      sqrt_trans_cov@sqrt_trans_cov.T +
-                                      ctrl_mat@sqrt_ctrl_noi@sqrt_ctrl_noi.T@ctrl_mat.T)
+            # Extract control matrix
+            try:
+                # Attempt to extract matrix from a LinearModel
+                control_matrix = self.control_model.matrix(
+                    timestamp=timestamp,
+                    time_interval=time_interval,
+                    **kwargs)
+            except AttributeError:
+                # Else read jacobian from a NonLinearModel
+                control_matrix = self.control_model.jacobian(
+                    timestamp=timestamp,
+                    time_interval=time_interval,
+                    **kwargs)
+            # Extract control noise covariance
+            try:
+                # covar() is implemented for control_model
+                contol_noise_covar = self.control_model.covar(
+                    timestamp=timestamp,
+                    time_interval=time_interval,
+                    **kwargs)
+            except AttributeError:
+                # covar() is NOT implemented for control_model
+                contol_noise_covar = np.zeros((self.control_model.ndim_ctrl,
+                                               self.control_model.ndim_ctrl))
+            if control_input is None:
+                control_input = np.zeros((self.control_model.ndim_ctrl, 1))
 
 
         return GaussianStatePrediction(prediction_mean,

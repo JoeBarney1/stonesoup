@@ -1,6 +1,6 @@
 import copy
 import datetime
-from collections import MutableSequence
+from collections.abc import MutableSequence
 
 import numpy as np
 from scipy.stats import multivariate_normal
