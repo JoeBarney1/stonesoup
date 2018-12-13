@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Contains collection of time based deleters"""
 from datetime import timedelta
 
@@ -13,7 +14,8 @@ class UpdateTimeStepsDeleter(Deleter):
     last :attr:`time_steps_since_update`.
     """
 
-    time_steps_since_update: int = Property(doc="Maximum time steps since last update")
+    time_steps_since_update = Property(
+        int, doc="Maximum time steps since last update")
 
     def check_for_deletion(self, track, **kwargs):
         """Delete track without update with measurements within time steps
@@ -26,20 +28,11 @@ class UpdateTimeStepsDeleter(Deleter):
         Returns
         -------
         bool
-            `False` if track has an :class:`~.Update` with measurements within
-            time steps; `True` otherwise.
+            `True` if track has an :class:`~.Update` with measurements within
+            time steps; `False` otherwise.
         """
-        timestamps_set = set()
-
-        for state in track[::-1]:
-            timestamps_set.add(state.timestamp)
-            if len(timestamps_set) > self.time_steps_since_update:
-                return True
-
-            if isinstance(state, Update) and state.hypothesis:
-                return False
-
-        return False
+        return not any(isinstance(state, Update) and state.hypothesis
+                       for state in track[-self.time_steps_since_update:])
 
 
 class UpdateTimeDeleter(Deleter):
@@ -49,7 +42,8 @@ class UpdateTimeDeleter(Deleter):
     measurements is greater than :attr:`time_since_update`.
     """
 
-    time_since_update: timedelta = Property(doc="Maximum time since last update")
+    time_since_update = Property(
+        timedelta, doc="Maximum time since last update")
 
     def check_for_deletion(self, track, timestamp=None, **kwargs):
         """Delete track based on time of last update with measurements
@@ -65,8 +59,8 @@ class UpdateTimeDeleter(Deleter):
         Returns
         -------
         bool
-            `False` if track has an :class:`~.Update` with measurements within
-            time; `True` otherwise.
+            `True` if track has an :class:`~.Update` with measurements within
+            time; `False` otherwise.
         """
         if timestamp is None:
             timestamp = track.timestamp
