@@ -3,7 +3,7 @@ from abc import abstractmethod
 from typing import Set, Mapping, Tuple
 
 from ..base import Base, Property
-from ..types import SingleMeasurementJointHypothesis
+from ..types import JointHypothesis
 from ..hypothesiser import Hypothesiser
 from ..types.detection import Detection
 from ..types.hypothesis import Hypothesis
@@ -70,7 +70,7 @@ class TrackToTrackAssociator(Associator):
 
         Parameters
         ----------
-        joint_hypothesis : :class:`SingleMeasurementJointHypothesis`
+        joint_hypothesis : :class:`JointHypothesis`
             A set of hypotheses linking each prediction to a single detection
 
         Returns
@@ -107,13 +107,13 @@ class TrackToTrackAssociator(Associator):
 
         Returns
         -------
-        joint_hypotheses : list of :class:`SingleMeasurementJointHypothesis`
+        joint_hypotheses : list of :class:`JointHypothesis`
             A list of all valid joint hypotheses with a score on each
         """
 
         # Create a list of dictionaries of valid track-hypothesis pairs
         joint_hypotheses = [
-            SingleMeasurementJointHypothesis({
+            JointHypothesis({
                 track: hypothesis
                 for track, hypothesis in zip(hypotheses, joint_hypothesis)})
             for joint_hypothesis in itertools.product(*hypotheses.values())
