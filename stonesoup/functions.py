@@ -352,106 +352,42 @@ def sphere2cart(rho, phi, theta):
     return (x, y, z)
 
 
-def rotx(theta):
-    r"""Rotation matrix for rotations around x-axis
-
-    For a given rotation angle: math: `\theta`, this function evaluates\
-    and returns the rotation matrix:
-
-    .. math: :
-        : label: Rx
-        R_{x}(\theta) = \begin{bmatrix}
-                        1 & 0 & 0 \\
-                        0 & cos(\theta) & -sin(\theta) \\
-                        0 & sin(\theta) & cos(\theta)
-                        \end{bmatrix}
+def gm_reduce_single(means, covars, weights):
+    """Reduce mixture of multi-variate Gaussians to single Gaussian
 
     Parameters
     ----------
-    theta: float
-        Rotation angle specified as a real-valued number. The rotation angle\
-        is positive if the rotation is in the clockwise direction\
-        when viewed by an observer looking down the x-axis towards the\
-        origin. Angle units are in radians.
+    means : np.array of shape (num_components, num_dims)
+        The means of the GM components
+    covars : np.array of shape (num_components, num_dims, num_dims)
+        The covariance matrices of the GM components
+    weights : np.array of shape (num_components,)
+        The weights of the GM components
 
     Returns
     -------
-    : : class: `numpy.ndarray` of shape (3, 3)
-        Rotation matrix around x-axis of the form eq: `Rx`
+    np.array of shape (num_dims, 1)
+        The mean of the reduced/single Gaussian
+    np.array of shape (num_dims, num_dims)
+        The covariance of the reduced/single Gaussian
     """
 
-    c, s = np.cos(theta), np.sin(theta)
+    # Compute dimensionality variables
+    num_components, num_dims = np.shape(means)
 
-    return np.array([[1, 0, 0],
-                     [0, c, -s],
-                     [0, s, c]])
+    # Normalise weights such that they sum to 1
+    weights = weights/np.sum(weights)
 
+    # Calculate mean
+    mean = np.average(means, axis=0, weights=weights)
+    mean.shape = (1, num_dims)
 
-def roty(theta):
-    r"""Rotation matrix for rotations around y-axis
+    # Calculate covar
+    covar = np.zeros((num_dims, num_dims))
+    for i in range(num_components):
+        v = means[i, :] - mean
+        a = np.add(covars[i], v@v.T)
+        b = weights[i]
+        covar = np.add(covar, b*a)
 
-    For a given rotation angle: math: `\theta`, this function evaluates\
-    and returns the rotation matrix:
-
-    .. math: :
-        : label: Ry
-        R_{y}(\theta) = \begin{bmatrix}
-                        cos(\theta) & 0 & sin(\theta) \\
-                        0 & 1 & 0 \\
-                        - sin(\theta) & 0 & cos(\theta)
-                        \end{bmatrix}
-
-    Parameters
-    ----------
-    theta: float
-        Rotation angle specified as a real-valued number. The rotation angle\
-        is positive if the rotation is in the clockwise direction\
-        when viewed by an observer looking down the y-axis towards the\
-        origin. Angle units are in radians.
-
-    Returns
-    -------
-    : : class: `numpy.ndarray` of shape (3, 3)
-        Rotation matrix around y-axis of the form eq: `Ry`
-    """
-
-    c, s = np.cos(theta), np.sin(theta)
-
-    return np.array([[c, 0, s],
-                     [0, 1, 0],
-                     [-s, 0, c]])
-
-
-def rotz(theta):
-    r"""Rotation matrix for rotations around z-axis
-
-    For a given rotation angle: math: `\theta`, this function evaluates\
-    and returns the rotation matrix:
-
-    .. math: :
-        : label: Rz
-        R_{z}(\theta) = \begin{bmatrix}
-                        cos(\theta) & -sin(\theta) & 0 \\
-                        sin(\theta) & cos(\theta) & 0 \\
-                        0 & 0 & 1
-                        \end{bmatrix}
-
-    Parameters
-    ----------
-    theta: float
-        Rotation angle specified as a real-valued number. The rotation angle\
-        is positive if the rotation is in the clockwise direction\
-        when viewed by an observer looking down the z-axis towards the\
-        origin. Angle units are in radians.
-
-    Returns
-    -------
-    : : class: `numpy.ndarray` of shape (3, 3)
-        Rotation matrix around z-axis of the form eq: `Rz`
-    """
-
-    c, s = np.cos(theta), np.sin(theta)
-
-    return np.array([[c, -s, 0],
-                     [s, c, 0],
-                     [0, 0, 1]])
+    return mean.transpose(), covar

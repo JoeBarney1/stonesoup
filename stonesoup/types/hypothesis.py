@@ -9,7 +9,7 @@ from .detection import Detection, MissedDetection, CompositeDetection
 from .prediction import MeasurementPrediction, Prediction, CompositePrediction, \
     CompositeMeasurementPrediction
 from ..base import Property
-from .detection import Detection
+from .detection import Detection, MissedDetection
 from .prediction import MeasurementPrediction, Prediction
 from ..types.numeric import Probability
 
@@ -19,16 +19,16 @@ class Hypothesis(Type):
 
     A Hypothesis has sub-types:
 
-    'SingleMeasurementHypothesis', which consists of a prediction for a single
+    'SingleHypothesis', which consists of a prediction for a single
     Track and a single Measurement that *might* be associated with it
 
-    'MultipleMeasurementHypothesis', which consists of a prediction for a
+    'MultipleHypothesis', which consists of a prediction for a
     single Track and multiple Measurements of which one *might* be associated
     with it
     """
 
 
-class SingleMeasurementHypothesis(Hypothesis):
+class SingleHypothesis(Hypothesis):
     """A hypothesis based on a single measurement.
 
     """
@@ -44,10 +44,11 @@ class SingleMeasurementHypothesis(Hypothesis):
         doc="Optional track prediction in measurement space")
 
     def __bool__(self):
-        return self.measurement is not None
+        return (not isinstance(self.measurement, MissedDetection)) and \
+               (self.measurement is not None)
 
 
-class SingleMeasurementDistanceHypothesis(SingleMeasurementHypothesis):
+class SingleDistanceHypothesis(SingleHypothesis):
     """Distance scored hypothesis subclass.
 
     Notes
@@ -81,11 +82,7 @@ class SingleMeasurementDistanceHypothesis(SingleMeasurementHypothesis):
             return float('inf')
 
 
-class SingleProbabilityHypothesis(ProbabilityHypothesis, SingleHypothesis):
-    """Single Measurement Probability scored hypothesis subclass."""
-
-
-class SingleMeasurementProbabilityHypothesis(SingleMeasurementHypothesis):
+class SingleProbabilityHypothesis(SingleHypothesis):
     """Single Measurement Probability scored hypothesis subclass.
 
     """
@@ -109,6 +106,10 @@ class SingleMeasurementProbabilityHypothesis(SingleMeasurementHypothesis):
     def __ge__(self, other):
         return self.probability >= other.probability
 
+    @property
+    def weight(self):
+        return self.probability
+
 
 class JointHypothesis(Type, UserDict):
     """Joint Hypothesis base type
@@ -129,10 +130,10 @@ class JointHypothesis(Type, UserDict):
     hypotheses: Hypothesis = Property(doc='Association hypotheses')
 
     def __new__(cls, hypotheses):
-        if all(isinstance(hypothesis, SingleMeasurementDistanceHypothesis)
+        if all(isinstance(hypothesis, SingleDistanceHypothesis)
                for hypothesis in hypotheses.values()):
             return super().__new__(DistanceJointHypothesis)
-        elif all(isinstance(hypothesis, SingleMeasurementProbabilityHypothesis)
+        elif all(isinstance(hypothesis, SingleProbabilityHypothesis)
                  for hypothesis in hypotheses.values()):
             return super().__new__(ProbabilityJointHypothesis)
         else:
@@ -178,9 +179,9 @@ class ProbabilityJointHypothesis(JointHypothesis):
         self.probability = Probability(np.prod(
             [hypothesis.probability for hypothesis in hypotheses.values()]))
 
-    def normalize(self):
-        sum_probability = sum(hypothesis.probability
-                              for hypothesis in self.hypotheses.values())
+    def normalise(self):
+        sum_probability = Probability.sum(
+            hypothesis.probability for hypothesis in self.hypotheses.values())
         for hypothesis in self.hypotheses.values():
             hypothesis.probability /= sum_probability
 

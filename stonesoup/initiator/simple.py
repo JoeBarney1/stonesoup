@@ -7,7 +7,7 @@ from ..dataassociator import DataAssociator
 from ..deleter import Deleter
 from ..models.base import LinearModel, ReversibleModel
 from ..models.measurement import MeasurementModel
-from ..types.hypothesis import SingleMeasurementHypothesis
+from ..types.hypothesis import SingleHypothesis
 from ..types.numeric import Probability
 from ..types.particle import Particle
 from ..types.state import GaussianState
@@ -45,7 +45,7 @@ class SinglePointInitiator(GaussianInitiator):
 
         tracks = set()
         for detection in unassociated_detections:
-            track_state = updater.update(SingleMeasurementHypothesis(
+            track_state = updater.update(SingleHypothesis(
                 self.prior_state, detection, measurement_prediction))
             track = Track([track_state])
             tracks.add(track)
@@ -86,7 +86,7 @@ class LinearMeasurementInitiator(GaussianInitiator):
                 prior_state_vector + inv_model_matrix@detection.state_vector,
                 prior_covar
                 + inv_model_matrix@model_covar@model_matrix.astype(bool),
-                SingleMeasurementHypothesis(None, detection),
+                SingleHypothesis(None, detection),
                 timestamp=detection.timestamp)
             ]))
         return tracks
