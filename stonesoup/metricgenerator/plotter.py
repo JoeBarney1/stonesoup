@@ -1,41 +1,31 @@
-from typing import Tuple
+# -*- coding: utf-8 -*-
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.lines
 
 from .base import PlotGenerator
 from ..base import Property
+from ..types.detection import Clutter
 from ..types.metric import TimeRangePlottingMetric
 from ..types.prediction import Prediction
 from ..types.time import TimeRange
-from ..plotter import Plotter
 
 
 class TwoDPlotter(PlotGenerator):
-    """:class:`~.MetricGenerator` for the plotting data
+    """:class:`~.MetricManager` for the plotting data
 
     Plots of :class:`~.Track`, :class:`~.Detection` and
     :class:`~.GroundTruthPath` objects in two dimensions.
     """
-    track_indices: Tuple[int, int] = Property(
+    track_indices = Property(
+        list,
         doc="Elements of track state vector to plot as x and y")
-    gtruth_indices: Tuple[int, int] = Property(
+    gtruth_indices = Property(
+        list,
         doc="Elements of ground truth path state vector to plot as x and y")
-    detection_indices: Tuple[int, int] = Property(
+    detection_indices = Property(
+        list,
         doc="Elements of detection state vector to plot as x and y")
-    uncertainty: bool = Property(default=False,
-                                 doc='If True the plot includes uncertainty ellipses')
-    particle: bool = Property(default=False,
-                              doc='If True the plot includes particles')
-    tracks_key: str = Property(doc='Key to access set of tracks added to MetricManager',
-                               default='tracks')
-    truths_key: str = Property(doc="Key to access set of ground truths added to MetricManager. "
-                                   "Or key to access a second set of tracks for track-to-track "
-                                   "metric generation",
-                               default='groundtruth_paths')
-    detections_key: str = Property(doc="Key to access desired set of detections added "
-                                       "to MetricManager",
-                                   default='detections')
-    generator_name: str = Property(doc="Unique identifier to use when accessing generated "
-                                       "plots from MultiManager",
-                                   default='tracker_plot')
 
     def compute_metric(self, manager, *args, **kwargs):
         """Compute the metric using the data in the metric manager
@@ -48,105 +38,98 @@ class TwoDPlotter(PlotGenerator):
         Returns
         -------
         TimeRangePlottingMetric
-            Contains a matplotlib figure
+            contains a matplotlib figure
         """
 
-        if self.truths_key in manager.states_sets.keys():
-            groundtruth_paths = self._get_data(manager, self.truths_key)
-        if self.tracks_key in manager.states_sets.keys():
-            tracks = self._get_data(manager, self.tracks_key)
-        if self.detections_key in manager.states_sets.keys():
-            detections = self._get_data(manager, self.detections_key)
-
-        metric = self.plot_tracks_truth_detections(tracks,
-                                                   groundtruth_paths,
-                                                   detections,
-                                                   self.uncertainty,
-                                                   self.particle)
+        metric = self.plot_tracks_truth_detections(manager.tracks,
+                                                   manager.groundtruth_paths,
+                                                   manager.detections)
         return metric
 
     def plot_tracks_truth_detections(self, tracks, groundtruth_paths,
-                                     detections, uncertainty=False, particle=False,
-                                     convert_measurements=True):
+                                     detections):
         """Plots tracks, truths and detections onto a 2d matplotlib figure
 
         Parameters
         ----------
-        tracks: list of set of :class:`~.Track`
-            Objects to be plotted as tracks
+        tracks: set of :class:`~.Track`
+            objects to be plotted as tracks
         groundtruth_paths: set of :class:`~.GroundTruthPath`
-            Objects to be plotted as truths
+            objects to be plotted as truths
         detections: set of :class:`~.Detection`
-            Objects to be plotted as detections
-        uncertainty : bool
-            If True, function plots uncertainty ellipses.
-        particle : bool
-            If True, function plots particles.
-        convert_measurements : bool
-            Should the measurements be converted from measurement space to state space before
-            being plotted. Default is True
+            objects to be plotted as detections
 
         Returns
-        -------
+        ----------
         TimeRangePlottingMetric
             Contains the produced plot
         """
 
-        plotter = Plotter()  # initialises axes using Plotter class
+        fig = plt.figure()
+        axis = fig.add_subplot(1, 1, 1)
 
-        plotter.ax.set_title(self.generator_name)
+        data = np.array([detection.state_vector for detection in detections
+                         if not isinstance(detection, Clutter)])
+        if data.any():
+            axis.plot(data[:, self.detection_indices[0]],
+                      data[:, self.detection_indices[1]],
+                      linestyle='', marker='o')
 
-        if detections is not None:
-            plotter.plot_measurements(detections, [self.detection_indices[0],
-                                                   self.detection_indices[1]],
-                                      convert_measurements, color='tab:blue')
-        else:
-            detections = []
+        data = np.array([detection.state_vector for detection in
+                         detections if isinstance(detection, Clutter)])
+        if data.any():
+            axis.plot(data[:, self.detection_indices[0]],
+                      data[:, self.detection_indices[1]],
+                      linestyle='', marker='2')
 
-        if groundtruth_paths is not None:
-            plotter.plot_ground_truths(groundtruth_paths, [self.gtruth_indices[0],
-                                                           self.gtruth_indices[1]],
-                                       linestyle=':')
-        else:
-            groundtruth_paths = []
+        for path in groundtruth_paths:
+            data = np.array([state.state_vector for state in path])
+            axis.plot(data[:, self.gtruth_indices[0]],
+                      data[:, self.gtruth_indices[1]],
+                      linestyle=':', marker='')
 
-        if tracks is not None:
-            plotting_tracks = set()
-            for track in tracks:
-                if len([state for state in track.states if not isinstance(
-                        state, Prediction)]) >= 2:
-                    plotting_tracks.add(track)
-                else:
-                    continue
-            # Don't plot tracks with only one detection associated; probably clutter
+        for track in tracks:
+            if len([state for state in track.states if not isinstance(
+                    state, Prediction)]) < 2:
+                continue
+                # Don't plot tracks with only one detection
+                #  associated; probably clutter
+            data = np.array([state.state_vector for state in track.states])
+            axis.plot(data[:, self.track_indices[0]],
+                      data[:, self.track_indices[1]],
+                      linestyle='-', marker='.')
+            if hasattr(track.state, 'particles'):
+                data = np.array(
+                    [particle.state_vector for state in track.states for
+                     particle in state.particles])
+                axis.plot(data[:, self.track_indices[0]],
+                          data[:, self.track_indices[1]], linestyle='',
+                          marker=".", markersize=1, alpha=0.25)
 
-            if uncertainty:
-                plotter.plot_tracks(plotting_tracks, [self.track_indices[0],
-                                                      self.track_indices[1]],
-                                    uncertainty=True,
-                                    track_label=self.tracks_key)
-
-            elif particle:
-                plotter.plot_tracks(plotting_tracks, [self.track_indices[0],
-                                                      self.track_indices[1]],
-                                    particle=True,
-                                    track_label=self.tracks_key)
-
-            else:
-                plotter.plot_tracks(plotting_tracks, [self.track_indices[0],
-                                                      self.track_indices[1]],
-                                    track_label=self.tracks_key)
-        else:
-            tracks = []
+        axis.set_xlabel("$x$")
+        axis.set_ylabel("$y$")
+        custom_legend = [
+            matplotlib.lines.Line2D([0], [0], color='0', linestyle='',
+                                    marker='o'),
+            matplotlib.lines.Line2D([0], [0], color='0', linestyle='',
+                                    marker='2'),
+            matplotlib.lines.Line2D([0], [0], color='0', linestyle=':',
+                                    marker=''),
+            matplotlib.lines.Line2D([0], [0], color='0', linestyle='-',
+                                    marker='.'),
+            matplotlib.lines.Line2D([0], [0], color='0', linestyle='',
+                                    marker='.', markersize=1),
+        ]
+        axis.legend(custom_legend,
+                    ['Detections', 'Clutter', 'Path', 'Track', 'Particles'])
 
         timestamps = []
-        states_list = set()
-        for state in states_list.union(tracks, groundtruth_paths, detections):
+        for state in tracks.union(groundtruth_paths, detections):
             if state.timestamp not in timestamps:
                 timestamps.append(state.timestamp)
 
         return TimeRangePlottingMetric(
             title='Track plot',
-            value=plotter.fig,
+            value=fig,
             time_range=TimeRange(min(timestamps), max(timestamps)),
             generator=self)

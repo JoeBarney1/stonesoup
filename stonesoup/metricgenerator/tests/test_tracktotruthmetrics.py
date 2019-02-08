@@ -1,195 +1,332 @@
-import numpy as np
-import pytest
+import datetime
 
-from ..tracktotruthmetrics import SIAPMetrics, IDSIAPMetrics
-from ...measures import Euclidean, Mahalanobis
-from ...types.groundtruth import GroundTruthPath
-from ...types.metric import SingleTimeMetric, TimeRangeMetric
+from ..tracktotruthmetrics import SIAPMetrics
+from ...types.association import TimeRangeAssociation, AssociationSet
 from ...types.track import Track
+from ...types.groundtruth import GroundTruthPath, GroundTruthState
+from ...metricgenerator.manager import SimpleManager
+from ...types.time import TimeRange
+from ...types.state import State
 
 
-@pytest.mark.parametrize('measure_class', [Euclidean, Mahalanobis])
-def test_siap(trial_manager, trial_truths, trial_tracks, trial_associations, measure_class):
-    position_measure = measure_class((0, 2))
-    velocity_measure = measure_class((1, 3))
-    siap_generator = SIAPMetrics(position_measure=position_measure,
-                                 velocity_measure=velocity_measure)
+def test_j_t():
+    manager = SimpleManager()
+    metric = SIAPMetrics()
+    tstart = datetime.datetime.now()
+    truths = {GroundTruthPath(states=[
+        GroundTruthState([[1]],
+                         timestamp=tstart + datetime.timedelta(seconds=i))
+        for i in range(5)]),
+        GroundTruthPath(states=[
+            GroundTruthState([[1]], timestamp=tstart + datetime.timedelta(
+                seconds=i))
+            for i in range(3)])}
+    manager.groundtruth_paths = truths
 
-    trial_manager.generators = [siap_generator]
-
-    timestamps = trial_manager.list_timestamps(siap_generator)
-
-    # Test num_tracks_at_time
-    for timestamp in timestamps:
-        assert siap_generator.num_tracks_at_time(trial_tracks, timestamp) == 3
-
-    # Test num_associated_tracks_at_time
-    assert siap_generator.num_associated_tracks_at_time(trial_manager, trial_tracks,
-                                                        timestamps[0]) == 2
-    assert siap_generator.num_associated_tracks_at_time(trial_manager, trial_tracks,
-                                                        timestamps[1]) == 3
-    assert siap_generator.num_associated_tracks_at_time(trial_manager, trial_tracks,
-                                                        timestamps[2]) == 3
-    assert siap_generator.num_associated_tracks_at_time(trial_manager, trial_tracks,
-                                                        timestamps[3]) == 2
-
-    # Test accuracy_at_time
-    assoc0_pos_accuracy = np.sqrt(0.1 ** 2 + 0.1 ** 2)
-    assoc1_pos_accuracy = np.sqrt(0.5 ** 2 + 0.5 ** 2)
-    assoc0_vel_accuracy = np.sqrt(0.2 ** 2 + 0.2 ** 2)
-    assoc1_vel_accuracy = np.sqrt(0.6 ** 2 + 0.6 ** 2)
-    exp_pos_accuracy = assoc0_pos_accuracy + assoc1_pos_accuracy
-    exp_vel_accuracy = assoc0_vel_accuracy + assoc1_vel_accuracy
-
-    pos_accuracy = siap_generator.accuracy_at_time(trial_manager, timestamps[0], position_measure)
-    assert pos_accuracy == exp_pos_accuracy
-    vel_accuracy = siap_generator.accuracy_at_time(trial_manager, timestamps[0], velocity_measure)
-    assert vel_accuracy == exp_vel_accuracy
-
-    # Test truth_track_from_association
-    for association in trial_associations:
-        truth, track = siap_generator.truth_track_from_association(association)
-        assert isinstance(truth, GroundTruthPath)
-        assert isinstance(track, Track)
-
-    # Test total_time_tracked
-    assert siap_generator.total_time_tracked(trial_manager, trial_truths[0]) == 3  # seconds
-    assert siap_generator.total_time_tracked(trial_manager, trial_truths[1]) == 2
-    assert siap_generator.total_time_tracked(trial_manager, trial_truths[2]) == 1
-    assert siap_generator.total_time_tracked(trial_manager, GroundTruthPath()) == 0
-
-    # Test min_num_tracks_needed_to_track
-    assert siap_generator.min_num_tracks_needed_to_track(trial_manager, trial_truths[0]) == 2
-    assert siap_generator.min_num_tracks_needed_to_track(trial_manager, trial_truths[1]) == 2
-    assert siap_generator.min_num_tracks_needed_to_track(trial_manager, trial_truths[2]) == 1
-    assert siap_generator.min_num_tracks_needed_to_track(trial_manager, GroundTruthPath()) == 0
-
-    # Test rate_of_track_number_changes
-    exp_rate = (2 - 1 + 2 - 1 + 1 - 1) / (3 + 2 + 1)
-    assert siap_generator.rate_of_track_number_changes(trial_manager, trial_truths) == exp_rate
-
-    # Test truth_lifetime
-    for truth in trial_truths:
-        assert siap_generator.truth_lifetime(truth) == 3
-
-    # Test longest_track_time_on_truth
-    assert siap_generator.longest_track_time_on_truth(trial_manager, trial_truths[0]) == 2
-    # Associations 1 and 2 (starting from 0) will join together
-    # because of the AssociationSet._simplify method, so this will be 2
-    assert siap_generator.longest_track_time_on_truth(trial_manager, trial_truths[1]) == 2
-    assert siap_generator.longest_track_time_on_truth(trial_manager, trial_truths[2]) == 1
-
-    # Test compute_metric
-    metrics = siap_generator.compute_metric(trial_manager)
-    expected_titles = ["SIAP Completeness", "SIAP Ambiguity", "SIAP Spuriousness",
-                       "SIAP Position Accuracy", "SIAP Velocity Accuracy",
-                       "SIAP Rate of Track Number Change", "SIAP Longest Track Segment",
-                       "SIAP Completeness at times", "SIAP Ambiguity at times",
-                       "SIAP Spuriousness at times", "SIAP Position Accuracy at times",
-                       "SIAP Velocity Accuracy at times"]
-
-    for expected_title in expected_titles:
-        assert len({metric for metric in metrics if metric.title == expected_title}) == 1
-    assert len({metric for metric in metrics if metric.title not in expected_titles}) == 0
-
-    for metric in metrics:
-        assert isinstance(metric, TimeRangeMetric)
-        assert metric.time_range.start == timestamps[0]
-        assert metric.time_range.end == timestamps[3]
-        assert metric.generator == siap_generator
-
-        if metric.title.endswith(" at times"):
-            assert isinstance(metric.value, list)
-            assert len(metric.value) == 4  # number of timestamps
-
-            for thing in metric.value:
-                assert isinstance(thing, SingleTimeMetric)
-                assert isinstance(thing.value, (float, int))
-                assert thing.generator == siap_generator
-        else:
-            assert isinstance(metric.value, (float, int))
+    assert metric._j_t(manager, tstart + datetime.timedelta(seconds=1)) == 2
+    assert metric._j_t(manager, tstart + datetime.timedelta(seconds=4)) == 1
 
 
-@pytest.mark.parametrize('measure_class', [Euclidean, Mahalanobis])
-def test_id_siap(trial_manager, trial_truths, trial_tracks, trial_associations, measure_class):
-    position_measure = measure_class((0, 2))
-    velocity_measure = measure_class((1, 3))
-    truth_id = track_id = "colour"
-    siap_generator = IDSIAPMetrics(position_measure=position_measure,
-                                   velocity_measure=velocity_measure,
-                                   truth_id=truth_id,
-                                   track_id=track_id)
+def test_j_sum():
+    manager = SimpleManager()
+    metric = SIAPMetrics()
+    tstart = datetime.datetime.now()
+    truths = {GroundTruthPath(states=[
+        GroundTruthState([[1]], timestamp=tstart + datetime.timedelta(
+            seconds=i))
+        for i in range(5)]),
+        GroundTruthPath(states=[
+            GroundTruthState([[1]], timestamp=tstart + datetime.timedelta(
+                seconds=i))
+            for i in range(3)])
+    }
+    manager.groundtruth_paths = truths
 
-    trial_manager.generators = [siap_generator]
+    assert metric._j_sum(manager, [tstart + datetime.timedelta(seconds=i)
+                                   for i in range(7)]) == 8
 
-    timestamps = trial_manager.list_timestamps(siap_generator)
 
-    # Test find_track_id
-    assert siap_generator.find_track_id(trial_tracks[0], timestamps[0]) == "red"
-    assert siap_generator.find_track_id(trial_tracks[0], timestamps[1]) == "blue"
-    assert siap_generator.find_track_id(trial_tracks[0], timestamps[2]) == "red"
-    assert siap_generator.find_track_id(trial_tracks[0], timestamps[3]) == "red"
+def test_jt():
+    manager = SimpleManager()
+    metric = SIAPMetrics()
+    tstart = datetime.datetime.now()
+    associations = {TimeRangeAssociation([], time_range=TimeRange(
+        start_timestamp=tstart,
+        end_timestamp=tstart + datetime.timedelta(seconds=3))),
+                    TimeRangeAssociation([], time_range=TimeRange(
+                        start_timestamp=tstart,
+                        end_timestamp=tstart + datetime.timedelta(seconds=5)))}
+    manager.association_set = AssociationSet(associations)
 
-    assert siap_generator.find_track_id(trial_tracks[1], timestamps[0]) == "red"
-    assert siap_generator.find_track_id(trial_tracks[1], timestamps[1]) == "red"
-    assert siap_generator.find_track_id(trial_tracks[1], timestamps[2]) == "green"
-    assert siap_generator.find_track_id(trial_tracks[1], timestamps[3]) == "green"
+    # test _jt_t
+    assert metric._jt_t(manager, tstart) == 2
+    assert metric._jt_t(manager, tstart + datetime.timedelta(seconds=5)) == 1
 
-    assert siap_generator.find_track_id(trial_tracks[2], timestamps[0]) is None
-    assert siap_generator.find_track_id(trial_tracks[2], timestamps[1]) is None
-    assert siap_generator.find_track_id(trial_tracks[2], timestamps[2]) == "blue"
-    assert siap_generator.find_track_id(trial_tracks[2], timestamps[3]) == "green"
+    # test _jt_sum
+    assert metric._jt_sum(manager,
+                          [tstart + datetime.timedelta(seconds=i)
+                           for i in range(5)]) == 9
 
-    # Test num_id_truths_at_time
-    u, c, i = siap_generator.num_id_truths_at_time(trial_manager, trial_truths, timestamps[0])
-    assert u == 0
-    assert c == 1
-    assert i == 1
 
-    u, c, i = siap_generator.num_id_truths_at_time(trial_manager, trial_truths, timestamps[1])
-    assert u == 1
-    assert c == 0
-    assert i == 1
+def test__na():
+    manager = SimpleManager()
+    metric = SIAPMetrics()
+    tstart = datetime.datetime.now()
+    truth = GroundTruthPath(states=[
+        GroundTruthState([[1]], timestamp=tstart + datetime.timedelta(
+            seconds=i))
+        for i in range(5)])
+    track1 = Track(
+        states=[State([[1]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(5)])
+    track2 = Track(
+        states=[State([[2]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(3)])
+    associations = {TimeRangeAssociation({truth, track1}, time_range=TimeRange(
+        start_timestamp=tstart,
+        end_timestamp=tstart + datetime.timedelta(seconds=4))),
+                    TimeRangeAssociation({truth, track2}, time_range=TimeRange(
+                        start_timestamp=tstart,
+                        end_timestamp=tstart + datetime.timedelta(seconds=2)))}
+    manager.tracks = {track1, track2}
+    manager.association_set = AssociationSet(associations)
 
-    u, c, i = siap_generator.num_id_truths_at_time(trial_manager, trial_truths, timestamps[2])
-    assert u == 0
-    assert c == 2
-    assert i == 0
+    # Test _na_t
+    assert metric._na_t(manager, tstart + datetime.timedelta(seconds=1)) == 2
+    assert metric._na_t(manager, tstart + datetime.timedelta(seconds=4)) == 1
+    assert metric._na_t(manager, tstart + datetime.timedelta(seconds=7)) == 0
 
-    u, c, i = siap_generator.num_id_truths_at_time(trial_manager, trial_truths, timestamps[3])
-    assert u == 0
-    assert c == 1
-    assert i == 1
+    # Test _na_sum
 
-    # Test compute_metric
-    metrics = siap_generator.compute_metric(trial_manager)
-    expected_titles = ["SIAP Completeness", "SIAP Ambiguity", "SIAP Spuriousness",
-                       "SIAP Position Accuracy", "SIAP Velocity Accuracy",
-                       "SIAP Rate of Track Number Change", "SIAP Longest Track Segment",
-                       "SIAP Completeness at times", "SIAP Ambiguity at times",
-                       "SIAP Spuriousness at times", "SIAP Position Accuracy at times",
-                       "SIAP Velocity Accuracy at times",
-                       "SIAP ID Completeness", "SIAP ID Correctness", "SIAP ID Ambiguity",
-                       "SIAP ID Completeness at times", "SIAP ID Correctness at times",
-                       "SIAP ID Ambiguity at times"]
+    assert metric._na_sum(manager, [tstart + datetime.timedelta(seconds=i)
+                                    for i in range(4)]) == 7
 
-    for expected_title in expected_titles:
-        assert len({metric for metric in metrics if metric.title == expected_title}) == 1
-    assert len({metric for metric in metrics if metric.title not in expected_titles}) == 0
 
-    for metric in metrics:
-        assert isinstance(metric, TimeRangeMetric)
-        assert metric.time_range.start == timestamps[0]
-        assert metric.time_range.end == timestamps[3]
-        assert metric.generator == siap_generator
+def test_n():
+    manager = SimpleManager()
+    metric = SIAPMetrics()
+    tstart = datetime.datetime.now()
+    track1 = Track(
+        states=[State([[1]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(5)])
+    track2 = Track(
+        states=[State([[2]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(3)])
+    track3 = Track(
+        states=[State([[3]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(2, 7)])
+    manager.tracks = {track1, track2, track3}
 
-        if metric.title.endswith(" at times"):
-            assert isinstance(metric.value, list)
-            assert len(metric.value) == 4  # number of timestamps
+    # test _n_t
+    assert metric._n_t(manager, tstart + datetime.timedelta(seconds=2)) == 3
+    assert metric._n_t(manager, tstart + datetime.timedelta(seconds=4)) == 2
+    assert metric._n_t(manager, tstart + datetime.timedelta(seconds=6)) == 1
+    assert metric._n_t(manager, tstart + datetime.timedelta(seconds=10)) == 0
 
-            for thing in metric.value:
-                assert isinstance(thing, SingleTimeMetric)
-                assert isinstance(thing.value, (float, int))
-                assert thing.generator == siap_generator
-        else:
-            assert isinstance(metric.value, (float, int))
+    # test _n_sum
+    assert metric._n_sum(manager, [tstart + datetime.timedelta(seconds=i)
+                                   for i in range(5)]) == 11
+
+
+def test_tt_j():
+    manager = SimpleManager()
+    metric = SIAPMetrics()
+    tstart = datetime.datetime.now()
+    truth = GroundTruthPath(states=[
+        GroundTruthState([[1]], timestamp=tstart + datetime.timedelta(
+            seconds=i))
+        for i in range(20)])
+    # Idea is track 1, then no track then 2 then 2 and 3 then 3
+    track1 = Track(
+        states=[State([[1]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(3)])
+    track2 = Track(
+        states=[State([[2]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(5, 10)])
+    track3 = Track(
+        states=[State([[3]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(7, 15)])
+    associations = {TimeRangeAssociation({truth, track1}, time_range=TimeRange(
+        start_timestamp=tstart,
+        end_timestamp=tstart + datetime.timedelta(seconds=2))),
+                    TimeRangeAssociation({truth, track2}, time_range=TimeRange(
+                        start_timestamp=tstart + datetime.timedelta(seconds=5),
+                        end_timestamp=tstart + datetime.timedelta(seconds=9))),
+                    TimeRangeAssociation({truth, track3}, time_range=TimeRange(
+                        start_timestamp=tstart + datetime.timedelta(seconds=7),
+                        end_timestamp=tstart + datetime.timedelta(
+                            seconds=14)))}
+    manager.tracks = {track1, track2, track3}
+    manager.association_set = AssociationSet(associations)
+
+    assert metric._tt_j(manager, truth) == datetime.timedelta(seconds=11)
+
+
+def test_nu_j():
+    manager = SimpleManager()
+    metric = SIAPMetrics()
+    tstart = datetime.datetime.now()
+    truth = GroundTruthPath(states=[
+        GroundTruthState([[1]], timestamp=tstart + datetime.timedelta(
+            seconds=i))
+        for i in range(40)])
+    # Single track
+    track1 = Track(
+        states=[State([[1]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(3)])
+    # Overlapping tracks
+    track2 = Track(
+        states=[State([[2]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(5, 10)])
+    track3 = Track(
+        states=[State([[3]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(7, 15)])
+    track4 = Track(
+        states=[State([[4]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(13, 20)])
+    # Long track with shorter unnecessary one internal
+    track5 = Track(
+        states=[State([[5]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(18, 28)])
+    track6 = Track(
+        states=[State([[6]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(22, 26)])
+    # 2 tracks covered by same range as 1
+    track7 = Track(
+        states=[State([[7]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(30, 40)])
+    track8 = Track(
+        states=[State([[8]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(30, 35)])
+    track9 = Track(
+        states=[State([[9]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(35, 40)])
+
+    manager.tracks = {track1, track2, track3, track4, track5, track6, track7,
+                      track8, track9}
+    manager.groundtruth_paths = {truth}
+    associations = {TimeRangeAssociation({truth, track}, time_range=TimeRange(
+        start_timestamp=min([state.timestamp for state in track.states]),
+        end_timestamp=max([state.timestamp for state in track.states])))
+                    for track in manager.tracks}
+    manager.association_set = AssociationSet(associations)
+
+    # test nu_j
+    # The fewest tracks to cover the whole length should be tracks 1,2,3,5 & 7
+    assert metric._nu_j(manager, truth) == 6
+
+    # test _tl_j
+    # longest track on truth is track 7
+    assert metric._tl_j(manager, truth) == datetime.timedelta(seconds=9)
+
+    # test _r
+    assert metric._r(manager) == 5 / 33
+
+
+def test_t_j():
+    metric = SIAPMetrics()
+
+    tstart = datetime.datetime.now()
+    truth = GroundTruthPath(states=[
+        GroundTruthState([[1]], timestamp=tstart + datetime.timedelta(
+            seconds=i))
+        for i in range(40)])
+
+    assert metric._t_j(truth) == datetime.timedelta(seconds=39)
+
+
+def test_compute_metric():
+    manager = SimpleManager()
+    generator = SIAPMetrics()
+    # Create truth, tracks and associations, same as test_nu_j
+    tstart = datetime.datetime.now()
+    truth = GroundTruthPath(states=[
+        GroundTruthState([[1]], timestamp=tstart + datetime.timedelta(
+            seconds=i))
+        for i in range(40)])
+    track1 = Track(
+        states=[State([[1]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(3)])
+    track2 = Track(
+        states=[State([[2]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(5, 10)])
+    track3 = Track(
+        states=[State([[3]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(7, 15)])
+    track4 = Track(
+        states=[State([[4]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(13, 20)])
+    track5 = Track(
+        states=[State([[5]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(18, 28)])
+    track6 = Track(
+        states=[State([[6]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(22, 26)])
+    track7 = Track(
+        states=[State([[7]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(30, 40)])
+    track8 = Track(
+        states=[State([[8]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(30, 35)])
+    track9 = Track(
+        states=[State([[9]], timestamp=tstart + datetime.timedelta(seconds=i))
+                for i in range(35, 40)])
+    manager.groundtruth_paths = truth
+    manager.tracks = {track1, track2, track3, track4, track5, track6, track7,
+                      track8, track9}
+    manager.groundtruth_paths = {truth}
+    associations = {TimeRangeAssociation({truth, track}, time_range=TimeRange(
+        start_timestamp=min([state.timestamp for state in track.states]),
+        end_timestamp=max([state.timestamp for state in track.states])))
+                    for track in manager.tracks}
+    manager.association_set = AssociationSet(associations)
+
+    metrics = generator.compute_metric(manager)
+    tend = tstart + datetime.timedelta(seconds=39)
+
+    assert len(metrics) == 5
+
+    c = metrics[0]
+    assert c.title == "SIAP C"
+    assert c.value == generator._jt_sum(manager,
+                                        manager.list_timestamps()) / (
+        generator._j_sum(manager, manager.list_timestamps()))
+    assert c.time_range.start_timestamp == tstart
+    assert c.time_range.end_timestamp == tend
+    assert c.generator == generator
+
+    a = metrics[1]
+    assert a.title == "SIAP A"
+    assert a.value == generator._na_sum(manager,
+                                        manager.list_timestamps()) / (
+               generator._jt_sum(manager, manager.list_timestamps()))
+    assert a.time_range.start_timestamp == tstart
+    assert a.time_range.end_timestamp == tend
+    assert a.generator == generator
+
+    s = metrics[2]
+    assert s.title == "SIAP S"
+    assert s.value == sum([generator._n_t(manager, timestamp) -
+                           generator._na_t(manager, timestamp)
+                           for timestamp in manager.list_timestamps()]) / (
+        generator._n_sum(manager, manager.list_timestamps()))
+    assert s.time_range.start_timestamp == tstart
+    assert s.time_range.end_timestamp == tend
+    assert s.generator == generator
+
+    lt = metrics[3]
+    assert lt.title == "SIAP LT"
+    assert lt.value == 1 / generator._r(manager)
+    assert lt.time_range.start_timestamp == tstart
+    assert lt.time_range.end_timestamp == tend
+    assert lt.generator == generator
+
+    ls = metrics[4]
+    assert ls.title == "SIAP LS"
+    assert ls.value == sum([generator._tl_j(manager, truth).total_seconds()
+                            for truth in manager.groundtruth_paths]) / sum(
+        [generator._t_j(truth).total_seconds()
+         for truth in manager.groundtruth_paths])
+    assert ls.time_range.start_timestamp == tstart
+    assert ls.time_range.end_timestamp == tend
+    assert ls.generator == generator
