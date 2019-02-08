@@ -118,28 +118,18 @@ class TrackToTrackAssociator(Associator):
             for joint_hypothesis in itertools.product(*hypotheses.values())
             if cls.isvalid(joint_hypothesis)]
 
-        unassociated_tracks = tuple(tracks_set - associated_tracks for tracks_set in tracks_sets)
-        return associations, unassociated_tracks
+        return joint_hypotheses
 
 
-class TwoTrackToTrackAssociator(TrackToTrackAssociator):
+class Associator(Base):
+    """Associator base class
+
+    An associator is used to associate objects for the generation of
+    metrics. It returns a :class:`~.AssociationSet` containing
+    a set of :class:`~.Association`
+    objects.
+    """
+
+
+class TrackToTrackAssociator(Associator):
     """Associates two sets of :class:`~.Track` objects together"""
-
-    @abstractmethod
-    def associate_tracks(self, tracks_set_1: Set[Track], tracks_set_2: Set[Track]) \
-            -> AssociationSet:
-        """Associate two sets of tracks together.
-
-        Parameters
-        ----------
-        tracks_set_1 : set of :class:`~.Track` objects
-            Tracks to associate to track set 2
-        tracks_set_2 : set of :class:`~.Track` objects
-            Tracks to associate to track set 1
-
-        Returns
-        -------
-        AssociationSet
-            Contains a set of :class:`~.Association` objects
-
-        """

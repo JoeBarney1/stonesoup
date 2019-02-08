@@ -7,8 +7,11 @@ Data Association
 .. automodule:: stonesoup.dataassociator.base
     :show-inheritance:
 
-General Association
--------------------
+Track-to-track Association
+==========================
+
+.. automodule:: stonesoup.dataassociator.tracktotrack
+    :show-inheritance:
 
 .. automodule:: stonesoup.dataassociator.general
     :show-inheritance:
