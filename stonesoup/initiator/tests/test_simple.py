@@ -63,9 +63,6 @@ def test_spi(measurement_model):
 
         # Compare against both tracks
         for track_idx, track in enumerate(tracks):
-            print(eval_track_state.covar-track.covar)
-            print(np.array_equal(eval_track_state.covar, track.covar))
-            print("---------")
 
             if(np.array_equal(eval_track_state.mean, track.mean)
                and np.array_equal(eval_track_state.covar, track.covar)):
@@ -73,9 +70,6 @@ def test_spi(measurement_model):
             if (np.array_equal(eval_track_state.mean, track.mean)
                     and np.array_equal(eval_track_state.covar, track.covar)):
                 evaluated_tracks[track_idx] = True
-
-    print(evaluated_tracks)
-    # print(tracks)
 
     # Ensure both tracks have been evaluated
     assert(all(evaluated_tracks))
