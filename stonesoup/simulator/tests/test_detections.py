@@ -94,8 +94,4 @@ def test_switch_detection_simulator(
         assert (meas_range[:, 0] <= clutter.state_vector.ravel()).all()
         assert (meas_range[:, 1] >= clutter.state_vector.ravel()).all()
 
-    # Ensure switching probability detector has less detections than 100%
-    # detection probability detector i.e. it switched to zero probability
-    # of detection at some point.
-    assert len(total_detections - clutter_detections) \
-        < len(test_detections - test_clutter_detections)
+    assert detector.clutter_spatial_density == 3e-8

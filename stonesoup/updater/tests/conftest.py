@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 
 import numpy as np
 import pytest
@@ -15,22 +15,17 @@ def measurement_model():
 
 
 @pytest.fixture()
-def timestamp():
-    return datetime(2023, 10, 11, 11, 19, 30)
-
-
-@pytest.fixture()
-def prediction(timestamp):
+def prediction():
     return TaggedWeightedGaussianStatePrediction(
         np.array([[-6.45], [0.7]]),
         np.array([[4.1123, 0.0013],
                   [0.0013, 0.0365]]),
         weight=1,
-        tag=1,
-        timestamp=timestamp)
+        tag=1)
 
 
 @pytest.fixture()
-def measurement(measurement_model, timestamp):
+def measurement():
     return Detection(np.array([[-6.23]]),
-                     timestamp=timestamp, measurement_model=measurement_model)
+                     timestamp=datetime.datetime.now() +
+                     datetime.timedelta(seconds=1))
