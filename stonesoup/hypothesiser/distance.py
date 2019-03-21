@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from .base import Hypothesiser
 from ..base import Property
 from ..types import SingleDistanceHypothesis
@@ -6,6 +7,7 @@ from ..types.detection import MissedDetection
 from ..types.hypothesis import SingleDistanceHypothesis
 from ..types.multihypothesis import MultipleHypothesis
 from ..updater import Updater
+from ..measures import Measure
 
 
 class DistanceHypothesiser(Hypothesiser):
@@ -13,7 +15,7 @@ class DistanceHypothesiser(Hypothesiser):
 
     Generate track predictions at detection times and score each hypothesised
     prediction-detection pair using the distance of the supplied
-    :class:`~.Measure` class.
+    :class:`Measure` class.
     """
 
     predictor = Property(
@@ -23,10 +25,13 @@ class DistanceHypothesiser(Hypothesiser):
         Updater,
         doc="Updater used to get measurement prediction")
     missed_distance = Property(
-        int,
-        default=4,
-        doc="Distance in standard deviations at which a missed detection is"
-            "considered more likely. Default is 4 standard deviations.")
+        float,
+        default=float('inf'),
+        doc="Distance for a missed detection. Default is set to infinity")
+    measure = Property(
+        Measure,
+        default=None,
+        doc="Measure class used to calculate the distance between two states.")
 
     def hypothesise(self, track, detections, timestamp, **kwargs):
         """ Evaluate and return all track association hypotheses.
@@ -60,9 +65,7 @@ class DistanceHypothesiser(Hypothesiser):
                 track.state, timestamp=detection.timestamp)
             measurement_prediction = self.updater.get_measurement_prediction(
                 prediction)
-            distance = mahalanobis(detection.state_vector,
-                                   measurement_prediction.state_vector,
-                                   np.linalg.inv(measurement_prediction.covar))
+            distance = self.measure(measurement_prediction, detection)
 
             hypotheses.append(
                 SingleDistanceHypothesis(
