@@ -20,7 +20,10 @@ class State(Type):
     state_vector: StateVector = Property(doc='State vector.')
 
     def __init__(self, state_vector, *args, **kwargs):
-        state_vector = StateVector(state_vector)
+        # Don't cast away subtype of state_vector if not necessary
+        if state_vector is not None \
+                and not isinstance(state_vector, StateVector):
+            state_vector = StateVector(state_vector)
         super().__init__(state_vector, *args, **kwargs)
 
     @property
