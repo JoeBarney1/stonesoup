@@ -13,7 +13,8 @@ from ..types.prediction import GaussianStatePrediction
 from ..types.track import Track
 from ..types.update import GaussianStateUpdate
 from ..updater import Updater
-from ..types import GaussianStateUpdate, MissedDetection
+from ..types.detection import MissedDetection
+from ..types.update import GaussianStateUpdate
 from ..functions import gm_reduce_single
 
 

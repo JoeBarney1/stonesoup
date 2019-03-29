@@ -7,8 +7,10 @@ from functools import lru_cache
 from ..base import Property
 from .base import Updater
 from ..base import Property
-from ..types import (GaussianMeasurementPrediction,
-                     GaussianStateUpdate)
+from ..types.hypothesis import SingleHypothesis
+from ..types.prediction import GaussianMeasurementPrediction
+from ..types.update import GaussianStateUpdate
+from ..functions import gauss2sigma, unscented_transform
 
 
 class KalmanUpdater(Updater):

@@ -3,7 +3,7 @@ from abc import abstractmethod
 from typing import Set, Mapping, Tuple
 
 from ..base import Base, Property
-from ..types import JointHypothesis
+from ..types.hypothesis import JointHypothesis
 from ..hypothesiser import Hypothesiser
 from ..types.detection import Detection
 from ..types.hypothesis import Hypothesis

@@ -13,7 +13,9 @@ from math import modf
 import numpy as np
 from dateutil.parser import parse
 
-from .base import GroundTruthReader, DetectionReader
+from ..base import Property
+from ..types.detection import Detection
+from .base import DetectionReader
 from .file import TextFileReader
 from ..base import Property
 from ..buffered_generator import BufferedGenerator

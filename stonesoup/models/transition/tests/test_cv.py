@@ -1,3 +1,4 @@
+# coding: utf-8
 import datetime
 
 from pytest import approx
@@ -5,7 +6,6 @@ import numpy as np
 from scipy.stats import multivariate_normal
 
 from ..linear import ConstantVelocity
-from ....types.state import State
 
 
 def test_cvmodel():

@@ -4,7 +4,6 @@ import numpy as np
 from scipy.stats import multivariate_normal
 
 from ..linear import LinearGaussian
-from ....types.state import State
 
 
 @pytest.mark.parametrize(

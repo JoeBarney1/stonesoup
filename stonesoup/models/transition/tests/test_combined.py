@@ -4,13 +4,9 @@ from numbers import Real
 
 import numpy as np
 
-from ..linear import (LinearGaussianTimeInvariantTransitionModel,
-                      CombinedLinearGaussianTransitionModel,
-                      ConstantVelocity)
-from ..nonlinear import ConstantTurn
-from ..base import CombinedGaussianTransitionModel
-from ....types.state import State
-from ....types.array import StateVectors
+from ..linear import (
+    LinearGaussianTimeInvariantTransitionModel, ConstantVelocity,
+    CombinedLinearGaussianTransitionModel)
 
 
 @pytest.mark.parametrize("comb_model", [CombinedGaussianTransitionModel,

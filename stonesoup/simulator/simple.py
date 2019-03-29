@@ -9,8 +9,10 @@ from ..base import Property
 from ..models.measurement import MeasurementModel
 from ..models.transition import TransitionModel
 from ..reader import GroundTruthReader
-from ..types import (Detection, Clutter, GaussianState, GroundTruthState,
-                     GroundTruthPath, Probability, State)
+from ..types.detection import Detection, Clutter
+from ..types.groundtruth import GroundTruthPath, GroundTruthState
+from ..types.numeric import Probability
+from ..types.state import GaussianState, State
 from .base import DetectionSimulator, GroundTruthSimulator
 from stonesoup.buffered_generator import BufferedGenerator
 
