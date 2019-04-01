@@ -211,19 +211,19 @@ class MultiTargetMixtureTracker(Tracker):
             unassociated_detections = set(detections)
             for track, multihypothesis in associations.items():
 
-                    # calculate each Track's state as a Gaussian Mixture of
-                    # its possible associations with each detection, then
-                    # reduce the Mixture to a single Gaussian State
-                    posterior_states = []
-                    posterior_state_weights = []
-                    for hypothesis in multihypothesis:
-                        if isinstance(hypothesis.measurement, MissedDetection):
-                            posterior_states.append(hypothesis.prediction)
-                        else:
-                            posterior_states.append(
-                                self.updater.update(hypothesis))
-                        posterior_state_weights.append(
-                            float(hypothesis.probability))
+                # calculate each Track's state as a Gaussian Mixture of
+                # its possible associations with each detection, then
+                # reduce the Mixture to a single Gaussian State
+                posterior_states = []
+                posterior_state_weights = []
+                for hypothesis in multihypothesis:
+                    if isinstance(hypothesis.measurement, MissedDetection):
+                        posterior_states.append(hypothesis.prediction)
+                    else:
+                        posterior_states.append(
+                            self.updater.update(hypothesis))
+                    posterior_state_weights.append(
+                        hypothesis.probability)
 
                     means = np.array([state.state_vector for state
                                       in posterior_states])
