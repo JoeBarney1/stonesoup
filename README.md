@@ -33,10 +33,7 @@ Stone Soup uses the following dependencies:
 | [SciPy](https://www.scipy.org/) | BSD |
 | [ruamel.yaml](https://yaml.readthedocs.io/) | MIT |
 | [pymap3d](https://github.com/scivision/pymap3d) | MIT |
-| [utm](https://github.com/Turbo87/utm) | MIT |
-| [ordered-set](https://github.com/LuminosoInsight/ordered-set) | MIT |
-| [setuptools](https://github.com/pypa/setuptools) | MIT |
-| [rtree](https://github.com/Toblerity/rtree) | MIT |
+| [utm](https://https://github.com/Turbo87/utm) | MIT |
 
 ### Development
 
@@ -55,9 +52,9 @@ These dependencies are required for building Stone Soup documentation.
 | Name | License |
 | ---- | ------- |
 | [Sphinx](https://www.sphinx-doc.org/) | BSD |
-| [sphinx-gallery](https://sphinx-gallery.github.io/) | BSD |
-| [pillow](https://pillow.readthedocs.io/en/stable/index.html) | [PIL Software License](https://pillow.readthedocs.io/en/stable/about.html#license) |
-| [folium](https://python-visualization.github.io/folium/) | MIT |
+| [pytest](https://docs.pytest.org/) | MIT |
+| [Flake8](https://flake8.pycqa.org/) | MIT |
+| [Coverage.py](https://coverage.readthedocs.io/) | Apache 2.0 |
 
 ## License
 Stone Soup is released under MIT License. Please see [License](LICENSE) for details.
