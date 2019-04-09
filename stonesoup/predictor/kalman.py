@@ -1,6 +1,7 @@
 from functools import partial
 
 import numpy as np
+from functools import lru_cache
 
 from .base import Predictor
 from ..base import Property
@@ -29,25 +30,9 @@ class KalmanPredictor(Predictor):
 
     """
 
-    transition_model: LinearGaussianTransitionModel = Property(
-        doc="The transition model to be used.")
-    control_model: LinearControlModel = Property(
-        default=None,
-        doc="The control model to be used. Default `None` where the predictor "
-            "will create a zero-effect linear :class:`~.ControlModel`.")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # If no control model insert a linear zero-effect one
-        if self.control_model is None:
-            ndims = self.transition_model.ndim_state
-            ndimc = 2  # No control exerted so this doesn't matter.
-            self.control_model = LinearControlModel(np.zeros([ndims, ndimc]),
-                                                    control_noise=np.zeros([ndimc, ndimc]))
-
-    def _transition_matrix(self, **kwargs):
-        """Return the transition matrix
+    @lru_cache()
+    def predict(self, prior, control_input=None, timestamp=None, **kwargs):
+        """Kalman Filter state prediction step
 
         Parameters
         ----------
@@ -241,20 +226,9 @@ class ExtendedKalmanPredictor(KalmanPredictor):
     transition and control models, if non-linear, must be able to return the
     :attr:`jacobian()` function.
 
-    """
-
-    # In this version the models can be non-linear, but must have access to the
-    # :attr:`jacobian()` function
-    # TODO: Enforce the presence of :attr:`jacobian()`
-    transition_model: TransitionModel = Property(doc="The transition model to be used.")
-    control_model: ControlModel = Property(
-        default=None,
-        doc="The control model to be used. Default `None` where the predictor "
-            "will create a zero-effect linear :class:`~.ControlModel`.")
-
-    def _transition_matrix(self, prior, linearisation_point=None, **kwargs):
-        r"""Returns the transition matrix, a matrix if the model is linear, or
-        approximated as Jacobian otherwise.
+    @lru_cache()
+    def predict(self, prior, control_input=None, timestamp=None, **kwargs):
+        """ Extended Kalman Filter state prediction step
 
         Parameters
         ----------
@@ -577,6 +551,7 @@ class UnscentedKalmanPredictor(KalmanPredictor):
                      doc="Secondary spread scaling parameter\
                         (default is calculated as 3-Ns)")
 
+    @lru_cache()
     def predict(self, prior, control_input=None, timestamp=None, **kwargs):
         """ Unscented Kalman Filter state prediction step
 

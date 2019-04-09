@@ -1,7 +1,6 @@
 import warnings
 
 import numpy as np
-import scipy.linalg as la
 from functools import lru_cache
 
 from ..base import Property
@@ -55,6 +54,7 @@ class KalmanUpdater(Updater):
     These are returned as a :class:`~.GaussianStateUpdate` object.
     """
 
+    @lru_cache()
     def get_measurement_prediction(self, state_prediction,
                                    measurement_model=None, **kwargs):
         """Kalman Filter measurement prediction step
@@ -630,6 +630,7 @@ class IteratedKalmanUpdater(ExtendedKalmanUpdater):
     function via the :meth:`_measurement_matrix()` function.
     """
 
+    @lru_cache()
     def get_measurement_prediction(self, state_prediction,
                                    measurement_model=None, **kwargs):
         """Extended Kalman Filter measurement prediction step
@@ -914,6 +915,7 @@ class UnscentedKalmanUpdater(KalmanUpdater):
                      doc="Secondary spread scaling parameter\
                         (default is calculated as 3-Ns)")
 
+    @lru_cache()
     def get_measurement_prediction(self, state_prediction,
                                    measurement_model=None, **kwargs):
         """Unscented Kalman Filter measurement prediction step
