@@ -63,34 +63,6 @@ This will produce a report in `htmlcov` directory.
 
 License
 -------
-Any contributions submitted are to be under the MIT_ or similar non-copyleft
-license. MIT_ License will be assumed to be unless otherwise stated on the pull
+Any contributions submitted are to be under the MIT or similar non-copyleft
+license. MIT License will be assumed to be unless otherwise stated on the pull
 request.
-
-External Dependencies
----------------------
-Use standard library and existing well maintained external libraries where
-possible. New external libraries should be licensed permissive (e.g MIT_) or
-weak copyleft (e.g. LGPL_)
-
-Pull Requests
--------------
-Submissions should be done via Pull Requests on the `Stone Soup GitHub repo`_.
-Currently we are using `GitHub Flow`_  as our approach to development. Once a
-pull request has been opened, CircleCI_ will run tests and build documentation,
-and Codecov_ will check code coverage. The results of these status checks will
-be available on the PR, and any failures should be addressed.
-
-.. _Python abstract classes: https://docs.python.org/3/library/abc.html
-.. _Flake8: https://flake8.pycqa.org/
-.. _NumPy Doc: https://numpydoc.readthedocs.io/en/latest/format.html
-.. _Sphinx: https://www.sphinx-doc.org/
-.. _Sphinx-Gallery: https://sphinx-gallery.github.io/
-.. _PyTest: https://docs.pytest.org/
-.. _Coverage.py: https://coverage.readthedocs.io/
-.. _MIT: https://opensource.org/licenses/MIT
-.. _LGPL: https://opensource.org/licenses/lgpl-license
-.. _Stone Soup GitHub repo: https://github.com/dstl/Stone-Soup
-.. _GitHub Flow: https://guides.github.com/introduction/flow/index.html
-.. _CircleCI: https://circleci.com/
-.. _Codecov: https://codecov.io/
