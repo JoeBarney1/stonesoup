@@ -13,16 +13,11 @@ Stone Soup is a software project to provide the target tracking and state estima
 community with a framework for the development and testing of tracking and state
 estimation algorithms.
 
-An article is [available](https://www.gov.uk/government/news/dstl-shares-new-open-source-framework-initiative) that details the background to the project, and contains links to sample data.
+Stone Soup is currently in *beta*.
 
 Please see the
 [Stone Soup documentation](https://stonesoup.readthedocs.org/) for more
 information.
-
-Please see the [tutorials](https://stonesoup.readthedocs.io/en/latest/auto_tutorials/index.html),
-[examples](https://stonesoup.readthedocs.io/en/latest/auto_examples/index.html),
-and [demonstrations](https://stonesoup.readthedocs.io/en/latest/auto_demos/index.html),
-which you can also try out on Binder: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/dstl/Stone-Soup/main?filepath=notebooks)
 
 ## Dependencies
 Stone Soup uses the following dependencies:
@@ -31,6 +26,7 @@ Stone Soup uses the following dependencies:
 | ---- | ------- |
 | [Python](https://www.python.org/) (v3.5+) | PSFL |
 | [SciPy](https://www.scipy.org/) | BSD |
+| [matplotlib](https://matplotlib.org/) | [PSF/BSD-compatible](https://matplotlib.org/users/license.html) |
 | [ruamel.yaml](https://yaml.readthedocs.io/) | MIT |
 | [pymap3d](https://github.com/scivision/pymap3d) | MIT |
 | [utm](https://https://github.com/Turbo87/utm) | MIT |
