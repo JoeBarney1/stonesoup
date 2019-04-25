@@ -173,89 +173,132 @@ class LinearGaussianTimeInvariantTransitionModel(LinearGaussianTransitionModel,
         return self.covariance_matrix
 
 
-class ConstantNthDerivative(LinearGaussianTransitionModel, TimeVariantModel):
-    r"""Discrete model based on the Nth derivative with respect to time being
-    constant, to set derivative use keyword argument
-    :attr:`constant_derivative`
+class OrnsteinUhlenbeck(LinearGaussianTransitionModel, TimeVariantModel):
+    r"""This is a class implementation of a time-variant 1D Linear-Gaussian
+    Ornstein Uhlenbeck Transition Model.
 
-     The model is described by the following SDEs:
+    The target is assumed to move with (nearly) constant velocity, which
+    exponentially decays to zero over time, and target acceleration is
+    modeled as white noise.
+
+    The model is described by the following SDEs:
 
         .. math::
             :nowrap:
 
             \begin{eqnarray}
-                dx^{(N-1)} & = & x^{(N)} dt & | {(N-1)th \ derivative \ on \
+                dx_{pos} & = & x_{vel} dt & | {Position \ on \
                 X-axis (m)} \\
-                dx^{(N)} & = & q\cdot dW_t,\ W_t \sim \mathcal{N}(0,q^2) & | \
-                Nth\ derivative\ on\ X-axis (m/s^{N})
+                dx_{vel} & = & -K x_{vel} dt + q dW_t,
+                W_t \sim \mathcal{N}(0,q) & | {Speed\ on \
+                X-axis (m/s)}
             \end{eqnarray}
 
-    It is hard to represent the matrix form of these due to the fact that they
-    vary with N, examples for N=1 and N=2 can be found in the
-    :class:`~.ConstantVelocity` and :class:`~.ConstantAcceleration` models
-    respectively. To aid visualisation of :math:`F_t` the elements are
-    calculated as the terms of the taylor expansion of each state variable.
+    Or equivalently:
+
+        .. math::
+            x_t = F_t x_{t-1} + w_t,\ w_t \sim \mathcal{N}(0,Q_t)
+
+    where:
+
+        .. math::
+            x & = & \begin{bmatrix}
+                        x_{pos} \\
+                        x_{vel}
+                \end{bmatrix}
+
+        .. math::
+            F_t & = & \begin{bmatrix}
+                        1 & \frac{1}{K}(1 - e^{-Kdt})\\
+                        0 & e^{-Kdt}
+                \end{bmatrix}
+
+        .. math::
+            Q_t & = & \begin{bmatrix}
+                        \frac{dt - \frac{2}{K}(1 - e^{-Kdt})
+                              + \frac{1}{2K}(1 - e^{-2Kdt})}{K^2} &
+                        \frac{\frac{1}{K}(1 - e^{-Kdt})
+                              - \frac{1}{2K}(1 - e^{-2Kdt})}{K} \\
+                        \frac{\frac{1}{K}(1 - e^{-Kdt})
+                              - \frac{1}{2K}(1 - e^{-2Kdt})}{K} &
+                        \frac{1 - e^{-2Kdt}}{2K}
+                \end{bmatrix} q
     """
 
-    constant_derivative: int = Property(
-        doc="The order of the derivative with respect to time to be kept constant, eg if 2 "
-            "identical to constant acceleration")
-    noise_diff_coeff: float = Property(
-        doc="The Nth derivative noise diffusion coefficient (Variance) :math:`q`")
+    noise_diff_coeff = Property(
+        float, doc="The velocity noise diffusion coefficient :math:`q`")
+    damping_coeff = Property(
+        float, doc="The velocity damping coefficient :math:`K`")
 
     @property
     def ndim_state(self):
-        return self.constant_derivative + 1
+        """ndim_state getter method
+
+        Returns
+        -------
+        :class:`int`
+            :math:`2` -> The number of model state dimensions
+        """
+
+        return 2
 
     def matrix(self, time_interval, **kwargs):
-        time_interval_sec = time_interval.total_seconds()
-        N = self.constant_derivative
-        Fmat = np.zeros((N + 1, N + 1))
-        dt = time_interval_sec
-        for i in range(0, N + 1):
-            for j in range(i, N + 1):
-                Fmat[i, j] = (dt ** (j - i)) / math.factorial(j - i)
+        """Model matrix :math:`F(t)`
 
-        return Fmat
+        Parameters
+        ----------
+        time_interval: :class:`datetime.timedelta`
+            A time interval :math:`dt`
+
+        Returns
+        -------
+        :class:`numpy.ndarray` of shape\
+        (:py:attr:`~ndim_state`, :py:attr:`~ndim_state`)
+            The model matrix evaluated given the provided time interval.
+        """
+
+        k = self.damping_coeff
+        dt = time_interval.total_seconds()
+
+        exp_kdt = sp.exp(-k*dt)
+
+        return sp.array([[1, (1 - exp_kdt)/k],
+                         [0, exp_kdt]])
 
     def covar(self, time_interval, **kwargs):
-        time_interval_sec = time_interval.total_seconds()
-        dt = time_interval_sec
-        N = self.constant_derivative
-        if N == 1:
-            covar = np.array([[dt**3 / 3, dt**2 / 2],
-                              [dt**2 / 2, dt]])
-        else:
-            Fmat = self.matrix(time_interval, **kwargs)
-            Q = np.zeros((N + 1, N + 1))
-            Q[N, N] = 1
-            igrand = Fmat @ Q @ Fmat.T
-            covar = np.zeros((N + 1, N + 1))
-            for l in range(0, N + 1):  # noqa: E741
-                for k in range(0, N + 1):
-                    covar[l, k] = (igrand[l, k]*dt / (1 + N*2 - l - k))
-        covar *= self.noise_diff_coeff
+        """Returns the transition model noise covariance matrix.
+
+        Parameters
+        ----------
+        time_interval : :class:`datetime.timedelta`
+            A time interval :math:`dt`
+        Returns
+        -------
+        :class:`stonesoup.types.state.CovarianceMatrix` of shape\
+        (:py:attr:`~ndim_state`, :py:attr:`~ndim_state`)
+            The process noise covariance.
+        """
+
+        k = self.damping_coeff
+        q = self.noise_diff_coeff
+        dt = time_interval.total_seconds()
+
+        exp_kdt = sp.exp(-k*dt)
+        exp_2kdt = sp.exp(-2*k*dt)
+
+        q11 = q*(dt - 2/k*(1 - exp_kdt) + 1/(2*k)*(1 - exp_2kdt))/(k**2)
+        q12 = q*((1 - exp_kdt)/k - 1/(2*k)*(1 - exp_2kdt))/k
+        q22 = q*(1 - exp_2kdt)/(2*k)
+
+        covar = sp.array([[q11, q12],
+                          [q12, q22]])
+
         return CovarianceMatrix(covar)
 
 
-class RandomWalk(ConstantNthDerivative):
-    r"""This is a class implementation of a discrete, time-variant 1D
-    Linear-Gaussian Random Walk Transition Model.
-
-        The target is assumed to be (almost) stationary, where
-        target velocity is modelled as white noise.
-        """
-    noise_diff_coeff: float = Property(doc="The position noise diffusion coefficient :math:`q`")
-
-    @property
-    def constant_derivative(self):
-        """For random walk, this is 0."""
-        return 0
-
-
-class ConstantVelocity(ConstantNthDerivative):
-    r"""This is a class implementation of a discrete, time-variant 1D
-    Linear-Gaussian Constant Velocity Transition Model.
+class ConstantVelocity(LinearGaussianTransitionModel, TimeVariantModel):
+    r"""This is a class implementation of a time-variant 1D Linear-Gaussian
+    Constant Velocity Transition Model.
 
     The target is assumed to move with (nearly) constant velocity, where
     target acceleration is modelled as white noise.
