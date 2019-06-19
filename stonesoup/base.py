@@ -344,13 +344,24 @@ class BaseMeta(ABCMeta):
 
         cls = super().__new__(mcls, name, bases, namespace)
 
-        for property_ in cls.properties.values():
-            if isinstance(property_.cls, str) and property_.cls == name:
-                property_.cls = cls
-
-        for base_class in cls.mro()[1:]:
-            if type(base_class) is mcls:
-                base_class._subclasses.add(cls)
+        cls._subclasses = set()
+        cls._properties = OrderedDict()
+        # Update subclass lists, and update properties (in reverse order)
+        for bcls in reversed(cls.mro()[1:]):
+            if type(bcls) is mcls:
+                bcls._subclasses.add(cls)
+                cls._properties.update(bcls._properties)
+        cls._properties.update(
+            (key, value) for key, value in namespace.items()
+            if isinstance(value, Property))
+        for name in list(cls._properties):
+            # Remove items which are no longer properties
+            if name in namespace and not isinstance(namespace[name], Property):
+                del cls._properties[name]
+                continue
+            # Optional arguments must follow mandatory
+            if cls._properties[name].default is not Property.empty:
+                cls._properties.move_to_end(name)
 
         if sys.version_info <= (3, 6):  # pragma: no cover
             for name, property_ in cls._properties.items():
