@@ -128,6 +128,7 @@ class CSVDetectionReader(DetectionReader, _CSVReader):
     metadata_fields = Property(
         [str], default=None, doc='List of columns to be saved as metadata, '
                                  'default all')
+    csv_options = Property(dict, default={}, doc='Keyword arguments for the underlying csv reader')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -139,7 +140,7 @@ class CSVDetectionReader(DetectionReader, _CSVReader):
 
     def detections_gen(self):
         with self.path.open(encoding=self.encoding, newline='') as csv_file:
-            reader = csv.DictReader(csv_file)
+            reader = csv.DictReader(csv_file, **self.csv_options)
             for row in reader:
                 if self.time_field_format is not None:
                     time_field_value = datetime.strptime(
