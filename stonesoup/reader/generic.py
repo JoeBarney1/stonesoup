@@ -147,7 +147,7 @@ class CSVDetectionReader(DetectionReader, _CSVReader):
                         row[self.time_field], self.time_field_format)
                 elif self.timestamp is True:
                     time_field_value = datetime.utcfromtimestamp(
-                        int(row[self.time_field]))
+                        int(float(row[self.time_field])))
                 else:
                     time_field_value = parse(row[self.time_field])
 
