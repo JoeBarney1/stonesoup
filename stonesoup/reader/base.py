@@ -2,7 +2,7 @@
 from abc import abstractmethod
 
 from ..base import Base
-from ..buffered_generator import BufferedGenerator
+from stonesoup.buffered_generator import BufferedGenerator
 
 
 class Reader(Base, BufferedGenerator):
@@ -11,17 +11,6 @@ class Reader(Base, BufferedGenerator):
 
 class DetectionReader(Reader):
     """Detection Reader base class"""
-
-    @property
-    @abstractmethod
-    def detections(self):
-        """The detections at the current time step.
-
-        This is the set of detections last returned by the
-        :meth:`detections_gen` generator, to allow other components, like
-        metrics, to access the data.
-        """
-        raise NotImplementedError
 
     @abstractmethod
     @BufferedGenerator.generator_method

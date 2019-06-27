@@ -172,12 +172,7 @@ class SimpleDetectionSimulator(DetectionSimulator):
         clutter detections per unit volume per timestep"""
         return self.clutter_rate/np.prod(np.diff(self.meas_range))
 
-    @property
-    def clutter_spatial_density(self):
-        """returns the clutter spatial density of the measurement space - num
-        clutter detections per unit volume per timestep"""
-        return self.clutter_rate/np.prod(np.diff(self.meas_range))
-
+    @BufferedGenerator.generator_method
     def detections_gen(self):
         for time, tracks in self.groundtruth.groundtruth_paths_gen():
             self.real_detections.clear()
@@ -201,4 +196,4 @@ class SimpleDetectionSimulator(DetectionSimulator):
                     timestamp=time)
                 self.clutter_detections.add(detection)
 
-            yield time, self.detections
+            yield time, self.real_detections | self.clutter_detections
