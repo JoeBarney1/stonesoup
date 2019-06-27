@@ -30,21 +30,14 @@ class SingleTargetGroundTruthSimulator(GroundTruthSimulator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._groundtruth_paths = set()
-
-    @property
-    def groundtruth_paths(self):
-        return self._groundtruth_paths.copy()
 
     @BufferedGenerator.generator_method
     def groundtruth_paths_gen(self):
-        self._groundtruth_paths = set()
         time = self.initial_state.timestamp or datetime.datetime.now()
 
         gttrack = GroundTruthPath([
             GroundTruthState(self.initial_state.state_vector, timestamp=time)])
-        self._groundtruth_paths.add(gttrack)
-        yield time, self.groundtruth_paths
+        yield time, {gttrack}
 
         for _ in range(self.number_steps - 1):
             time += self.timestep
@@ -53,8 +46,7 @@ class SingleTargetGroundTruthSimulator(GroundTruthSimulator):
                 gttrack[-1], noise=True, time_interval=self.timestep)
             gttrack.append(GroundTruthState(
                 trans_state_vector, timestamp=time))
-
-            yield time, self.groundtruth_paths
+            yield time, {gttrack}
 
 
 class SwitchOneTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
@@ -107,19 +99,20 @@ class MultiTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
                        "simulated. These simulated targets will be made in addition to those "
                        "defined by :attr:`preexisting_states`.")
 
+    @BufferedGenerator.generator_method
     def groundtruth_paths_gen(self):
-        self._groundtruth_paths = set()
+        groundtruth_paths = set()
         time = self.initial_state.timestamp or datetime.datetime.now()
 
         for _ in range(self.number_steps):
             # Random drop tracks
-            self._groundtruth_paths.difference_update(
+            groundtruth_paths.difference_update(
                 gttrack
-                for gttrack in self.groundtruth_paths
+                for gttrack in groundtruth_paths.copy()
                 if np.random.rand() <= self.death_probability)
 
             # Move tracks forward
-            for gttrack in self.groundtruth_paths:
+            for gttrack in groundtruth_paths.copy():
                 trans_state_vector = self.transition_model.function(
                     gttrack[-1], noise=True, time_interval=self.timestep)
                 gttrack.append(GroundTruthState(
@@ -134,9 +127,9 @@ class MultiTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
                     np.sqrt(self.initial_state.covar) @
                     np.random.randn(self.initial_state.ndim, 1),
                     timestamp=time))
-                self._groundtruth_paths.add(gttrack)
+                groundtruth_paths.add(gttrack)
 
-            yield time, self.groundtruth_paths
+            yield time, groundtruth_paths
             time += self.timestep
 
 
