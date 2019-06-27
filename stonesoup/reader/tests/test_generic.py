@@ -50,7 +50,7 @@ def csv_gt_filename(tmpdir):
                                     metadata_fields=["z"])
     detections = [
         detection
-        for _, detections in csv_reader.detections_gen()
+        for _, detections in csv_reader
         for detection in detections]
 
     for n, detection in enumerate(detections):
@@ -81,7 +81,7 @@ def csv_gt_filename(tmpdir):
                                     timestamp=True)
     detections = [
         detection
-        for _, detections in csv_reader.detections_gen()
+        for _, detections in csv_reader
         for detection in detections]
 
     for n, detection in enumerate(detections):
