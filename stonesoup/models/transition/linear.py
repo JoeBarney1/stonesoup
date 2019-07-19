@@ -296,7 +296,7 @@ class OrnsteinUhlenbeck(LinearGaussianTransitionModel, TimeVariantModel):
 
 
 class ConstantNthDerivative(LinearGaussianTransitionModel, TimeVariantModel):
-    r"""Model based on the Nth derivative of position being constant,
+    r"""Model based on the Nth derivative with respect to time being constant,
     to set derivative use keyword argument :attr:`constant_derivative`
 
      The model is described by the following SDEs:
@@ -319,11 +319,11 @@ class ConstantNthDerivative(LinearGaussianTransitionModel, TimeVariantModel):
     """
 
     constant_derivative = Property(
-        int, doc="The position derivative to be kept constant, "
-                 "eg if 2 identical to constant acceleration")
+        int, doc="The order of the derivative with respect to time to be kept\
+                    constant, eg if 2 identical to constant acceleration")
     noise_diff_coeff = Property(
-        float, doc="The Nth derivative noise diffusion"
-                   "coefficient (Variance) :math:`q`")
+        float, doc="The Nth derivative noise diffusion \
+                   coefficient (Variance) :math:`q`")
 
     @property
     def ndim_state(self):
@@ -372,6 +372,7 @@ class RandomWalk(ConstantNthDerivative):
 
     @property
     def constant_derivative(self):
+        """For random walk, this is 0."""
         return 0
 
 
@@ -424,6 +425,7 @@ class ConstantVelocity(ConstantNthDerivative):
 
     @property
     def constant_derivative(self):
+        """For constant velocity, this is 1."""
         return 1
 
 
@@ -482,6 +484,7 @@ class ConstantAcceleration(ConstantNthDerivative):
 
     @property
     def constant_derivative(self):
+        """For constant acceleration, this is 2."""
         return 2
 
 
