@@ -126,8 +126,7 @@ class LinearModel(Model):
         """Model matrix"""
         raise NotImplementedError
 
-    def function(self, state: State, noise: Union[bool, np.ndarray] = False,
-                 **kwargs) -> Union[StateVector, StateVectors]:
+    def function(self, state_vector, noise=None, **kwargs):
         """Model linear function :math:`f_k(x(k),w(k)) = F_k(x_k) + w_k`
 
         Parameters
@@ -135,8 +134,9 @@ class LinearModel(Model):
         state_vector: :class:`~.StateVector`
             An input state vector
         noise: :class:`numpy.ndarray`
-            An externally generated random process noise sample (the default in
-            `None`, in which case process noise will be generated internally)
+            An externally generated random process noise sample (the default is
+            `None`, in which case process noise will be generated via
+            :meth:`~.Model.rvs`)
 
         Returns
         -------
@@ -149,7 +149,9 @@ class LinearModel(Model):
             else:
                 noise = 0
 
-        return self.matrix(**kwargs) @ state.state_vector + noise
+        if noise is None:
+            # TODO: doesn't make sense for noise=None to generate noise
+            noise = self.rvs(**kwargs)
 
     def jacobian(self, state: State, **kwargs) -> np.ndarray:
         """Model jacobian matrix :math:`H_{jac}`

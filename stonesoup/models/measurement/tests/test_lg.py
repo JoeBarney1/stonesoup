@@ -66,7 +66,7 @@ def test_lgmodel(H, R, ndim_state, mapping):
 
     # Propagate a state vector through the model
     # (with internal noise)
-    meas_pred_w_inoise = lg.function(state, noise=lg.rvs())
+    meas_pred_w_inoise = lg.function(state_vec, noise=lg.rvs())
     assert not np.array_equal(meas_pred_w_inoise, H@state_vec)
 
     # Evaluate the likelihood of the predicted state, given the prior

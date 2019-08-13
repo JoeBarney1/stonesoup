@@ -1,17 +1,19 @@
-import numpy as np
+# -*- coding: utf-8 -*-
+
+from scipy import ndarray
+from scipy.stats import multivariate_normal
 
 from .base import ControlModel
-from ..base import LinearModel, GaussianModel
+from ..base import LinearModel
 from ...base import Property
-from ...types.array import StateVector
 
 
-class LinearControlModel(ControlModel, LinearModel, GaussianModel):
+class LinearControlModel(ControlModel, LinearModel):
     r"""Implements a linear effect to the state vector via,
 
     .. math::
 
-        \hat{x}_k = B_k (\mathbf{u}_k + \gamma_k)
+        \hat{x}_k = B_k \mathbf{u}_k + \gamma_k
 
     where :math:`B_k` is the control-input model matrix (i.e. control matrix),
     :math:`\mathbf{u}_k` is the control vector and :math:`\gamma_k` is
@@ -20,56 +22,67 @@ class LinearControlModel(ControlModel, LinearModel, GaussianModel):
 
     """
 
-    control_matrix: np.ndarray = Property(
+    control_vector = Property(
+        ndarray, doc="Control vector at time :math:`k`")
+    control_matrix = Property(
+        ndarray,
         doc="Control input model matrix at time :math:`k`, :math:`B_k`")
-    control_noise: np.ndarray = Property(
+    control_noise = Property(
+        ndarray,
         default=None,
         doc="Control input noise covariance at time :math:`k`")
 
-    def __init__(self, *args, **kwargs):
-        """Ensures that the None control noise defaults to a ndimxndim zero matrix"""
-        super().__init__(*args, **kwargs)
-
-        if self.control_noise is None:
-            self.control_noise = np.zeros([self.ndim_ctrl, self.ndim_ctrl])
-
-    @property
-    def ndim(self):
-        return self.ndim_ctrl
-
     @property
     def ndim_ctrl(self):
-        return self.control_matrix.shape[1]
+        return self.control_vector.shape[0]
 
-    def matrix(self, **kwargs) -> np.ndarray:
+    def matrix(self):
         """
         Returns
         -------
         : :class:`numpy.ndarray`
             the control-input model matrix, :math:`B_k`
         """
-
         return self.control_matrix
 
-    def covar(self, **kwargs):
+    def control_input(self):
+        r"""The mean control input
 
-        return self.control_noise
-
-    def function(self, control_input, noise=False, **kwargs) -> StateVector:
-        """This needs to be overwritten because noise is added before the transformation
-        rather than after it.
+        Returns
+        -------
+        : :class:`numpy.ndarray`
+            the noiseless effect of the control input, :math:`B_k \mathbf{u}_k`
 
         """
-        # have to accept that control input might be None and then adjust (including to add noise).
-        if control_input is None:
-            control_vector = StateVector(np.zeros(self.ndim_ctrl))
-        else:
-            control_vector = control_input.state_vector
+        return self.control_matrix @ self.control_vector
 
-        if isinstance(noise, bool) or noise is None:
-            if noise:
-                noise = self.rvs(num_samples=control_vector.shape[1], **kwargs)
-            else:
-                noise = 0
+    def rvs(self):
+        r"""Sample (once) from the multivariate normal distribution determined
+        from the mean and covariance control parameters
 
-        return self.matrix(**kwargs) @ (control_vector + noise)
+        Returns
+        -------
+        : :class:`numpy.ndarray`
+            a sample from :math:`\mathcal{N}(B_k \mathbf{u}_k, \Gamma_k)`
+
+        """
+        return multivariate_normal.rvs(self.control_input(),
+                                       self.control_noise).reshape(-1, 1)
+
+    def pdf(self, control_vec):
+        """The value of the probability density function (pdf) at a test point
+
+        Parameters
+        ----------
+        control_vec : :class:`numpy.ndarray`
+            The control vector at the test point
+
+        Returns
+        -------
+        float
+            The value of the pdf at :obj:`control_vec`
+
+        """
+        return multivariate_normal.pdf(control_vec,
+                                       mean=self.control_input(),
+                                       cov=self.control_noise).reshape(-1, 1)

@@ -67,7 +67,7 @@ class LinearGaussian(MeasurementModel, LinearModel, GaussianModel):
             An input state vector
         noise: :class:`numpy.ndarray`
             An externally generated random process noise sample (the default in
-            `None`, in which case process noise will be generated internally)
+            `None`, in which case process noise will be added via :meth:`rvs`)
 
         Returns
         -------
@@ -75,11 +75,8 @@ class LinearGaussian(MeasurementModel, LinearModel, GaussianModel):
             The model function evaluated given the provided time interval.
         """
 
-        if isinstance(noise, bool) or noise is None:
-            if noise:
-                noise = self.rvs(num_samples=state.state_vector.shape[1], **kwargs)
-            else:
-                noise = 0
+        if noise is None:
+            noise = self.rvs()  # TODO: change noise=None generates noise!
 
         return self.matrix(**kwargs)@state.state_vector + noise
 

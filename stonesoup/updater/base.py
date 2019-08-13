@@ -46,7 +46,7 @@ class Updater(Base):
         return measurement_model
 
     @abstractmethod
-    def get_measurement_prediction(
+    def predict_measurement(
             self, state_prediction, measurement_model=None, **kwargs):
         """Get measurement prediction from state prediction
 
@@ -60,7 +60,6 @@ class Updater(Base):
             on the received measurement. The default is `None`, in which case
             the updater will use the measurement model specified on
             initialisation
-
 
         Returns
         -------
