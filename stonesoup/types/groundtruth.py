@@ -5,8 +5,8 @@ from .state import State, StateMutableSequence
 
 class GroundTruthState(State):
     """Ground Truth State type"""
-    metadata: MutableMapping = Property(
-        default=None, doc='Dictionary of metadata items for Detections.')
+    metadata = Property(dict, default=None,
+                        doc='Dictionary of metadata items for Detections.')
 
     def __init__(self, state_vector, *args, **kwargs):
         super().__init__(state_vector, *args, **kwargs)
