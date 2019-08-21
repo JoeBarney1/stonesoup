@@ -1,26 +1,24 @@
+# coding: utf-8
 import datetime
 
-from pytest import approx
-import numpy as np
+import scipy as sp
 from scipy.stats import multivariate_normal
 
-from ..linear import KnownTurnRateSandwich
-from ..linear import ConstantVelocity
-from ....types.state import State
+from ..linear import ConstantTurnSandwich, ConstantVelocity
 
 
 def test_ctmodel():
-    """ KnownTurnRateSandwich Transition Model test """
-    state = State(np.array([[3.0], [1.0], [2.0], [1.0], [1.0], [1.0]]))
-    turn_noise_diff_coeffs = np.array([0.01, 0.01])
+    """ ConstantTurnSandwich Transition Model test """
+    state_vec = sp.array([[3.0], [1.0], [2.0], [1.0], [1.0], [1.0]])
+    turn_noise_diff_coeffs = sp.array([0.01, 0.01])
     turn_rate = 0.1
     noise_diff_cv = 0.1
     model_list = [ConstantVelocity(noise_diff_cv)]
-    base(KnownTurnRateSandwich, state, turn_noise_diff_coeffs, turn_rate,
+    base(ConstantTurnSandwich, state_vec, turn_noise_diff_coeffs, turn_rate,
          noise_diff_cv, model_list)
 
 
-def base(model, state, turn_noise_diff_coeffs, turn_rate, noise_diff_cv,
+def base(model, state_vec, turn_noise_diff_coeffs, turn_rate, noise_diff_cv,
          model_list):
     """ Base test for n-dimensional ConstantAcceleration Transition Models """
 
@@ -30,7 +28,7 @@ def base(model, state, turn_noise_diff_coeffs, turn_rate, noise_diff_cv,
                       turn_rate=turn_rate, model_list=model_list)
 
     # State related variables
-    state_vec = state.state_vector
+    state_vec = state_vec
     old_timestamp = datetime.datetime.now()
     timediff = 1  # 1sec
     new_timestamp = old_timestamp + datetime.timedelta(seconds=timediff)
@@ -41,112 +39,111 @@ def base(model, state, turn_noise_diff_coeffs, turn_rate, noise_diff_cv,
     noise_diff_cv = noise_diff_cv
     turn_rate = turn_rate
     turn_ratedt = turn_rate*timediff
-    F = np.array(
-            [[1, np.sin(turn_ratedt) / turn_rate, 0, 0,
-              0, -(1 - np.cos(turn_ratedt)) / turn_rate],
-             [0, np.cos(turn_ratedt), 0, 0,
-              0, -np.sin(turn_ratedt)],
+    F = sp.array(
+            [[1, sp.sin(turn_ratedt) / turn_rate, 0, 0,
+              0, -(1 - sp.cos(turn_ratedt)) / turn_rate],
+             [0, sp.cos(turn_ratedt), 0, 0,
+              0, -sp.sin(turn_ratedt)],
              [0, 0, 1, 1, 0, 0],
              [0, 0, 0, 1, 0, 0],
-             [0, (1 - np.cos(turn_ratedt)) / turn_rate, 0, 0,
-              1, np.sin(turn_ratedt) / turn_rate],
-             [0, np.sin(turn_ratedt), 0, 0,
-              0, np.cos(turn_ratedt)]])
+             [0, (1 - sp.cos(turn_ratedt)) / turn_rate, 0, 0,
+              1, sp.sin(turn_ratedt) / turn_rate],
+             [0, sp.sin(turn_ratedt), 0, 0,
+              0, sp.cos(turn_ratedt)]])
     q = noise_diff_cv
     qx = turn_noise_diff_coeffs[0]
     qy = turn_noise_diff_coeffs[1]
-    Q = np.array([[qx * timediff**3 / 3,
-                   qx * timediff**2 / 2,
+    Q = sp.array([[qx * sp.power(timediff, 3) / 3,
+                   qx * sp.power(timediff, 2) / 2,
                    0, 0,
                    0, 0],
-                  [qx * timediff**2 / 2,
+                  [qx * sp.power(timediff, 2) / 2,
                    qx * timediff,
                    0, 0,
                    0, 0],
                   [0,
                    0,
-                   q * timediff**3 / 3,
-                   q * timediff**2 / 2,
+                   q * sp.power(timediff, 3) / 3,
+                   q * sp.power(timediff, 2) / 2,
                    0,
                    0],
                   [0,
                    0,
-                   q * timediff**2 / 2,
+                   q * sp.power(timediff, 2) / 2,
                    q * timediff,
                    0,
                    0],
                   [0, 0,
                    0, 0,
-                   qy * timediff**3 / 3,
-                   qy * timediff**2 / 2],
+                   qy * sp.power(timediff, 3) / 3,
+                   qy * sp.power(timediff, 2) / 2],
                   [0, 0,
                    0, 0,
-                   qy * timediff**2 / 2,
+                   qy * sp.power(timediff, 2) / 2,
                    qy * timediff]])
 
     # Ensure ```model_obj.transfer_function(time_interval)``` returns F
-    assert np.array_equal(F, model_obj.matrix(
+    assert sp.array_equal(F, model_obj.matrix(
         timestamp=new_timestamp, time_interval=time_interval))
 
     # Ensure ```model_obj.covar(time_interval)``` returns Q
-    assert np.array_equal(Q, model_obj.covar(
+    assert sp.array_equal(Q, model_obj.covar(
         timestamp=new_timestamp, time_interval=time_interval))
 
-    # Propagate a state vector through the model
+    # Propagate a state vector throught the model
     # (without noise)
     new_state_vec_wo_noise = model_obj.function(
-        state,
+        state_vec,
         timestamp=new_timestamp,
-        time_interval=time_interval)
-
-    assert np.array_equal(new_state_vec_wo_noise, F@state_vec)
+        time_interval=time_interval,
+        noise=0)
+    assert sp.array_equal(new_state_vec_wo_noise, F@state_vec)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (without noise)
-    prob = model_obj.pdf(State(new_state_vec_wo_noise),
-                         state,
+    prob = model_obj.pdf(new_state_vec_wo_noise,
+                         state_vec,
                          timestamp=new_timestamp,
                          time_interval=time_interval)
-    assert approx(prob) == multivariate_normal.pdf(
+    assert sp.array_equal(prob, multivariate_normal.pdf(
         new_state_vec_wo_noise.T,
-        mean=np.array(F@state_vec).ravel(),
-        cov=Q)
+        mean=sp.array(F@state_vec).ravel(),
+        cov=Q).T)
 
     # Propagate a state vector throughout the model
     # (with internal noise)
     new_state_vec_w_inoise = model_obj.function(
-        state,
-        noise=True,
+        state_vec,
         timestamp=new_timestamp,
         time_interval=time_interval)
-    assert not np.array_equal(new_state_vec_w_inoise, F@state_vec)
+    assert not sp.array_equal(new_state_vec_w_inoise, F@state_vec)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
-    prob = model_obj.pdf(State(new_state_vec_w_inoise),
-                         state,
+    prob = model_obj.pdf(new_state_vec_w_inoise,
+                         state_vec,
                          timestamp=new_timestamp,
                          time_interval=time_interval)
-    assert approx(prob) == multivariate_normal.pdf(
+    assert sp.array_equal(prob, multivariate_normal.pdf(
         new_state_vec_w_inoise.T,
-        mean=np.array(F@state_vec).ravel(),
-        cov=Q)
+        mean=sp.array(F@state_vec).ravel(),
+        cov=Q).T)
 
-    # Propagate a state vector through the model
+    # Propagate a state vector throught the model
     # (with external noise)
     noise = model_obj.rvs(timestamp=new_timestamp, time_interval=time_interval)
     new_state_vec_w_enoise = model_obj.function(
-        state,
+        state_vec,
         timestamp=new_timestamp,
         time_interval=time_interval,
         noise=noise)
-    assert np.array_equal(new_state_vec_w_enoise, F@state_vec+noise)
+    assert sp.array_equal(new_state_vec_w_enoise, F@state_vec+noise)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
-    prob = model_obj.pdf(State(new_state_vec_w_enoise), state,
+    prob = model_obj.pdf(new_state_vec_w_enoise, state_vec,
                          timestamp=new_timestamp, time_interval=time_interval)
-    assert approx(prob) == multivariate_normal.pdf(
+    assert sp.array_equal(prob, multivariate_normal.pdf(
         new_state_vec_w_enoise.T,
-        mean=np.array(F@state_vec).ravel(),
-        cov=Q)
+        mean=sp.array(F@state_vec).ravel(),
+        cov=Q).T)
