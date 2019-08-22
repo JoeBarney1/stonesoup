@@ -2,7 +2,7 @@
 from abc import abstractmethod
 
 from ..base import Base
-from stonesoup.buffered_generator import BufferedGenerator
+from ..buffered_generator import BufferedGenerator
 
 
 class Reader(Base, BufferedGenerator):
@@ -11,6 +11,10 @@ class Reader(Base, BufferedGenerator):
 
 class DetectionReader(Reader):
     """Detection Reader base class"""
+
+    @property
+    def detections(self):
+        return self.current[1]
 
     @abstractmethod
     @BufferedGenerator.generator_method
@@ -30,6 +34,10 @@ class DetectionReader(Reader):
 class GroundTruthReader(Reader):
     """Ground Truth Reader base class"""
 
+    @property
+    def groundtruth_paths(self):
+        return self.current[1]
+
     @abstractmethod
     @BufferedGenerator.generator_method
     def groundtruth_paths_gen(self):
@@ -48,7 +56,12 @@ class GroundTruthReader(Reader):
 class SensorDataReader(Reader):
     """Sensor Data Reader base class"""
 
+    @property
+    def sensor_data(self):
+        return self.current[1]
+
     @abstractmethod
+    @BufferedGenerator.generator_method
     def sensor_data_gen(self):
         """Returns a generator of sensor data for each time step.
 
