@@ -6,7 +6,8 @@ of data that is in common formats.
 
 import csv
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
+from math import modf
 
 import numpy as np
 from dateutil.parser import parse
@@ -53,8 +54,10 @@ class CSVGroundTruthReader(GroundTruthReader, TextFileReader):
                     time_field_value = datetime.strptime(
                         row[self.time_field], self.time_field_format)
                 elif self.timestamp is True:
+                    fractional, timestamp = modf(float(row[self.time_field]))
                     time_field_value = datetime.utcfromtimestamp(
-                        int(float(row[self.time_field])))
+                        int(timestamp))
+                    time_field_value += timedelta(microseconds=fractional*1E6)
                 else:
                     time_field_value = parse(row[self.time_field])
 
@@ -189,8 +192,10 @@ class CSVDetectionReader(DetectionReader, _CSVReader):
                     time_field_value = datetime.strptime(
                         row[self.time_field], self.time_field_format)
                 elif self.timestamp is True:
+                    fractional, timestamp = modf(float(row[self.time_field]))
                     time_field_value = datetime.utcfromtimestamp(
-                        int(float(row[self.time_field])))
+                        int(timestamp))
+                    time_field_value += timedelta(microseconds=fractional*1E6)
                 else:
                     time_field_value = parse(row[self.time_field])
 
