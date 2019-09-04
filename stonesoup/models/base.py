@@ -153,21 +153,7 @@ class LinearModel(Model):
             # TODO: doesn't make sense for noise=None to generate noise
             noise = self.rvs(**kwargs)
 
-    def jacobian(self, state: State, **kwargs) -> np.ndarray:
-        """Model jacobian matrix :math:`H_{jac}`
-
-        Parameters
-        ----------
-        state : :class:`~.State`
-            An input state
-
-        Returns
-        -------
-        :class:`numpy.ndarray` of shape (:py:attr:`~ndim_meas`, \
-        :py:attr:`~ndim_state`)
-            The model jacobian matrix evaluated around the given state vector.
-        """
-        return self.matrix(**kwargs)
+        return self.matrix(**kwargs) @ state_vector + noise
 
 
 class ReversibleModel(Model):
@@ -214,6 +200,33 @@ class ReversibleModel(Model):
         -------
         : :class:`numpy.ndarray`
             The model function evaluated.
+        """
+        pass
+
+
+class ReversibleModel(NonLinearModel):
+    """Non-linear model containing sufficient co-ordinate
+    information such that the linear co-ordinate conversions
+    can be calculated from the non-linear counterparts.
+
+    Contains an inverse function which computes the reverse
+    of the relevant linear-to-non-linear function"""
+
+    @abstractmethod
+    def inverse_function(self, state_vector, **kwargs):
+        """Takes in the result of the function and
+        computes the inverse function, returning the initial
+        input of the function.
+
+        Parameters
+        ----------
+        state_vector: :class:`~.StateVector`
+            Input state vector (non-linear format)
+
+        Returns
+        -------
+        : :class:`numpy.ndarray`
+            The linear co-ordinates
         """
         pass
 
