@@ -1,18 +1,17 @@
+# coding: utf-8
 import datetime
 
-from pytest import approx
-import numpy as np
+import scipy as sp
 from scipy.stats import multivariate_normal
 
 from ..linear import RandomWalk
-from ....types.state import State
 
 
 def test_rwodel():
     """ RandomWalk Transition Model test """
 
     # State related variables
-    state = State(np.array([[3.0]]))
+    state_vec = sp.array([[3.0]])
     old_timestamp = datetime.datetime.now()
     timediff = 1  # 1sec
     new_timestamp = old_timestamp + datetime.timedelta(seconds=timediff)
@@ -20,74 +19,74 @@ def test_rwodel():
 
     # Model-related components
     noise_diff_coeff = 0.001  # m/s^2
-    F = np.array([[1]])
-    Q = np.array([[timediff]]) * noise_diff_coeff
+    F = sp.array([[1]])
+    Q = sp.array([[timediff]]) * noise_diff_coeff
 
     # Create and a Random Walk model object
     rw = RandomWalk(noise_diff_coeff=noise_diff_coeff)
 
     # Ensure ```rw.transfer_function(time_interval)``` returns F
-    assert np.array_equal(F, rw.matrix(
+    assert sp.array_equal(F, rw.matrix(
         timestamp=new_timestamp, time_interval=time_interval))
 
     # Ensure ```rw.covar(time_interval)``` returns Q
-    assert np.array_equal(Q, rw.covar(
+    assert sp.array_equal(Q, rw.covar(
         timestamp=new_timestamp, time_interval=time_interval))
 
     # Propagate a state vector through the model
     # (without noise)
     new_state_vec_wo_noise = rw.function(
-        state,
+        state_vec,
         timestamp=new_timestamp,
-        time_interval=time_interval)
-    assert np.array_equal(new_state_vec_wo_noise, F@state.state_vector)
+        time_interval=time_interval,
+        noise=0)
+    assert sp.array_equal(new_state_vec_wo_noise, F@state_vec)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (without noise)
-    prob = rw.pdf(State(new_state_vec_wo_noise),
-                  state,
+    prob = rw.pdf(new_state_vec_wo_noise,
+                  state_vec,
                   timestamp=new_timestamp,
                   time_interval=time_interval)
-    assert approx(prob) == multivariate_normal.pdf(
+    assert sp.array_equal(prob, multivariate_normal.pdf(
         new_state_vec_wo_noise.T,
-        mean=np.array(F@state.state_vector).ravel(),
-        cov=Q)
+        mean=sp.array(F@state_vec).ravel(),
+        cov=Q).T)
 
     # Propagate a state vector throught the model
     # (with internal noise)
     new_state_vec_w_inoise = rw.function(
-        state,
-        noise=True,
+        state_vec,
         timestamp=new_timestamp,
         time_interval=time_interval)
-    assert not np.array_equal(new_state_vec_w_inoise, F@state.state_vector)
+    assert not sp.array_equal(new_state_vec_w_inoise, F@state_vec)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
-    prob = rw.pdf(State(new_state_vec_w_inoise),
-                  state,
+    prob = rw.pdf(new_state_vec_w_inoise,
+                  state_vec,
                   timestamp=new_timestamp,
                   time_interval=time_interval)
-    assert approx(prob) == multivariate_normal.pdf(
+    assert sp.array_equal(prob, multivariate_normal.pdf(
         new_state_vec_w_inoise.T,
-        mean=np.array(F@state.state_vector).ravel(),
-        cov=Q)
+        mean=sp.array(F@state_vec).ravel(),
+        cov=Q).T)
 
-    # Propagate a state vector through the model
+    # Propagate a state vector throught the model
     # (with external noise)
     noise = rw.rvs(timestamp=new_timestamp, time_interval=time_interval)
     new_state_vec_w_enoise = rw.function(
-        state,
+        state_vec,
         timestamp=new_timestamp,
         time_interval=time_interval,
         noise=noise)
-    assert np.array_equal(new_state_vec_w_enoise, F@state.state_vector + noise)
+    assert sp.array_equal(new_state_vec_w_enoise, F@state_vec+noise)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
-    prob = rw.pdf(State(new_state_vec_w_enoise), state,
+    prob = rw.pdf(new_state_vec_w_enoise, state_vec,
                   timestamp=new_timestamp, time_interval=time_interval)
-    assert approx(prob) == multivariate_normal.pdf(
+    assert sp.array_equal(prob, multivariate_normal.pdf(
         new_state_vec_w_enoise.T,
-        mean=np.array(F@state.state_vector).ravel(),
-        cov=Q)
+        mean=sp.array(F@state_vec).ravel(),
+        cov=Q).T)
