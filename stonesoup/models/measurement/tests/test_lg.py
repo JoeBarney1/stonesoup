@@ -58,8 +58,8 @@ def test_lgmodel(H, R, ndim_state, mapping):
 
     # Evaluate the likelihood of the predicted measurement, given the state
     # (without noise)
-    prob = lg.pdf(State(meas_pred_wo_noise), state)
-    assert approx(prob) == multivariate_normal.pdf(
+    prob = lg.pdf(meas_pred_wo_noise, state_vec)
+    assert approx(prob), multivariate_normal.pdf(
         meas_pred_wo_noise.T,
         mean=np.array(H@state_vec).ravel(),
         cov=R)
@@ -71,7 +71,7 @@ def test_lgmodel(H, R, ndim_state, mapping):
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
-    prob = lg.pdf(State(meas_pred_w_inoise), state)
+    prob = lg.pdf(meas_pred_w_inoise, state_vec)
     assert approx(prob) == multivariate_normal.pdf(
         meas_pred_w_inoise.T,
         mean=np.array(H@state_vec).ravel(),
@@ -86,22 +86,8 @@ def test_lgmodel(H, R, ndim_state, mapping):
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
-    prob = lg.pdf(State(meas_pred_w_enoise), state)
+    prob = lg.pdf(meas_pred_w_enoise, state_vec)
     assert approx(prob) == multivariate_normal.pdf(
         meas_pred_w_enoise.T,
         mean=np.array(H@state_vec).ravel(),
         cov=R)
-
-    # Test random seed give consistent results
-    lg1 = LinearGaussian(ndim_state=ndim_state,
-                         noise_covar=R,
-                         mapping=mapping,
-                         seed=1)
-    lg2 = LinearGaussian(ndim_state=ndim_state,
-                         noise_covar=R,
-                         mapping=mapping,
-                         seed=1)
-
-    # Check first values produced by seed match
-    for _ in range(3):
-        assert all(lg1.rvs() == lg2.rvs())

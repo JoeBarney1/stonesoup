@@ -2,7 +2,7 @@
 import datetime
 
 from pytest import approx
-import numpy as np
+import scipy as sp
 from scipy.stats import multivariate_normal
 
 from ..linear import ConstantVelocity
@@ -53,7 +53,7 @@ def test_cvmodel():
                   time_interval=time_interval)
     assert approx(prob) == multivariate_normal.pdf(
         new_state_vec_wo_noise.T,
-        mean=np.array(F@state.state_vector).ravel(),
+        mean=sp.array(F@state_vec).ravel(),
         cov=Q)
 
     # Propagate a state vector throught the model
@@ -73,7 +73,7 @@ def test_cvmodel():
                   time_interval=time_interval)
     assert approx(prob) == multivariate_normal.pdf(
         new_state_vec_w_inoise.T,
-        mean=np.array(F@state.state_vector).ravel(),
+        mean=sp.array(F@state_vec).ravel(),
         cov=Q)
 
     # Propagate a state vector throught the model
@@ -92,5 +92,5 @@ def test_cvmodel():
                   timestamp=new_timestamp, time_interval=time_interval)
     assert approx(prob) == multivariate_normal.pdf(
         new_state_vec_w_enoise.T,
-        mean=np.array(F@state.state_vector).ravel(),
+        mean=sp.array(F@state_vec).ravel(),
         cov=Q)

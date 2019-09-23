@@ -5,8 +5,12 @@ from datetime import timedelta
 import numpy as np
 from scipy.stats import multivariate_normal
 
+import numpy as np
+from scipy.stats import multivariate_normal
+
 from ..base import Base
 from ..functions import jacobian as compute_jac
+from ..types.numeric import Probability
 
 
 class Model(Base):
@@ -16,104 +20,24 @@ class Model(Base):
 
     @property
     @abstractmethod
-    def ndim(self) -> int:
+    def ndim(self):
         """Number of dimensions of model"""
-        raise NotImplementedError
+        pass
 
     @abstractmethod
-    def function(self, state: State, noise: Union[bool, np.ndarray] = False,
-                 **kwargs) -> Union[StateVector, StateVectors]:
-        """Model function :math:`f_k(x(k),w(k))`
-
-        Parameters
-        ----------
-        state: State
-            An input state
-        noise: :class:`numpy.ndarray` or bool
-            An externally generated random process noise sample (the default is
-            `False`, in which case no noise will be added
-            if 'True', the output of :meth:`~.Model.rvs` is used)
-
-        Returns
-        -------
-        : :class:`StateVector` or :class:`StateVectors`
-            The StateVector(s) with the model function evaluated.
-        """
-        raise NotImplementedError
-
-    def jacobian(self, state, **kwargs):
-        """Model jacobian matrix :math:`H_{jac}`
-
-        Parameters
-        ----------
-        state : :class:`~.State`
-            An input state
-
-        Returns
-        -------
-        :class:`numpy.ndarray` of shape (:py:attr:`~ndim_meas`, \
-        :py:attr:`~ndim_state`)
-            The model jacobian matrix evaluated around the given state vector.
-        """
-
-        return compute_jac(self.function, state, **kwargs)
+    def function(self, state_vector, noise=None):
+        """ Model function"""
+        pass
 
     @abstractmethod
-    def rvs(self, num_samples: int = 1, **kwargs) -> Union[StateVector, StateVectors]:
-        r"""Model noise/sample generation function
-
-        Generates noise samples from the model.
-
-
-        Parameters
-        ----------
-        num_samples: scalar, optional
-            The number of samples to be generated (the default is 1)
-
-        Returns
-        -------
-        noise : 2-D array of shape (:attr:`ndim`, ``num_samples``)
-            A set of Np samples, generated from the model's noise
-            distribution.
-        """
-        raise NotImplementedError
+    def rvs(self, num_samples=1):
+        """Model noise/sample generation method"""
+        pass
 
     @abstractmethod
-    def pdf(self, state1: State, state2: State, **kwargs) -> Union[Probability, np.ndarray]:
-        r"""Model pdf/likelihood evaluation function
-
-        Evaluates the pdf/likelihood of ``state1``, given the state
-        ``state2`` which is passed to :meth:`function()`.
-
-        Parameters
-        ----------
-        state1 : State
-        state2 : State
-
-        Returns
-        -------
-        : :class:`~.Probability` or :class:`~.numpy.ndarray` of :class:`~.Probability`
-            The likelihood of ``state1``, given ``state2``
-        """
-        raise NotImplementedError
-
-    def logpdf(self, state1: State, state2: State, **kwargs) -> Union[float, np.ndarray]:
-        r"""Model log pdf/likelihood evaluation function
-
-        Evaluates the pdf/likelihood of ``state1``, given the state
-        ``state2`` which is passed to :meth:`function()`.
-
-        Parameters
-        ----------
-        state1 : State
-        state2 : State
-
-        Returns
-        -------
-        :  float or :class:`~.numpy.ndarray`
-            The log likelihood of ``state1``, given ``state2``
-        """
-        return np.log(self.pdf(state1, state2, **kwargs))
+    def pdf(self, state_vector1, state_vector2):
+        """Model pdf/likelihood evaluator method"""
+        pass
 
 
 class LinearModel(Model):
@@ -369,255 +293,69 @@ class GaussianModel(Model):
 
         return likelihood
 
-    @abstractmethod
-    def covar(self, **kwargs) -> CovarianceMatrix:
-        """Model covariance"""
+    def rvs(self, num_samples=1, **kwargs):
+        r"""Model noise/sample generation function
 
+        Generates noise samples from the model.
 
-class Latents:
-    """Data class for handling sampled non-linear (and non-Gaussian)
-    latent variables.
-    """
+        In mathematical terms, this can be written as:
 
-    def __init__(self, num_samples: int) -> None:
-        """Constructor
+        .. math::
 
-        Args:
-            num_samples (int): Number of jumps sampled
+            v_t \sim \mathcal{N}(0,Q)
+
+        where :math:`v_t =` ``noise`` and :math:`Q` = :attr:`covar`.
+
+        Parameters
+        ----------
+        num_samples: scalar, optional
+            The number of samples to be generated (the default is 1)
+
+        Returns
+        -------
+        noise : 2-D array of shape (:attr:`~.ndim`, ``num_samples``)
+            A set of Np samples, generated from the model's noise
+            distribution.
         """
-        self.store: dict[ConditionallyGaussianDriver, namedtuple] = dict()
-        self.Data = namedtuple("Data", ["sizes", "times"])
-        self._num_samples = num_samples
 
-    def exists(self, driver: ConditionallyGaussianDriver) -> bool:
-        """Checks if the driver instance exists in the store.
+        noise = multivariate_normal.rvs(
+            np.zeros(self.ndim), self.covar(**kwargs), num_samples)
 
-        Args:
-            driver (ConditionalGaussianDriver): Driver instance.
+        return np.atleast_2d(noise).T
 
-        Returns:
-            bool: True if driver has already been added, else False.
+    def pdf(self, state_vector1, state_vector2, **kwargs):
+        r"""Model pdf/likelihood evaluation function
+
+        Evaluates the pdf/likelihood of ``state_vector1``, given the state
+        ``state_vector2`` which is passed to :meth:`~.function`.
+
+        In mathematical terms, this can be written as:
+
+        .. math::
+
+            p = p(y_t | x_t) = \mathcal{N}(y_t; x_t, Q)
+
+        where :math:`y_t` = ``state_vector1``, :math:`x_t` = ``state_vector2``
+        and :math:`Q` = :attr:`covar`.
+
+        Parameters
+        ----------
+        state_vector1 : :class:`~.StateVector`
+        state_vector2 : :class:`~.StateVector`
+
+        Returns
+        -------
+        : :class:`~.Probability`
+            The likelihood of ``state_vector1``, given ``state_vector2``
         """
-        return driver in self.store
 
-    def add(
-        self, driver: ConditionallyGaussianDriver, jsizes: np.ndarray, jtimes: np.ndarray
-    ) -> None:
-        """Adds the driver instance to the store alongside its sampled
-        latent variables.
-
-        Latent variables are non-linear and possible non-Gaussian, in the form of Poisson
-        jumps.
-
-        The number of sampled jumps must match `self._num_samples`.
-
-        Args:
-            driver (ConditionalGaussianDriver): Driver instance to add.
-            jsizes (np.ndarray): Sampled jump sizes.
-            jtimes (np.ndarray): Sampled jump times.
-        """
-        assert jsizes.shape == jtimes.shape
-        assert jsizes.shape[1] == self._num_samples
-        data = self.Data(jsizes, jtimes)
-        self.store[driver] = data
-
-    def sizes(self, driver: ConditionallyGaussianDriver) -> np.ndarray:
-        """Returns the sampled jump sizes generated by the specified driver instance.
-
-        Args:
-            driver (ConditionalGaussianDriver): Driver instance.
-
-        Returns:
-            np.ndarray: Jump sizes sampled by the given driver instance.
-        """
-        assert driver in self.store
-        # dimensions of sizes are (n_jumps, n_samples)
-        return self.store[driver].sizes
-
-    def times(self, driver: ConditionallyGaussianDriver) -> np.ndarray:
-        """Returns the sampled jump times generated by the specified driver instance.
-
-        Args:
-            driver (ConditionalGaussianDriver): Driver instance.
-
-        Returns:
-            np.ndarray: Jump times sampled by the given driver instance.
-        """
-        assert driver in self.store
-        # dimensions of times are (n_times, n_samples)
-        return self.store[driver].times
-
-    @property
-    def num_samples(self) -> int:
-        """Returns the number of expected jumps.
-
-        All latent samples generated by drivers that will be added to this store
-        must have a length equal to `self._num_samples`
-
-        Returns:
-            int: No. expected jumps
-        """
-        return self._num_samples
-
-
-class LevyModel(Model):
-    """
-    Class to be derived from for Levy models.
-    For now, we consider only conditionally Gaussian ones
-    """
-
-    driver: Union[ConditionallyGaussianDriver, GaussianDriver] = Property(
-        doc="Conditional Gaussian process noise driver"
-    )
-    mu_W: Optional[float] = Property(default=None, doc="Condtional Gaussian mean")
-    sigma_W2: Optional[float] = Property(default=None, doc="Conditional Gaussian variance")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        likelihood = multivariate_normal.logpdf(
+            state_vector1.T,
+            mean=self.function(state_vector2, noise=0, **kwargs).ravel(),
+            cov=self.covar(**kwargs)
+        )
+        return Probability(likelihood, log_value=True)
 
     @abstractmethod
-    def _integrand(self, dt: float, jtimes: np.ndarray) -> np.ndarray:
-        pass
-
-    def _integrate(self, func: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarray:
-        res, err = quad_vec(func, a=a, b=b)
-        return res
-
-    def _integral(self, dt: float) -> np.ndarray:
-        def func(dt: int):
-            return self._integrand(dt, jtimes=np.zeros((1, 1)))[0, 0, :]  # currying
-        return self._integrate(func, a=0, b=dt)
-
-    def mean(
-        self, latents: Latents, time_interval: timedelta, **kwargs
-    ) -> Union[StateVector, StateVectors]:
-        """Model mean"""
-        assert latents is not None
-        dt = time_interval.total_seconds()
-        if latents.exists(self.driver):
-            jsizes = latents.sizes(self.driver)
-            jtimes = latents.times(self.driver)
-        else:
-            jsizes, jtimes = None, None
-        return self.driver.mean(
-            jsizes=jsizes,
-            jtimes=jtimes,
-            dt=dt,
-            e_ft_func=self._integral,
-            ft_func=self._integrand,
-            mu_W=self.mu_W,
-            num_samples=latents.num_samples,
-        )
-
-    def covar(
-        self, latents: Latents, time_interval: timedelta, **kwargs
-    ) -> Union[CovarianceMatrix, CovarianceMatrices]:
+    def covar(self):
         """Model covariance"""
-        assert latents is not None
-        dt = time_interval.total_seconds()
-        if latents.exists(self.driver):
-            jsizes = latents.sizes(self.driver)
-            jtimes = latents.times(self.driver)
-        else:
-            jsizes, jtimes = None, None
-        return self.driver.covar(
-            jsizes=jsizes,
-            jtimes=jtimes,
-            dt=dt,
-            e_ft_func=self._integral,
-            ft_func=self._integrand,
-            mu_W=self.mu_W,
-            sigma_W2=self.sigma_W2,
-            num_samples=latents.num_samples,
-        )
-
-    def sample_latents(
-        self,
-        time_interval: timedelta,
-        num_samples: int,
-        random_state: Optional[np.random.RandomState] = None,
-    ) -> Latents:
-        dt = time_interval.total_seconds()
-        latents = Latents(num_samples=num_samples)
-        if isinstance(self.driver, ConditionallyGaussianDriver):
-            jsizes, jtimes = self.driver.sample_latents(
-                dt=dt, num_samples=num_samples, random_state=random_state
-            )
-            latents.add(driver=self.driver, jsizes=jsizes, jtimes=jtimes)
-        return latents
-
-    def rvs(
-        self,
-        latents: Optional[Latents] = None,
-        n_rvs_samples_for_each_mean_covar_pair: int = 1,
-        random_state: Optional[np.random.RandomState] = None,
-        **kwargs
-    ) -> Union[StateVector, StateVectors]:
-        noise = 0
-        n_mean_covar_pair = 1
-        if not latents:
-            latents = self.sample_latents(
-                num_samples=n_mean_covar_pair, random_state=random_state, **kwargs
-            )
-        mean = self.mean(latents=latents, **kwargs)
-        if mean is None or None in mean:
-            raise ValueError("Cannot generate rvs from None-type mean")
-        assert isinstance(mean, StateVector)
-
-        covar = self.covar(latents=latents, **kwargs)
-        if covar is None or None in covar:
-            raise ValueError("Cannot generate rvs from None-type covariance")
-        assert isinstance(covar, CovarianceMatrix)
-
-        noise += self.driver.rvs(
-            mean=mean,
-            covar=covar,
-            random_state=random_state,
-            num_samples=n_rvs_samples_for_each_mean_covar_pair,
-            **kwargs
-        )
-        return noise
-
-    def condpdf(
-        self, state1: State, state2: State, latents: Optional[Latents] = None, **kwargs
-    ) -> Union[Probability, np.ndarray]:
-        r"""Model conditional pdf/likelihood evaluation function"""
-        return Probability.from_log_ufunc(
-            self.logcondpdf(state1, state2, latents=latents, **kwargs)
-        )
-
-    def logcondpdf(
-        self, state1: State, state2: State, latents: Optional[Latents] = None, **kwargs
-    ) -> Union[float, np.ndarray]:
-        r"""Model log conditional pdf/likelihood evaluation function"""
-        if latents is None:
-            raise ValueError("Latents cannot be none.")
-
-        mean = self.mean(latents=latents, **kwargs)
-        if mean is None or None in mean:
-            raise ValueError("Cannot generate pdf from None-type mean")
-        assert isinstance(mean, StateVector)
-
-        covar = self.covar(latents=latents, **kwargs)
-        if covar is None or None in covar:
-            raise ValueError("Cannot generate pdf from None-type covariance")
-        assert isinstance(covar, CovarianceMatrix)
-
-        likelihood = np.atleast_1d(
-            multivariate_normal.logpdf(
-                (state1.state_vector - self.function(state2, **kwargs)).T, mean=mean, cov=covar
-            )
-        )
-
-        if len(likelihood) == 1:
-            likelihood = likelihood[0]
-
-        return likelihood
-
-    def logpdf(self, state1: State, state2: State, **kwargs) -> Union[Probability, np.ndarray]:
-        r"""Model log pdf/likelihood evaluation function"""
-        return NotImplementedError
-
-    def pdf(self, state1: State, state2: State, **kwargs) -> Union[Probability, np.ndarray]:
-        r"""Model pdf/likelihood evaluation function"""
-        return Probability.from_log_ufunc(self.logpdf(state1, state2, **kwargs))

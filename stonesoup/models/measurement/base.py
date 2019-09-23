@@ -16,6 +16,10 @@ class MeasurementModel(Model, ABC):
         return self.ndim_meas
 
     @property
+    def ndim(self):
+        return self.ndim_meas
+
+    @property
     @abstractmethod
     def ndim_meas(self) -> int:
         """Number of measurement dimensions"""

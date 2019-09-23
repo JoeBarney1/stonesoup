@@ -1,3 +1,4 @@
+# coding: utf-8
 from numbers import Real
 
 import numpy as np
@@ -22,10 +23,4 @@ def test_linear_gaussian():
     assert np.array_equal(x_2, model.function(State(x_1),
                                               noise=np.zeros([3, 1])))
     assert isinstance(model.rvs(), np.ndarray)
-    assert isinstance(model.pdf(State(x_2), State(x_1)), Real)
-
-    model = LinearGaussianTimeInvariantTransitionModel(transition_matrix=F, covariance_matrix=None)
-    with pytest.raises(ValueError, match="Cannot generate rvs from None-type covariance"):
-        model.rvs()
-    with pytest.raises(ValueError, match="Cannot generate pdf from None-type covariance"):
-        model.pdf(State([0]), State([0]))
+    assert isinstance(model.pdf(x_2, x_1), Real)
