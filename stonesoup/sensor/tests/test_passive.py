@@ -1,28 +1,25 @@
+# -*- coding: utf-8 -*-
 import datetime
 
 import numpy as np
 
-from stonesoup.types.detection import TrueDetection
-from ..passive import PassiveElevationBearing
 from ...functions import cart2angles, rotx, roty, rotz
 from ...types.array import StateVector, CovarianceMatrix
-from ...types.groundtruth import GroundTruthState, GroundTruthPath
+from ...types.state import State
+from ..passive import PassiveElevationBearing
 
 
 def test_passive_sensor():
     # Input arguments
     # TODO: pytest parametarization
-    noise_covar = CovarianceMatrix([[np.deg2rad(0.015), 0],
-                                    [0, np.deg2rad(0.1)]])
-    detector_position = StateVector([1, 1, 0])
-    detector_orientation = StateVector([0, 0, 0])
-
-    target_state = GroundTruthState(detector_position + np.array([[1], [1], [0]]),
-                                    timestamp=datetime.datetime.now())
-    target_truth = GroundTruthPath([target_state])
-
-    truth = {target_truth}
-
+    noise_covar = CovarianceMatrix(np.array([[np.deg2rad(0.015), 0],
+                                             [0, np.deg2rad(0.1)]]))
+    detector_position = StateVector(
+        np.array(([[1], [1], [0]])))
+    detector_orientation = StateVector([[0], [0], [0]])
+    target_state = State(detector_position +
+                         np.array([[1], [1], [0]]),
+                         timestamp=datetime.datetime.now())
     measurement_mapping = np.array([0, 1, 2])
 
     # Create a radar object
@@ -35,10 +32,11 @@ def test_passive_sensor():
 
     # Assert that the object has been correctly initialised
     assert (np.equal(detector.position, detector_position).all())
+    assert (np.equal(detector.measurement_model.translation_offset,
+                     detector_position).all())
 
     # Generate a noiseless measurement for the given target
-    measurement = detector.measure(truth, noise=False)
-    measurement = next(iter(measurement))  # Get measurement from set
+    measurement = detector.gen_measurement(target_state, noise=0)
 
     # Account
     xyz = target_state.state_vector - detector_position
@@ -53,31 +51,9 @@ def test_passive_sensor():
     xyz_rot = rot_mat @ xyz
 
     # Convert to Angles
-    phi, theta = cart2angles(*xyz_rot)
+    phi, theta = cart2angles(*xyz_rot[:, 0])
 
     # Assert correction of generated measurement
     assert (measurement.timestamp == target_state.timestamp)
     assert (np.equal(measurement.state_vector,
-                     StateVector([theta, phi])).all())
-
-    # Assert is TrueDetection type
-    assert isinstance(measurement, TrueDetection)
-    assert measurement.groundtruth_path is target_truth
-    assert isinstance(measurement.groundtruth_path, GroundTruthPath)
-
-    target2_state = GroundTruthState(detector_position + np.array([[-1], [-1], [0]]),
-                                     timestamp=datetime.datetime.now())
-    target2_truth = GroundTruthPath([target2_state])
-
-    truth.add(target2_truth)
-
-    # Generate a noiseless measurement for each of the given target states
-    measurements = detector.measure(truth, noise=False)
-
-    # Two measurements for 2 truth states
-    assert len(measurements) == 2
-
-    # Measurements store ground truth paths
-    for measurement in measurements:
-        assert measurement.groundtruth_path in truth
-        assert isinstance(measurement.groundtruth_path, GroundTruthPath)
+                     StateVector(np.array([[theta], [phi]]))).all())
