@@ -3,6 +3,7 @@ from abc import abstractmethod
 
 from ..base import Base, Property
 from ..models.measurement import MeasurementModel
+from ..types.state import StateVector
 
 
 class Sensor(Base):
@@ -20,14 +21,28 @@ class Sensor(Base):
         """Generate a measurement"""
         raise NotImplementedError
 
+class Sensor3DCartesian(Sensor):
+    """Sensor base class extended to include 3D cartesian motion
 
-class MountableSensor(Sensor):
-    """MountableSensor base class
 
-    A sensor that can be mounted on a platform.
     """
+    position = Property(StateVector,
+                        doc="The sensor position on a 3D Cartesian plane,\
+                                expressed as a 3x1 array of Cartesian coordinates\
+                                in the order :math:`x,y,z`")
+    orientation = Property(
+        StateVector,
+        doc="A 3x1 array of angles (rad), specifying the sensor orientation in \
+               terms of the counter-clockwise rotation around each Cartesian \
+               axis in the order :math:`x,y,z`. The rotation angles are positive \
+               if the rotation is in the counter-clockwise direction when viewed \
+               by an observer looking along the respective rotation axis, \
+               towards the origin")
 
-    platform_offset = Property(
-        StateVector, default=None,
-        doc="A state vector describing the mounting offset of the sensor,\
-            relative to the platform on which it is mounted")
+    def set_position(self, position):
+        self.position = position
+        self.measurement_model.translation_offset = position
+
+    def set_orientation(self, orientation):
+        self.orientation = orientation
+        self.measurement_model.rotation_offset = orientation
