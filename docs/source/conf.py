@@ -48,48 +48,8 @@ extensions = [
 napoleon_google_docstring = False
 
 autodoc_default_options = {
-    'members': None,
+    'members': True,
     'member-order': 'bysource',
-}
-autodoc_mock_imports = [
-    'ffmpeg', 'moviepy', 'tensorflow', 'object_detection', 'tensornets', 'cv2', 'ortools']
-
-autosectionlabel_prefix_document = True
-
-binder_branch = os.environ.get("READTHEDOCS_VERSION", "latest")
-if binder_branch == "latest":
-    binder_branch = "main"
-
-sphinx_gallery_conf = {
-    'examples_dirs': ['../tutorials', '../examples', '../demos'],
-    'gallery_dirs': ['auto_tutorials', 'auto_examples', 'auto_demos'],
-    'filename_pattern': re.escape(os.sep),
-    'image_scrapers': ('doc_extensions.gallery_scraper',),
-    'reset_modules': ('matplotlib', 'seaborn', 'doc_extensions.reset_numpy_random_seed'),
-    'reset_modules_order': 'both',
-    'abort_on_example_error': False,
-    'reference_url': {'stonesoup': None},
-    'remove_config_comments': True,
-    'ignore_repr_types': r'matplotlib\.(?:figure|animation|legend)',
-    'nested_sections': False,
-    'within_subsection_order': "FileNameSortKey",
-    'matplotlib_animations': True,
-    'notebook_images':
-        f'https://stonesoup.rtfd.io/en/{os.environ.get("READTHEDOCS_VERSION", "latest")}/',
-    'binder': {
-        'org': 'dstl',
-        'repo': 'Stone-Soup',
-        'branch': binder_branch,
-        'binderhub_url': 'https://mybinder.org',
-        'dependencies': ['requirements.txt'],
-    },
-}
-
-intersphinx_mapping = {
-    'python': ('https://docs.python.org/{.major}'.format(sys.version_info), None),
-    'matplotlib': ('https://matplotlib.org/', None),
-    'numpy': ('https://docs.scipy.org/doc/numpy', None),
-    'scipy': ('https://docs.scipy.org/doc/scipy/reference', None),
 }
 
 # Add any paths that contain templates here, relative to this directory.
