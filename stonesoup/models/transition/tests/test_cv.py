@@ -2,7 +2,7 @@
 import datetime
 
 from pytest import approx
-import scipy as sp
+import numpy as np
 from scipy.stats import multivariate_normal
 
 from ..linear import ConstantVelocity
@@ -12,7 +12,7 @@ def test_cvmodel():
     """ ConstanVelocity Transition Model test """
 
     # State related variables
-    state = State(np.array([[3.0], [1.0]]))
+    state_vec = np.array([[3.0], [1.0]])
     old_timestamp = datetime.datetime.now()
     timediff = 1  # 1sec
     new_timestamp = old_timestamp + datetime.timedelta(seconds=timediff)
@@ -42,8 +42,9 @@ def test_cvmodel():
     new_state_vec_wo_noise = cv.function(
         state,
         timestamp=new_timestamp,
-        time_interval=time_interval)
-    assert np.array_equal(new_state_vec_wo_noise, F@state.state_vector)
+        time_interval=time_interval,
+        noise=0)
+    assert np.array_equal(new_state_vec_wo_noise, F@state_vec)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (without noise)
@@ -53,7 +54,7 @@ def test_cvmodel():
                   time_interval=time_interval)
     assert approx(prob) == multivariate_normal.pdf(
         new_state_vec_wo_noise.T,
-        mean=sp.array(F@state_vec).ravel(),
+        mean=np.array(F@state_vec).ravel(),
         cov=Q)
 
     # Propagate a state vector throught the model
@@ -63,7 +64,7 @@ def test_cvmodel():
         noise=True,
         timestamp=new_timestamp,
         time_interval=time_interval)
-    assert not np.array_equal(new_state_vec_w_inoise, F@state.state_vector)
+    assert not np.array_equal(new_state_vec_w_inoise, F@state_vec)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
@@ -73,7 +74,7 @@ def test_cvmodel():
                   time_interval=time_interval)
     assert approx(prob) == multivariate_normal.pdf(
         new_state_vec_w_inoise.T,
-        mean=sp.array(F@state_vec).ravel(),
+        mean=np.array(F@state_vec).ravel(),
         cov=Q)
 
     # Propagate a state vector throught the model
@@ -84,7 +85,7 @@ def test_cvmodel():
         timestamp=new_timestamp,
         time_interval=time_interval,
         noise=noise)
-    assert np.array_equal(new_state_vec_w_enoise, F@state.state_vector+noise)
+    assert np.array_equal(new_state_vec_w_enoise, F@state_vec+noise)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
@@ -92,5 +93,5 @@ def test_cvmodel():
                   timestamp=new_timestamp, time_interval=time_interval)
     assert approx(prob) == multivariate_normal.pdf(
         new_state_vec_w_enoise.T,
-        mean=sp.array(F@state_vec).ravel(),
+        mean=np.array(F@state_vec).ravel(),
         cov=Q)

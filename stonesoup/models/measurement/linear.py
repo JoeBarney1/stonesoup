@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import scipy as sp
+import numpy as np
 
 from ...base import Property
 from ...types.array import CovarianceMatrix
