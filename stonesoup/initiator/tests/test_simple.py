@@ -3,11 +3,12 @@ import datetime
 import numpy as np
 import pytest
 
+from ...models.base import LinearModel
 from ...models.measurement.linear import LinearGaussian
 from ...models.measurement.nonlinear import CartesianToBearingRange
 from ...models.transition.linear import \
     CombinedLinearGaussianTransitionModel, ConstantVelocity
-from ...updater.kalman import KalmanUpdater
+from ...updater.kalman import KalmanUpdater, ExtendedKalmanUpdater
 from ...predictor.kalman import KalmanPredictor
 from ...deleter.time import UpdateTimeDeleter
 from ...hypothesiser.distance import DistanceHypothesiser
@@ -35,11 +36,11 @@ def test_spi(measurement_model):
         np.array([[0], [0]]),
         np.array([[100, 0], [0, 1]]))
 
-    # Define a measurement model
-    measurement_model = LinearGaussian(2, [0], np.array([[1]]))
-
     # Create the Kalman updater
-    kup = KalmanUpdater(measurement_model)
+    if isinstance(measurement_model, LinearModel):
+        kup = KalmanUpdater(measurement_model)
+    else:
+        kup = ExtendedKalmanUpdater(measurement_model)
 
     # Define the Initiator
     initiator = SinglePointInitiator(
