@@ -1,14 +1,9 @@
+# -*- coding: utf-8 -*-
 import datetime
-
+from pytest import approx
 import numpy as np
-from pytest import approx, raises
 
-from ..beam_pattern import BeamTransitionModel, StationaryBeam, BeamSweep
-
-
-def test_abstract_beam_pattern():
-    with raises(TypeError):
-        BeamTransitionModel()
+from ..beam_pattern import StationaryBeam, BeamSweep
 
 
 def test_stationary_beam():

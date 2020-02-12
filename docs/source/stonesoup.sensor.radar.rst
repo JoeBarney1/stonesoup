@@ -4,6 +4,8 @@ Radars
 .. automodule:: stonesoup.sensor.radar
     :no-members:
 
+Radars
+------
 .. automodule:: stonesoup.sensor.radar.radar
     :show-inheritance:
 
