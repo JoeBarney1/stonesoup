@@ -84,9 +84,6 @@ class Property:
     flag. Such properties can be written only once (when the parent object is
     instantiated). Any subsequent write raises an ``AttributeError``
 
-    Property also can be used in similar way to Python standard `property`
-    using `getter`, `setter` and `deleter` decorators.
-
     Parameters
     ----------
     cls : class, optional
@@ -98,7 +95,6 @@ class Property:
     doc : str, optional
         Doc string for property
     readonly : bool, optional
-        If `True`, then property can only be set during initialisation.
 
     Attributes
     ----------
@@ -112,7 +108,7 @@ class Property:
     empty = inspect.Parameter.empty
     _property_name = None
 
-    def __init__(self, cls=None, *, default=inspect.Parameter.empty, doc=None,
+    def __init__(self, cls, *, default=inspect.Parameter.empty, doc=None,
                  readonly=False):
         self.cls = cls
         self.default = default
@@ -120,6 +116,17 @@ class Property:
         self._setter = None
         self._getter = None
         self._deleter = None
+
+        if readonly:
+            def _setter(instance, value):
+                # if the value hasn't been set before then we can set it once
+                if not hasattr(instance, self._property_name):
+                    setattr(instance, self._property_name, value)
+                else:
+                    # if the value has been set, raise an AttributeError
+                    raise AttributeError(f'{self._property_name} is readonly')
+
+            self._setter = _setter
 
     def __get__(self, instance, owner):
         if instance is None:
