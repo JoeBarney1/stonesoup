@@ -116,16 +116,10 @@ class Property:
                  readonly=False):
         self.cls = cls
         self.default = default
-        self.doc = self.__doc__ = doc
-        # Fix for when ":" in doc string being interpreted as type in NumpyDoc
-        if doc is not None and ':' in doc:
-            self.__doc__ = ": " + doc
-        self._property_name = None
+        self.doc = doc
         self._setter = None
         self._getter = None
         self._deleter = None
-        self.readonly = readonly
-        self._clear_cached = set()
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -136,14 +130,6 @@ class Property:
             return self._getter(instance)
 
     def __set__(self, instance, value):
-        if self.readonly and hasattr(instance, self._property_name):
-            # if the value has been set, raise an AttributeError
-            raise AttributeError('{} is readonly'.format(self._property_name))
-
-        for cached_value in self._clear_cached:
-            if cached_value in instance.__dict__:
-                del instance.__dict__[cached_value]
-
         if self._setter is None:
             setattr(instance, self._property_name, value)
         else:
@@ -162,106 +148,15 @@ class Property:
 
     def deleter(self, method):  # real signature unknown
         """ Descriptor to change the deleter on a property. """
-        new_property = copy(self)
-        new_property._deleter = method
-        return new_property
+        self._deleter = method
 
     def getter(self, method):  # real signature unknown
         """ Descriptor to change the getter on a property. """
-        new_property = copy(self)
-        new_property._getter = method
-        return new_property
+        self._getter = method
 
     def setter(self, method):  # real signature unknown
         """ Descriptor to change the setter on a property. """
-        new_property = copy(self)
-        new_property._setter = method
-        return new_property
-
-
-def _format_note(property_names):
-    multiple = len(property_names) > 1
-    prop_str = [f":attr:`{prop_name}`" for prop_name in property_names]
-    return textwrap.dedent(f"""\
-
-
-        Note
-        ----
-        This will be cached until {", ".join(prop_str[:-1])}
-        {"or " if multiple else ""}{prop_str[-1]} {"are" if multiple else "is"} replaced.
-        """)
-
-
-def clearable_cached_property(*property_names: str):
-    """cached property which is cleared on provided properties being modified
-
-    This decorator will use the standard library functools.cached_property
-    but will automatically clear this cache if the provided Stone Soup properties are
-    set to a different value.
-
-    Care should be made where a Stone Soup Property is a mutable type, that the cache
-    will not be clear as there is no way to track changes of mutable types.
-    """
-
-    def decorator(func):
-        if func.__doc__ is None:
-            func.__doc__ = ""
-        func.__doc__ = func.__doc__ + _format_note(property_names)
-        cached_method = cached_property(func)
-        cached_method._property_names = property_names
-        return cached_method
-    return decorator
-
-
-class BaseRepr(Repr):
-    def __init__(self):
-        self.maxlevel = 10
-        self.maxtuple = 10
-        self.maxlist = 10
-        self.maxarray = 10
-        self.maxdict = 20
-        self.maxset = 10
-        self.maxfrozenset = 10
-        self.maxdeque = 10
-        self.maxstring = 500
-        self.maxlong = 40
-        self.maxother = 50000
-        self.fillvalue = '...'
-        self.indent = None
-
-    def repr_list(self, obj, level):
-        if len(obj) > self.maxlist:
-            max_len = round(self.maxlist/2)
-            first = ',\n '.join(self.repr1(x, level - 1) for x in obj[:max_len])
-            last = ',\n '.join(self.repr1(x, level - 1) for x in obj[-max_len:])
-            return f'[{first},\n {self.fillvalue}\n {self.fillvalue}\n {self.fillvalue}\n {last}]'
-        else:
-            return '[{}]'.format(',\n '.join(self.repr1(x, level - 1) for x in obj))
-
-    def whitespace_remove(self, maxlen_whitespace, val):
-        """Remove excess whitespace, replacing with ellipses"""
-        large_whitespace = ' ' * (maxlen_whitespace+1)
-        fixed_whitespace = ' ' * maxlen_whitespace
-        while (excess := val.find(large_whitespace)) != -1:   # Find the excess whitespace, if any
-            line_end = ''.join(val[excess:].partition('\n')[1:])
-            val = ''.join([val[0:excess], fixed_whitespace, self.fillvalue, line_end])
-        return val
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        return getattr(instance, self._property_name)
-
-    def __set__(self, instance, value):
-        setattr(instance, self._property_name, value)
-
-    def __delete__(self, instance):
-        delattr(instance, self._property_name)
-
-    def __set_name__(self, owner, name):
-        if not isinstance(owner, BaseMeta):
-            raise AttributeError("Cannot use Property on this class type")
-        self._property_name = "_property_{}".format(name)
+        self._setter = method
 
 
 class BaseMeta(ABCMeta):
