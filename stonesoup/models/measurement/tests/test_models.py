@@ -184,15 +184,15 @@ def test_models(h, ModelClass, state_vec, R,
 
     # Project a state through the model
     # (without noise)
-    meas_pred_wo_noise = model.function(state, noise=0)
+    meas_pred_wo_noise = model.function(state_vec)
     eval_m = h(state_vec, model.translation_offset, model.rotation_offset)
     assert np.array_equal(meas_pred_wo_noise, eval_m)
 
     # Ensure ```lg.transfer_function()``` returns H
     def fun(x):
-        return model.function(x, noise=0)
-    H = compute_jac(fun, state)
-    assert np.array_equal(H, model.jacobian(state))
+        return model.function(x)
+    H = compute_jac(fun, state_vec)
+    assert np.array_equal(H, model.jacobian(state_vec))
 
     # Check Jacobian has proper dimensions
     assert H.shape == (model.ndim_meas, ndim_state)
@@ -218,7 +218,7 @@ def test_models(h, ModelClass, state_vec, R,
     # Project a state throught the model
     # Project a state through the model
     # (without noise)
-    meas_pred_wo_noise = model.function(state, noise=0)
+    meas_pred_wo_noise = model.function(state_vec)
     assert np.array_equal(meas_pred_wo_noise,  h(
         state_vec, model.translation_offset, model.rotation_offset))
 
@@ -234,7 +234,7 @@ def test_models(h, ModelClass, state_vec, R,
 
     # Propagate a state vector through the model
     # (with internal noise)
-    meas_pred_w_inoise = model.function(state)
+    meas_pred_w_inoise = model.function(state_vec, noise=True)
     assert not np.array_equal(
         meas_pred_w_inoise,  h(state_vec, model.translation_offset,
                                model.rotation_offset))

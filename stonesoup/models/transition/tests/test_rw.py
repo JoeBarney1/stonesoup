@@ -40,9 +40,8 @@ def test_rwodel():
     new_state_vec_wo_noise = rw.function(
         state,
         timestamp=new_timestamp,
-        time_interval=time_interval,
-        noise=0)
-    assert np.array_equal(new_state_vec_wo_noise, F@state.state_vector)
+        time_interval=time_interval)
+    assert np.array_equal(new_state_vec_wo_noise, F@state_vec)
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (without noise)
@@ -58,7 +57,8 @@ def test_rwodel():
     # Propagate a state vector throught the model
     # (with internal noise)
     new_state_vec_w_inoise = rw.function(
-        state,
+        state_vec,
+        noise=True,
         timestamp=new_timestamp,
         time_interval=time_interval)
     assert not np.array_equal(new_state_vec_w_inoise, F@state.state_vector)
