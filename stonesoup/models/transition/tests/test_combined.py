@@ -7,6 +7,7 @@ import numpy as np
 from ..linear import (
     LinearGaussianTimeInvariantTransitionModel, ConstantVelocity,
     CombinedLinearGaussianTransitionModel)
+from ....types.state import State
 
 
 @pytest.mark.parametrize("comb_model", [CombinedGaussianTransitionModel,
@@ -40,10 +41,7 @@ def test__linear_combined(comb_model):
     assert (DIM, 1) == combined_model.function(
         State(x_prior), noise=np.random.randn(DIM, 1),
         time_interval=t_delta).shape
-    # Test vectorized handling i.e. multiple state vector inputs
-    assert state.state_vector.shape == combined_model.function(
-        state,
-        time_interval=t_delta).shape
     assert (DIM, 1) == combined_model.rvs(time_interval=t_delta).shape
     assert isinstance(
-        combined_model.pdf(x_post, x_prior, time_interval=t_delta), Real)
+        combined_model.pdf(State(x_post), State(x_prior),
+                           time_interval=t_delta), Real)

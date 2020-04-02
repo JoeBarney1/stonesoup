@@ -5,7 +5,6 @@ import numpy as np
 
 from ..linear import LinearGaussianTimeInvariantTransitionModel
 from ....types.state import State
-import pytest
 
 
 def test_linear_gaussian():
@@ -23,4 +22,4 @@ def test_linear_gaussian():
     assert np.array_equal(x_2, model.function(State(x_1),
                                               noise=np.zeros([3, 1])))
     assert isinstance(model.rvs(), np.ndarray)
-    assert isinstance(model.pdf(x_2, x_1), Real)
+    assert isinstance(model.pdf(State(x_2), State(x_1)), Real)

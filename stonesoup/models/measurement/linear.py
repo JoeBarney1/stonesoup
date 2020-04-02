@@ -60,13 +60,13 @@ class LinearGaussian(MeasurementModel, LinearModel, GaussianModel):
 
         return model_matrix
 
-    def function(self, state, noise=False, **kwargs):
+    def function(self, state, noise=None, **kwargs):
         """Model function :math:`h(t,x(t),w(t))`
 
         Parameters
         ----------
-        state_vector: :class:`~.StateVector`
-            An input state vector
+        state: :class:`~.State`
+            An input state
         noise: :class:`numpy.ndarray`
             An externally generated random process noise sample (the default in
             `None`, in which case process noise will be added via :meth:`rvs`)
