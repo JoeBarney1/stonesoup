@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import re
 from collections.abc import Sequence
 from pathlib import PurePosixPath
@@ -20,6 +21,8 @@ else:
     from plotly.io import write_image as write_plotly_image
 
 from stonesoup.base import Base
+
+STONESOUP_TYPE_REGEX = re.compile(r'stonesoup\.(\w+\.)*')
 
 
 STONESOUP_TYPE_REGEX = re.compile(r'stonesoup\.(\w+\.)*')
