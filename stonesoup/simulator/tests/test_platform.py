@@ -1,33 +1,22 @@
+# -*- coding: utf-8 -*-
+
 import datetime
-from copy import deepcopy
 
 import numpy as np
 
-from stonesoup.platform.base import MovingPlatform
-from ...models.transition.linear import CombinedLinearGaussianTransitionModel, ConstantVelocity
 from ...types.state import State
+
 from ..platform import PlatformDetectionSimulator
 from ..simple import SingleTargetGroundTruthSimulator
 
 
-def build_platform(sensors, x_velocity):
-    state = State(state_vector=[[0], [x_velocity], [0], [0]],
-                  timestamp=datetime.datetime(2020, 4, 1))
-    model_1d = ConstantVelocity(0.0)  # zero noise so pure movement
-    trans_model = CombinedLinearGaussianTransitionModel([model_1d] * 2)
-    position_mapping = np.array([[0, 2]])
-    platform = MovingPlatform(states=state, sensors=sensors,
-                              transition_model=trans_model,
-                              position_mapping=position_mapping)
-    return platform
-
-
 def test_platform_detection_simulator(sensor_model1,
                                       sensor_model2,
+                                      platform_class,
                                       transition_model1):
 
-    platform1 = build_platform([sensor_model1], 1)
-    platform2 = build_platform([sensor_model2], 2)
+    platform1 = platform_class([sensor_model1], 1)
+    platform2 = platform_class([sensor_model2], 2)
 
     ground_truth = ((datetime.datetime(2020, 4, 1) +
                      datetime.timedelta(seconds=i),
@@ -36,7 +25,6 @@ def test_platform_detection_simulator(sensor_model1,
                                           [platform1, platform2])
 
     for n, (time, detections) in enumerate(detector):
-
         # Detection count at each step.
         assert len(detections) == 1
         # platform1 position.
@@ -61,9 +49,10 @@ def test_platform_detection_simulator(sensor_model1,
 
 def test_platform_ground_truth_detection_simulator(sensor_model1,
                                                    sensor_model2,
+                                                   platform_class,
                                                    transition_model1):
 
-    platform = build_platform([sensor_model1,
+    platform = platform_class([sensor_model1,
                                sensor_model2],
                               1)
 
@@ -82,16 +71,16 @@ def test_platform_ground_truth_detection_simulator(sensor_model1,
         for detection in detections:
             for i in range(0, len(detection.state_vector)):
                 # Detection at location of ground truth.
-                assert int(detection.state_vector[i]) == int(n/2)
+                assert int(detection.state_vector[i][0]) == int(n/2)
 
 
 def test_detection_simulator(sensor_model1,
                              sensor_model2,
+                             platform_class,
                              transition_model1):
 
-    # take copies of sensor_model1, otherwise sensor is TRANSFERRED from platform1 to platform2
-    platform1 = build_platform([deepcopy(sensor_model1), sensor_model2], 1)
-    platform2 = build_platform([deepcopy(sensor_model1)], 2)
+    platform1 = platform_class([sensor_model1, sensor_model2], 1)
+    platform2 = platform_class([sensor_model1], 2)
 
     initial_state = State(np.array([[0], [0], [0], [0]]),
                           timestamp=datetime.datetime(2020, 4, 1))
@@ -105,4 +94,4 @@ def test_detection_simulator(sensor_model1,
         assert len(detections) == 2  # Detection count at each step.
         for detection in detections:
             # Detection at location of ground truth or at platform.
-            assert int(detection.state_vector[0]) in (int(n/3), 2*int(n/3))
+            assert int(detection.state_vector[0][0]) in (int(n/3), 2*int(n/3))
