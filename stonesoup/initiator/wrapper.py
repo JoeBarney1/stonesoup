@@ -20,12 +20,11 @@ class StatesLengthLimiter(Initiator):
         initiator = StatesLengthLimiter(<initiator model>, max_length)
 
     """
-    initiator: Initiator = Property(doc="Stone Soup Initiator")
-    max_length: int = Property(doc="Length of track history to be stored in memory")
+    initiator = Property(Initiator, doc="Stone Soup Initiator")
+    max_length = Property(int, doc="Length of track history to be stored in memory")
 
     def initiate(self, *args, **kwargs):
         tracks = self.initiator.initiate(*args, **kwargs)
         for track in tracks:
             track.states = collections.deque(track.states, self.max_length)
-            track.metadatas = collections.deque(track.metadatas, self.max_length)
         return tracks

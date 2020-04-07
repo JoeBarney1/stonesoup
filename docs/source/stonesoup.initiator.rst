@@ -10,7 +10,9 @@ Initiators
 .. automodule:: stonesoup.initiator.simple
     :show-inheritance:
 
-.. automodule:: stonesoup.initiator.particle
+Wrappers
+--------
+.. automodule:: stonesoup.initiator.wrapper
     :show-inheritance:
 
 Wrappers

@@ -24,8 +24,7 @@ def test_states_length_limiter(max_len):
     measurements = []
     for i in range(10):
         measurements.append(Detection(np.array([[i*2.0]]),
-                                      timestamp=start_time+timedelta(seconds=i*100),
-                                      metadata={"colour": np.random.choice(["red", "blue"])}))
+                                      timestamp=start_time+timedelta(seconds=i*100)))
 
     # Tracking components
     # ===================
@@ -53,7 +52,7 @@ def test_states_length_limiter(max_len):
         hypothesis = SingleHypothesis(prediction, measurement)
         posterior = updater.update(hypothesis)
         if track is None:
-            track = initiator.initiate([measurement], measurement.timestamp).pop()
+            track = initiator.initiate([measurement]).pop()
         else:
             track.append(posterior)
         prior = track[-1]
@@ -61,4 +60,3 @@ def test_states_length_limiter(max_len):
         assert len(track) <= max_len
 
     assert len(track) == max_len
-    assert len(track.metadatas) == max_len
