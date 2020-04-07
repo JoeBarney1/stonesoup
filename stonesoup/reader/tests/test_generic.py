@@ -8,7 +8,8 @@ import pytest
 from ..generic import CSVDetectionReader, CSVGroundTruthReader
 
 
-def test_csv_gt(tmpdir):
+@pytest.fixture()
+def csv_gt_filename(tmpdir):
     csv_filename = tmpdir.join("test.csv")
     with csv_filename.open('w') as csv_file:
         csv_file.write(dedent("""\
@@ -19,24 +20,22 @@ def test_csv_gt(tmpdir):
                 13,23,33,32018332,2018-01-01T14:03:00Z
                 14,24,34,32018332,2018-01-01T14:04:00Z
                 """))
+    return csv_filename
 
+
+def test_csv_gt_2d(csv_gt_filename):
     # run test with:
     #   - 2d co-ordinates
     #   - default time field format
     #   - no special csv options
-    csv_reader = CSVGroundTruthReader(csv_filename.strpath,
+    csv_reader = CSVGroundTruthReader(csv_gt_filename.strpath,
                                       state_vector_fields=["x", "y"],
                                       time_field="t",
                                       path_id_field="identifier")
 
-    all_gt_paths = [
-        gt_paths_at_timestep
-        for timestep, gt_paths_at_timestep
-        in csv_reader.groundtruth_paths_gen()]
-
-    final_gt_paths = [
-        gt_path
-        for gt_path in all_gt_paths[len(all_gt_paths) - 1]]
+    final_gt_paths = set()
+    for _, gt_paths_at_timestep in csv_reader:
+        final_gt_paths.update(gt_paths_at_timestep)
     assert len(final_gt_paths) == 2
 
     ground_truth_states = [
@@ -52,23 +51,20 @@ def test_csv_gt(tmpdir):
         assert gt_state.timestamp.minute == n
         assert gt_state.timestamp.date() == datetime.date(2018, 1, 1)
 
+
+def test_csv_gt_3d_time(csv_gt_filename):
     # run test with:
     #   - 3d co-ordinates
     #   - time field format specified
-    csv_reader = CSVGroundTruthReader(csv_filename.strpath,
+    csv_reader = CSVGroundTruthReader(csv_gt_filename.strpath,
                                       state_vector_fields=["x", "y", "z"],
                                       time_field="t",
                                       time_field_format="%Y-%m-%dT%H:%M:%SZ",
                                       path_id_field="identifier")
 
-    all_gt_paths = [
-        gt_paths_at_timestep
-        for timestep, gt_paths_at_timestep
-        in csv_reader.groundtruth_paths_gen()]
-
-    final_gt_paths = [
-        gt_path
-        for gt_path in all_gt_paths[len(all_gt_paths) - 1]]
+    final_gt_paths = set()
+    for _, gt_paths_at_timestep in csv_reader:
+        final_gt_paths.update(gt_paths_at_timestep)
     assert len(final_gt_paths) == 2
 
     ground_truth_states = [
@@ -84,10 +80,13 @@ def test_csv_gt(tmpdir):
         assert gt_state.timestamp.minute == n
         assert gt_state.timestamp.date() == datetime.date(2018, 1, 1)
 
+
+def test_csv_gt_3d_timestamp_csv_opt(tmpdir):
     # run test with:
     #   - time field represented as a Unix epoch timestamp
     #   - csv options specified
-    with csv_filename.open('w') as csv_file:
+    csv_gt_filename = tmpdir.join("test.csv")
+    with csv_gt_filename.open('w') as csv_file:
         csv_file.write(dedent("""\
                 10,20,30,22018332,1514815200
                 11,21,31,22018332,1514815260
@@ -96,7 +95,7 @@ def test_csv_gt(tmpdir):
                 14,24,34,32018332,1514815440
                 """))
 
-    csv_reader = CSVGroundTruthReader(csv_filename.strpath,
+    csv_reader = CSVGroundTruthReader(csv_gt_filename.strpath,
                                       state_vector_fields=["x", "y", "z"],
                                       time_field="t",
                                       timestamp=True,
@@ -105,14 +104,9 @@ def test_csv_gt(tmpdir):
                                                     ['x', 'y', 'z',
                                                         'identifier', 't']})
 
-    all_gt_paths = [
-        gt_paths_at_timestep
-        for timestep, gt_paths_at_timestep
-        in csv_reader.groundtruth_paths_gen()]
-
-    final_gt_paths = [
-        gt_path
-        for gt_path in all_gt_paths[len(all_gt_paths) - 1]]
+    final_gt_paths = set()
+    for _, gt_paths_at_timestep in csv_reader:
+        final_gt_paths.update(gt_paths_at_timestep)
     assert len(final_gt_paths) == 2
 
     ground_truth_states = [
@@ -129,8 +123,32 @@ def test_csv_gt(tmpdir):
         assert gt_state.timestamp.date() == datetime.date(2018, 1, 1)
 
 
+def test_csv_gt_multi_per_timestep(tmpdir):
+    csv_gt_filename = tmpdir.join("test.csv")
+    with csv_gt_filename.open('w') as csv_file:
+        csv_file.write(dedent("""\
+                x,y,z,identifier,t
+                10,20,30,22018332,2018-01-01T14:00:00Z
+                11,21,31,22018332,2018-01-01T14:01:00Z
+                12,22,32,22018332,2018-01-01T14:02:00Z
+                13,23,33,32018332,2018-01-01T14:02:00Z
+                14,24,34,32018332,2018-01-01T14:03:00Z
+                """))
+
+    csv_reader = CSVGroundTruthReader(csv_gt_filename.strpath,
+                                      state_vector_fields=["x", "y"],
+                                      time_field="t",
+                                      path_id_field="identifier")
+
+    for time, ground_truth_paths in csv_reader:
+        if time == datetime.datetime(2018, 1, 1, 14, 2):
+            assert len(ground_truth_paths) == 2
+        else:
+            assert len(ground_truth_paths) == 1
+
+
 @pytest.fixture()
-def csv_gt_filename(tmpdir):
+def csv_det_filename(tmpdir):
     csv_filename = tmpdir.join("test.csv")
     with csv_filename.open('w') as csv_file:
         csv_file.write(dedent("""\
@@ -139,11 +157,14 @@ def csv_gt_filename(tmpdir):
             11,21,31,22018332,2018-01-01T14:01:00Z
             12,22,32,22018332,2018-01-01T14:02:00Z
             """))
+    return csv_filename
 
+
+def test_csv_default(csv_det_filename):
     # run test with:
     #   - 'metadata_fields' for 'CSVDetectionReader' == default
     #   - copy all metadata items
-    csv_reader = CSVDetectionReader(csv_filename.strpath, ["x", "y"], "t")
+    csv_reader = CSVDetectionReader(csv_det_filename.strpath, ["x", "y"], "t")
     detections = [
         detection
         for _, detections in csv_reader
@@ -162,11 +183,13 @@ def csv_gt_filename(tmpdir):
         assert int(detection.metadata['z']) == 30 + n
         assert detection.metadata['identifier'] == '22018332'
 
+
+def test_csv_metadata_time(csv_det_filename):
     # run test with:
     #   - 'metadata_fields' for 'CSVDetectionReader' contains
     #       'z' but not 'identifier'
     #   - 'time_field_format' is specified
-    csv_reader = CSVDetectionReader(csv_filename.strpath, ["x", "y"], "t",
+    csv_reader = CSVDetectionReader(csv_det_filename.strpath, ["x", "y"], "t",
                                     time_field_format="%Y-%m-%dT%H:%M:%SZ",
                                     metadata_fields=["z"])
     detections = [
@@ -185,11 +208,14 @@ def csv_gt_filename(tmpdir):
         assert 'z' in detection.metadata.keys()
         assert int(detection.metadata['z']) == 30 + n
 
+
+def test_csv_missing_metadata_timestamp(tmpdir):
     # run test with:
     #   - 'metadata_fields' for 'CSVDetectionReader' contains
     #       column names that do not exist in CSV file
     #   - 'time' field represented as a Unix epoch timestamp
-    with csv_filename.open('w') as csv_file:
+    csv_det_filename = tmpdir.join("test.csv")
+    with csv_det_filename.open('w') as csv_file:
         csv_file.write(dedent("""\
             x,y,z,identifier,t
             10,20,30,22018332,1514815200
@@ -197,7 +223,7 @@ def csv_gt_filename(tmpdir):
             12,22,32,22018332,1514815320
             """))
 
-    csv_reader = CSVDetectionReader(csv_filename.strpath, ["x", "y"], "t",
+    csv_reader = CSVDetectionReader(csv_det_filename.strpath, ["x", "y"], "t",
                                     metadata_fields=["heading"],
                                     timestamp=True)
     detections = [
@@ -213,6 +239,27 @@ def csv_gt_filename(tmpdir):
         assert detection.timestamp.date() == datetime.date(2018, 1, 1)
         assert isinstance(detection.metadata, dict)
         assert len(detection.metadata) == 0
+
+
+def test_csv_multi_per_timestep(tmpdir):
+    csv_det_filename = tmpdir.join("test.csv")
+    with csv_det_filename.open('w') as csv_file:
+        csv_file.write(dedent("""\
+                x,y,z,identifier,t
+                10,20,30,22018332,2018-01-01T14:00:00Z
+                11,21,31,22018332,2018-01-01T14:01:00Z
+                12,22,32,22018332,2018-01-01T14:02:00Z
+                13,23,33,32018332,2018-01-01T14:02:00Z
+                14,24,34,32018332,2018-01-01T14:03:00Z
+                """))
+
+    csv_reader = CSVDetectionReader(csv_det_filename.strpath, ["x", "y"], "t")
+
+    for time, detections in csv_reader:
+        if time == datetime.datetime(2018, 1, 1, 14, 2):
+            assert len(detections) == 2
+        else:
+            assert len(detections) == 1
 
 
 def test_tsv(tmpdir):
