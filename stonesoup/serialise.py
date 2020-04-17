@@ -18,9 +18,10 @@ import numpy as np
 import ruamel.yaml
 from ruamel.yaml.constructor import ConstructorError
 
-from .types.array import StateVector
-from .sensor.sensor import Sensor
-from .base import Base, Property
+from .base import Base
+from .types.angle import Angle
+from .types.array import Matrix
+from .types.numeric import Probability
 
 
 class YAML:
@@ -55,11 +56,23 @@ class YAML:
         self._yaml.constructor.add_constructor(
             "!pathlib.Path", self.path_from_yaml)
 
-        # deque
+        # Probability
         self._yaml.representer.add_representer(
-            deque, self.deque_to_yaml)
+            Probability, self.probability_to_yaml)
         self._yaml.constructor.add_constructor(
-            "!collections.deque", self.deque_from_yaml)
+            self.yaml_tag(Probability), self.probability_from_yaml)
+
+        # Angle
+        self._yaml.representer.add_multi_representer(
+            Angle, self.angle_to_yaml)
+        self._yaml.constructor.add_multi_constructor(
+            '{}types.angle.'.format(self.tag_prefix), self.angle_from_yaml)
+
+        # Array
+        self._yaml.representer.add_multi_representer(
+            Matrix, self.ndarray_to_yaml)
+        self._yaml.constructor.add_multi_constructor(
+            '{}types.array.'.format(self.tag_prefix), self.array_from_yaml)
 
         # Declarative classes
         self._yaml.representer.add_multi_representer(
@@ -150,6 +163,27 @@ class YAML:
             raise ImportError("Unable to find {!r}".format(tag))
         return classes[0]
 
+    @classmethod
+    def probability_to_yaml(cls, representer, node):
+        return representer.represent_scalar(cls.yaml_tag(type(node)), str(node))
+
+    @staticmethod
+    def probability_from_yaml(constructor, node):
+        string = constructor.construct_scalar(node)
+        if string.startswith('exp('):
+            return Probability(float(string[4:-1]), log_value=True)
+        else:
+            return Probability(float(string))
+
+    @classmethod
+    def angle_to_yaml(cls, representer, node):
+        return representer.represent_scalar(cls.yaml_tag(type(node)), str(node))
+
+    @classmethod
+    def angle_from_yaml(cls, constructor, tag_suffix, node):
+        class_ = cls._get_class('types.angle.{}'.format(tag_suffix))
+        return class_(float(constructor.construct_scalar(node)))
+
     def ndarray_to_yaml(self, representer, node):
         """Convert numpy.ndarray to YAML."""
         if node.ndim > 1:
@@ -157,13 +191,18 @@ class YAML:
             [seq.fa.set_flow_style() for seq in array]
         else:
             array = node.tolist()
-        return representer.represent_sequence(
-            "!numpy.ndarray", array)
+        return representer.represent_sequence(self.yaml_tag(type(node)), array)
 
     @staticmethod
     def ndarray_from_yaml(constructor, node):
         """Convert YAML to numpy.ndarray."""
         return np.array(constructor.construct_sequence(node, deep=True))
+
+    @classmethod
+    def array_from_yaml(cls, constructor, tag_suffix, node):
+        """Convert YAML to numpy.ndarray."""
+        class_ = cls._get_class('types.array.{}'.format(tag_suffix))
+        return class_(constructor.construct_sequence(node, deep=True))
 
     @staticmethod
     def numpy_int_to_yaml(representer, node):
