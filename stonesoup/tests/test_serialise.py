@@ -11,9 +11,9 @@ from ..types.array import Matrix, StateVector, CovarianceMatrix
 from ..types.angle import Angle, Bearing, Elevation, Longitude, Latitude
 
 
-@pytest.fixture()
-def serialised_file():
-    return YAML()
+@pytest.fixture(params=['rt', 'safe'])
+def serialised_file(request):
+    return YAML(typ=request.param)
 
 
 def test_declarative(base, serialised_file):
@@ -47,6 +47,9 @@ def test_nested_declarative(base, serialised_file):
 
 
 def test_duplicate_tag_warning(base, serialised_file):
+    if 'safe' in serialised_file._yaml.typ:
+        pytest.xfail("With 'safe' constructor, warning isn't raised")
+
     class _TestDuplicateBase(base):
         pass
 
