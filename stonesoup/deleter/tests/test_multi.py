@@ -1,10 +1,11 @@
+# -*- coding: utf-8 -*-
 import datetime
 
 import numpy as np
 import pytest
 
 from ..error import CovarianceBasedDeleter
-from ..multi import CompositeDeleter
+from ..multi import MultiDeleterIntersect, MultiDeleterUnion
 from ..time import UpdateTimeDeleter
 from ...types.detection import Detection
 from ...types.hypothesis import SingleHypothesis
@@ -13,12 +14,12 @@ from ...types.track import Track
 from ...types.update import GaussianStateUpdate
 
 
-@pytest.fixture(params=[True, False])
-def intersect(request):
+@pytest.fixture(params=[MultiDeleterIntersect, MultiDeleterUnion])
+def multi_deleter_class(request):
     return request.param
 
 
-def test_multi_deleter_single(intersect):
+def test_multi_deleter_single(multi_deleter_class):
     """Test multi deleter classes with a single deleter"""
 
     # Create covariance based deleter
@@ -35,11 +36,11 @@ def test_multi_deleter_single(intersect):
     track = Track()
     track.append(state)
     tracks.add(track)
-    covar_deletion_thresh = 100
-    deleter = CovarianceBasedDeleter(covar_trace_thresh=covar_deletion_thresh)
+    cover_deletion_thresh = 100
+    deleter = CovarianceBasedDeleter(cover_deletion_thresh)
 
     # Test intersect deleter
-    multi_deleter = CompositeDeleter(deleters=[deleter], intersect=intersect)
+    multi_deleter = multi_deleter_class([deleter])
     deleted_tracks = multi_deleter.delete_tracks(tracks)
     tracks -= deleted_tracks
 
@@ -47,13 +48,13 @@ def test_multi_deleter_single(intersect):
     assert (len(deleted_tracks) == 1)
 
 
-def test_multi_deleter_multiple(intersect):
+def test_multi_deleter_multiple(multi_deleter_class):
     """Test multi deleter classes with multiple deleters"""
 
-    covar_deletion_thresh = 99
-    deleter = CovarianceBasedDeleter(covar_trace_thresh=covar_deletion_thresh)
+    cover_deletion_thresh = 99
+    deleter = CovarianceBasedDeleter(cover_deletion_thresh)
     deleter2 = UpdateTimeDeleter(datetime.timedelta(minutes=10))
-    multi_deleter = CompositeDeleter(deleters=[deleter, deleter2], intersect=intersect)
+    multi_deleter = multi_deleter_class([deleter, deleter2])
 
     # Create track that is not deleted by either deleter
     track = Track([
@@ -91,7 +92,7 @@ def test_multi_deleter_multiple(intersect):
     deleted_tracks = multi_deleter.delete_tracks(tracks)
     tracks -= deleted_tracks
 
-    if intersect:
+    if isinstance(multi_deleter, MultiDeleterIntersect):
         assert len(tracks) == 1
         assert len(deleted_tracks) == 0
     else:
