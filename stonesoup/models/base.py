@@ -10,7 +10,7 @@ from scipy.stats import multivariate_normal
 
 from ..base import Base
 from ..functions import jacobian as compute_jac
-from ..types.array import Matrix, StateVector
+from ..types.array import StateVector, StateVectors
 from ..types.numeric import Probability
 
 
@@ -325,7 +325,7 @@ class GaussianModel(Model):
         if num_samples == 1:
             return noise.view(StateVector)
         else:
-            return noise.view(Matrix)
+            return noise.view(StateVectors)
 
     def pdf(self, state1, state2, **kwargs):
         r"""Model pdf/likelihood evaluation function
