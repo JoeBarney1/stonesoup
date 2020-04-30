@@ -1,91 +1,90 @@
+# -*- coding: utf-8 -*-
+
 from functools import lru_cache
 
-import numpy as np
-
 from ..base import Property
-from ..types.prediction import GaussianMeasurementPrediction
-from ..types.update import Update
+from ..types.prediction import InformationMeasurementPrediction
+from ..types.update import InformationStateUpdate
 from ..models.measurement.linear import LinearGaussian
 from ..updater.kalman import KalmanUpdater
+from numpy.linalg import inv
 
 
-class InformationKalmanUpdater(KalmanUpdater):
-    r"""A class which implements the update of information form of the Kalman filter. This is
-    conceptually very simple. The update proceeds as:
+class InfoFilterUpdater(KalmanUpdater):
+    r"""A class to implement the update of Information filter.
+
+    The Information Filter update class inherits from the Kalman filter updater. Assume
+    :math:`h(\mathbf{x}) = H \mathbf{x}` with additive noise :math:`\sigma = \mathcal{N}(0,R)`.
+    Daughter classes can overwrite to specify a more general measurement model
+    :math:`h(\mathbf{x})`.
+
+    :meth:`update` first calls :meth:`predict_measurement` function which
+    proceeds by calculating the predicted measurement, innovation covariance
+    and measurement cross-covariance, :meth:`predict_measurement` returns a
+    :class:`~.InformationMeasurementPrediction`.
+
+    The information state contribution and information
 
     .. math::
 
-        Y_{k|k} = Y_{k|k-1} + H^{T}_k R^{-1}_k H_k
+        \mathbf{i}_{k|k-1} = H^{T}_k R^{-1}_k \mathbf{z}_{k}
 
-        \mathbf{y}_{k|k} = \mathbf{y}_{k|k-1} + H^{T}_k R^{-1}_k \mathbf{z}_{k}
+    .. math::
 
-    where :math:`\mathbf{y}_{k|k-1}` is the predicted information state and :math:`Y_{k|k-1}` the
-    predicted information matrix which form the :class:`~.InformationStatePrediction` object. The
-    measurement matrix :math:`H_k` and measurement covariance :math:`R_k` are those in the Kalman
-    filter (see tutorial 1). An :class:`~.InformationStateUpdate` object is returned.
+        I_{k|k-1} = H^{T}_k R^{-1}_k H
 
-    Note
-    ----
-    Analogously with the :class:`~.InformationKalmanPredictor`, the measurement model is queried
-    for the existence of an :meth:`inverse_covar()` property. If absent, the :meth:`covar()` is
-    inverted.
 
+    where :math:`\mathbf{i}` and :math:`I` are the information state and information matrix
+    contribution.
+
+    and the posterior information state mean and information matrix are,
+
+    .. math::
+
+        \mathbf{y}_{k|k} = \mathbf{y}_{k|k-1} + \mathbf{i}_k
+
+        Y_{k|k} = Y_{k|k-1} + I_k
+
+
+    where :math:`\mathbf{y}_{k|k}` is the posterior information state and :math:`Y_{k|k}` is the
+    posterior Fisher information matrix.
+
+    These are returned as a :class:`~.InformationStateUpdate` object.
     """
-    measurement_model: LinearGaussian = Property(
-        default=None,
+
+    # TODO: at present this will throw an error if a measurement model is not
+    # TODO: specified in either individual measurements or the Updater object
+    measurement_model = Property(
+        LinearGaussian, default=None,
         doc="A linear Gaussian measurement model. This need not be defined if "
             "a measurement model is provided in the measurement. If no model "
             "specified on construction, or in the measurement, then error "
             "will be thrown.")
 
-    def _inverse_measurement_covar(self, measurement_model, **kwargs):
-        """Return the inverse of the measurement covariance (or calculate it)
-
-        Parameters
-        ----------
-        measurement_model
-            The measurement model to be queried
-        **kwargs : various, optional
-            These are passed to :meth:`~.LinearGaussian.covar()`
-
-        Returns
-        -------
-        : :class:`numpy.ndarray`
-            The inverse of the measurement covariance, :math:`R_k^{-1}`
-
-        """
-        if hasattr(measurement_model, 'inverse_covar'):
-            inv_measurement_covar = measurement_model.inverse_covar(**kwargs)
-        else:
-            inv_measurement_covar = np.linalg.inv(measurement_model.covar(**kwargs))
-
-        return inv_measurement_covar
-
     @lru_cache()
-    def predict_measurement(self, predicted_state, measurement_model=None, measurement_noise=True,
+    def predict_measurement(self, predicted_state, measurement_model=None,
                             **kwargs):
-        r"""There's no direct analogue of a predicted measurement in the information form. This
-        method is therefore provided to return the predicted measurement as would the standard
-        Kalman updater. This is mainly for compatibility as it's not anticipated that it would
-        be used in the usual operation of the information filter.
+        r"""Predict the information theoretic quantity implied by the predicted state mean and
+        predicted measurement. The :meth:`~.predict_measurement` method allocates the information
+        equivalent of the measurement prediction, :math:`H_k Y^{-1}_{k|k-1} \mathbf{y}_{k|k-1}`, to
+        the hypothesis. This is consistent with the Kalman filter and allows data association when
+        implementing the information filter in a multi-target scenario or scenario with clutter.
 
         Parameters
         ----------
         predicted_state : :class:`~.State`
-            The predicted state in information form :math:`\mathbf{y}_{k|k-1}`
+            The predicted state :math:`\mathbf{y}_{k|k-1}`
         measurement_model : :class:`~.MeasurementModel`
             The measurement model. If omitted, the model in the updater object
             is used
-        measurement_noise : bool
-            Whether to include measurement noise :math:`R` with innovation covariance.
-            Default `True`
         **kwargs : various
-            These are passed to :meth:`~.MeasurementModel.matrix()`
+            These are passed to :meth:`~.MeasurementModel.function` and
+            :meth:`~.MeasurementModel.matrix`
 
         Returns
         -------
-        : :class:`~.GaussianMeasurementPrediction`
-            The measurement prediction, :math:`H \mathbf{x}_{k|k-1}`
+        : :class:`InformationMeasurementPrediction`
+            The information-theoretic measurement prediction, :math:`\mathbf{\upsilon}_{k|k-1}`
 
         """
         # If a measurement model is not specified then use the one that's
@@ -96,28 +95,38 @@ class InformationKalmanUpdater(KalmanUpdater):
                                       measurement_model=measurement_model,
                                       **kwargs)
 
-        predicted_covariance = np.linalg.inv(predicted_state.precision)
-        predicted_state_mean = predicted_covariance @ predicted_state.state_vector
+        # See equations 294 and 295 in Hugh Durrant-Whyte document
+        #      pred_meas = measurement_model.function(predicted_state, **kwargs) # Returns a vector
+        #      in measurement space
 
-        predicted_measurement = hh @ predicted_state_mean
-        innovation_covariance = hh @ predicted_covariance @ hh.T
-        if measurement_noise:
-            innovation_covariance += measurement_model.covar(**kwargs)
+        # projection matrix from measurement space to information space.
+        proj_matrix = hh.T @ inv(measurement_model.covar())
 
-        return GaussianMeasurementPrediction(predicted_measurement, innovation_covariance,
-                                             predicted_state.timestamp,
-                                             cross_covar=predicted_covariance @ hh.T)
+        # information theoretic quantity - project measurement space to info theoretic space.
+        pred_info_meas = hh @ inv(predicted_state.info_matrix) @ predicted_state.state_vector
 
-    def update(self, hypothesis, **kwargs):
-        r"""The Information filter update (corrector) method. Given a hypothesised association
-        between a predicted information state and an actual measurement, calculate the posterior
-        information state.
+        # innov_cov = hh@predicted_state.covar@hh.T + measurement_model.covar()
+        innov_cov = hh @ predicted_state.info_matrix @ hh.T + measurement_model.covar()
+        # meas_cross_cov = predicted_state.info_matrix @ hh.T
+
+        return InformationMeasurementPrediction(pred_info_meas, innov_cov,
+                                                predicted_state.timestamp, proj_matrix=proj_matrix)
+
+    def update(self, hypothesis, force_symmetric_covariance=False, **kwargs):
+        r"""The Information filter update (estimate) method. Given a hypothesised association
+        between a predicted information state or predicted measurement and an actual measurement,
+        calculate the posterior information state.
 
         Parameters
         ----------
         hypothesis : :class:`~.SingleHypothesis`
             the prediction-measurement association hypothesis. This hypothesis
-            carries a predicted information state.
+            may carry a predicted measurement, or a predicted state. In the
+            latter case a predicted measurement will be calculated.
+        force_symmetric_covariance : :obj:`bool`, optional
+            A flag to force the output Fisher information matrix to be symmetric by way
+            of a simple geometric combination of the matrix and transpose.
+            Default is `False`
         **kwargs : various
             These are passed to :meth:`predict_measurement`
 
@@ -125,24 +134,50 @@ class InformationKalmanUpdater(KalmanUpdater):
         -------
         : :class:`~.InformationStateUpdate`
             The posterior information state with information state :math:`\mathbf{y}_{k|k}` and
-            precision :math:`Y_{k|k}`
+            Fisher information matrix :math:`Y_{k|k}`
 
         """
+
+        # Get the predicted state out of the hypothesis
+        predicted_state = hypothesis.prediction
+
+        # #If there is no measurement prediction in the hypothesis then do the
+        # #measurement prediction (and attach it back to the hypothesis).
+        # if hypothesis.measurement_prediction is None:
+        #     # Get the measurement model out of the measurement if it's there.
+        #     # If not, use the one native to the updater (which might still be
+        #     # none)
+        #     measurement_model = hypothesis.measurement.measurement_model
+        #     measurement_model = self._check_measurement_model(
+        #         measurement_model)
+        #
+        #     # Attach the measurement prediction to the hypothesis
+        #     hypothesis.measurement_prediction = self.predict_measurement(
+        #         predicted_state, measurement_model=measurement_model, **kwargs)
 
         measurement_model = hypothesis.measurement.measurement_model
         measurement_model = self._check_measurement_model(measurement_model)
 
-        pred_info_mean = hypothesis.prediction.state_vector
-        hh = measurement_model.matrix()
-        invr = self._inverse_measurement_covar(measurement_model)
+        # Attach the measurement prediction to the hypothesis
+        hypothesis.measurement_prediction = self.predict_measurement(
+            predicted_state, measurement_model=measurement_model, **kwargs)
 
-        posterior_precision = hypothesis.prediction.precision + hh.T @ invr @ hh
-        posterior_information_mean = pred_info_mean + hh.T @ invr @ \
-            hypothesis.measurement.state_vector
+        y = hypothesis.prediction
+        H = measurement_model.matrix()
+        R = measurement_model.noise_covar
 
-        if self.force_symmetric_covariance:
-            posterior_precision = (posterior_precision + posterior_precision.T)/2
+        posterior_mean = y.state_vector + H.T @ inv(R) @ hypothesis.measurement.state_vector
+        posterior_information_matrix = hypothesis.prediction.info_matrix + H.T @ inv(R) @ H
 
-        return Update.from_state(hypothesis.prediction, posterior_information_mean,
-                                 posterior_precision,
-                                 timestamp=hypothesis.measurement.timestamp, hypothesis=hypothesis)
+        # Complete the calculation of the posterior
+        # This isn't optimised
+
+        if force_symmetric_covariance:
+            posterior_information_matrix = \
+                (posterior_information_matrix + posterior_information_matrix.T)/2
+
+        return InformationStateUpdate(
+            posterior_mean,
+            posterior_information_matrix,
+            hypothesis,
+            hypothesis.measurement.timestamp)
