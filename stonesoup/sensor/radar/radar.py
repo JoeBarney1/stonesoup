@@ -37,7 +37,7 @@ class RadarRangeBearing(Sensor):
         default=2,
         doc="Number of state dimensions. This is utilised by (and follows in format) "
             "the underlying :class:`~.CartesianToBearingRange` model")
-    pos_mapping = Property(
+    position_mapping = Property(
         [np.array],
         doc="Mapping between the targets state space and the sensors\
             measurement capability")
@@ -67,7 +67,7 @@ class RadarRangeBearing(Sensor):
         """
         measurement_model = CartesianToBearingRange(
             ndim_state=self.ndim_state,
-            mapping=self.pos_mapping,
+            mapping=self.position_mapping,
             noise_covar=self.noise_covar,
             translation_offset=self.position,
             rotation_offset=self.orientation)
@@ -149,7 +149,7 @@ class RadarRotatingRangeBearing(RadarRangeBearing):
 
         measurement_model = CartesianToBearingRange(
             ndim_state=self.ndim_state,
-            mapping=self.pos_mapping,
+            mapping=self.position_mapping,
             noise_covar=self.noise_covar,
             translation_offset=self.position,
             rotation_offset=rot_offset)
@@ -245,7 +245,7 @@ class RadarRangeBearingElevation(RadarRangeBearing):
         """
         measurement_model = CartesianToElevationBearingRange(
             ndim_state=self.ndim_state,
-            mapping=self.pos_mapping,
+            mapping=self.position_mapping,
             noise_covar=self.noise_covar,
             translation_offset=self.position,
             rotation_offset=self.orientation)
@@ -265,13 +265,15 @@ class RadarRangeRateBearing(RadarRangeBearing):
 
     Note
     ----
-    The current implementation of this class assumes a 3D Cartesian plane.
+    This class implementation assuming at 3D cartesian space, it therefore\
+     expects a 6D state space.
 
     """
 
-    vel_mapping = Property(
+    velocity_mapping = Property(
         np.array,
-        doc="Mapping to the targets velocity information within its state space")
+        default=np.array([[1], [3], [5]]),
+        doc="Mapping to the target's velocity information within its state space")
     ndim_state = Property(
         int,
         default=3,
@@ -303,8 +305,8 @@ class RadarRangeRateBearing(RadarRangeBearing):
         """
         measurement_model = CartesianToBearingRangeRate(
             ndim_state=self.ndim_state,
-            mapping=self.pos_mapping,
-            vel_mapping=self.vel_mapping,
+            mapping=self.position_mapping,
+            velocity_mapping=self.velocity_mapping,
             noise_covar=self.noise_covar,
             translation_offset=self.position,
             velocity=self.velocity,
@@ -329,9 +331,10 @@ class RadarRangeRateBearingElevation(RadarRangeRateBearing):
 
     """
 
-    vel_mapping = Property(
+    velocity_mapping = Property(
         np.array,
-        doc="Mapping to the targets velocity information within its state space")
+        default=np.array([[1], [3], [5]]),
+        doc="Mapping to the target's velocity information within its state space")
     ndim_state = Property(
         int,
         default=6,
@@ -363,8 +366,8 @@ class RadarRangeRateBearingElevation(RadarRangeRateBearing):
         """
         measurement_model = CartesianToElevationBearingRangeRate(
             ndim_state=self.ndim_state,
-            mapping=self.pos_mapping,
-            vel_mapping=self.vel_mapping,
+            mapping=self.position_mapping,
+            velocity_mapping=self.velocity_mapping,
             noise_covar=self.noise_covar,
             translation_offset=self.position,
             velocity=self.velocity,
@@ -392,7 +395,8 @@ class RadarRasterScanRangeBearing(RadarRotatingRangeBearing):
 
     Note
     ----
-    * The current implementation of this class assumes a 3D Cartesian plane.
+    This class implementation assuming at 3D cartesian space, it therefore\
+     expects a 6D state space.
 
     """
 
@@ -491,7 +495,7 @@ class AESARadar(Sensor):
             "counter-clockwise rotation around the :math:`x,y,z` axis. i.e Roll, Pitch and Yaw. "
             "Default is ``StateVector([0, 0, 0])``")
 
-    pos_mapping = Property(
+    position_mapping = Property(
         np.array, default=(0, 1, 2),
         doc="Mapping between or positions and state "
             "dimensions. [x,y,z]")
@@ -626,7 +630,7 @@ class AESARadar(Sensor):
         spoiled_width = self.beam_width / (np.cos(beam_az) * np.cos(beam_el))
         # state relative to radar (in cartesian space)
 
-        relative_vector = sky_state.state_vector[self.pos_mapping, :] - self.position
+        relative_vector = sky_state.state_vector[self.position_mapping, :] - self.position
 
         relative_vector = self._rotation_matrix @ relative_vector
 

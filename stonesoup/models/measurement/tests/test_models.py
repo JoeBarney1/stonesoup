@@ -404,7 +404,7 @@ def test_rangeratemodels(h, modelclass, state_vec, ndim_state, pos_mapping, vel_
     # Create and a measurement model object
     model = modelclass(ndim_state=ndim_state,
                        mapping=pos_mapping,
-                       vel_mapping=vel_mapping,
+                       velocity_mapping=vel_mapping,
                        noise_covar=noise_covar,
                        translation_offset=position,
                        rotation_offset=orientation)
@@ -414,7 +414,7 @@ def test_rangeratemodels(h, modelclass, state_vec, ndim_state, pos_mapping, vel_
     meas_pred_wo_noise = model.function(state)
     eval_m = h(state_vec,
                model.mapping,
-               model.vel_mapping,
+               model.velocity_mapping,
                model.translation_offset,
                model.rotation_offset,
                model.velocity)
@@ -454,7 +454,7 @@ def test_rangeratemodels(h, modelclass, state_vec, ndim_state, pos_mapping, vel_
     meas_pred_wo_noise = model.function(state)
     assert np.array_equal(meas_pred_wo_noise, h(state_vec,
                                                 model.mapping,
-                                                model.vel_mapping,
+                                                model.velocity_mapping,
                                                 model.translation_offset,
                                                 model.rotation_offset,
                                                 model.velocity))
@@ -466,7 +466,7 @@ def test_rangeratemodels(h, modelclass, state_vec, ndim_state, pos_mapping, vel_
         meas_pred_wo_noise.T,
         mean=np.array(h(state_vec,
                         model.mapping,
-                        model.vel_mapping,
+                        model.velocity_mapping,
                         model.translation_offset,
                         model.rotation_offset,
                         model.velocity)).ravel(),
@@ -478,7 +478,7 @@ def test_rangeratemodels(h, modelclass, state_vec, ndim_state, pos_mapping, vel_
     assert not np.array_equal(
         meas_pred_w_inoise, h(state_vec,
                               model.mapping,
-                              model.vel_mapping,
+                              model.velocity_mapping,
                               model.translation_offset,
                               model.rotation_offset,
                               model.velocity))
@@ -490,7 +490,7 @@ def test_rangeratemodels(h, modelclass, state_vec, ndim_state, pos_mapping, vel_
         meas_pred_w_inoise.T,
         mean=np.array(h(state_vec,
                         model.mapping,
-                        model.vel_mapping,
+                        model.velocity_mapping,
                         model.translation_offset,
                         model.rotation_offset,
                         model.velocity)).ravel(),
@@ -503,7 +503,7 @@ def test_rangeratemodels(h, modelclass, state_vec, ndim_state, pos_mapping, vel_
                                         noise=noise)
     assert np.array_equal(meas_pred_w_enoise, h(state_vec,
                                                 model.mapping,
-                                                model.vel_mapping,
+                                                model.velocity_mapping,
                                                 model.translation_offset,
                                                 model.rotation_offset,
                                                 model.velocity) + noise)
@@ -515,7 +515,7 @@ def test_rangeratemodels(h, modelclass, state_vec, ndim_state, pos_mapping, vel_
         meas_pred_w_enoise.T,
         mean=np.array(h(state_vec,
                         model.mapping,
-                        model.vel_mapping,
+                        model.velocity_mapping,
                         model.translation_offset,
                         model.rotation_offset,
                         model.velocity)).ravel(),
