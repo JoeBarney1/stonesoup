@@ -1,5 +1,4 @@
-from typing import Union
-
+# -*- coding: utf-8 -*-
 from ..base import Property
 from ..hypothesiser import Hypothesiser
 
@@ -11,5 +10,5 @@ class Gater(Hypothesiser):
     returned hypotheses.
     """
 
-    hypothesiser: Union[Hypothesiser, 'Gater'] = Property(
-        doc="Hypothesiser or Gater that is being wrapped.")
+    hypothesiser = Property(
+        Hypothesiser, doc="Hypothesiser that is being wrapped.")
