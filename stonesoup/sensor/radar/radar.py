@@ -33,8 +33,7 @@ class RadarRangeBearing(Sensor):
     """
 
     ndim_state = Property(
-        int,
-        default=2,
+        int, default=2,
         doc="Number of state dimensions. This is utilised by (and follows in format) "
             "the underlying :class:`~.CartesianToBearingRange` model")
     position_mapping = Property(
@@ -215,8 +214,7 @@ class RadarRangeBearingElevation(RadarRangeBearing):
     """
 
     ndim_state = Property(
-        int,
-        default=3,
+        int, default=3,
         doc="Number of state dimensions. This is utilised by (and follows in format) "
             "the underlying :class:`~.CartesianToBearingRange` model")
     noise_covar = Property(
@@ -271,12 +269,10 @@ class RadarRangeRateBearing(RadarRangeBearing):
     """
 
     velocity_mapping = Property(
-        np.array,
-        default=np.array([[1], [3], [5]]),
+        np.array, default=(1, 3, 5),
         doc="Mapping to the target's velocity information within its state space")
     ndim_state = Property(
-        int,
-        default=3,
+        int, default=3,
         doc="Number of state dimensions. This is utilised by (and follows in format) "
             "the underlying :class:`~.CartesianToBearingRangeRate` model")
     noise_covar = Property(
@@ -332,12 +328,10 @@ class RadarRangeRateBearingElevation(RadarRangeRateBearing):
     """
 
     velocity_mapping = Property(
-        np.array,
-        default=np.array([[1], [3], [5]]),
+        np.array, default=(1, 3, 5),
         doc="Mapping to the target's velocity information within its state space")
     ndim_state = Property(
-        int,
-        default=6,
+        int, default=6,
         doc="Number of state dimensions. This is utilised by (and follows in format) "
             "the underlying :class:`~.CartesianToElevationBearingRangeRate` model")
     noise_covar = Property(

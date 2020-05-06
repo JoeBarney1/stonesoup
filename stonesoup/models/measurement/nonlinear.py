@@ -616,16 +616,13 @@ class CartesianToBearingRangeRate(NonLinearGaussianMeasurement):
     """
 
     translation_offset = Property(
-        StateVector,
-        default=None,
+        StateVector, default=None,
         doc="A 3x1 array specifying the origin offset in terms of :math:`x,y` coordinates.")
     velocity_mapping = Property(
-        np.array,
-        default=np.array([[1], [3], [5]]),
+        np.array, default=(1, 3, 5),
         doc="Mapping to the targets velocity within its state space")
     velocity = Property(
-        StateVector,
-        default=None,
+        StateVector, default=None,
         doc="A 3x1 array specifying the sensor velocity in terms of :math:`x,y` \
         coordinates.")
 
@@ -765,16 +762,13 @@ class CartesianToElevationBearingRangeRate(NonLinearGaussianMeasurement, Reversi
     """
 
     translation_offset = Property(
-        StateVector,
-        default=None,
+        StateVector, default=None,
         doc="A 3x1 array specifying the origin offset in terms of :math:`x,y,z` coordinates.")
     velocity_mapping = Property(
-        np.array,
-        default=np.array([[1], [3], [5]]),
+        np.array, default=(1, 3, 5),
         doc="Mapping to the targets velocity within its state space")
     velocity = Property(
-        StateVector,
-        default=None,
+        StateVector, default=None,
         doc="A 3x1 array specifying the sensor velocity in terms of :math:`x,y,z` coordinates.")
 
     def __init__(self, *args, **kwargs):
