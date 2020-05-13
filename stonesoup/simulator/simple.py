@@ -280,7 +280,7 @@ class DummyGroundTruthSimulator(GroundTruthSimulator):
      It returns an empty set at each time step.
     """
 
-    times = Property([datetime], doc='list to times to return')
+    times = Property([datetime.datetime], doc='list to times to return')
 
     @BufferedGenerator.generator_method
     def groundtruth_paths_gen(self):
