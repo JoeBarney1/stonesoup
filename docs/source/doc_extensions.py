@@ -89,13 +89,18 @@ def shorten_type_hints(app, what, name, obj, options, signature, return_annotati
 
 def setup(app):
     app.connect('autodoc-process-docstring', declarative_class)
-    app.connect('autodoc-process-signature', shorten_type_hints)
 
 
-class GalleryScraper():
+import os
+import matplotlib
+import matplotlib.pyplot as plt
+
+from sphinx_gallery.scrapers import figure_rst
+
+
+class gallery_scraper():
     def __init__(self):
         self.plotted_figures = set()
-        self.current_src_file = None
 
     def __call__(self, block, block_vars, gallery_conf, **kwargs):
         """Scrape Matplotlib images.
@@ -121,54 +126,25 @@ class GalleryScraper():
             The ReSTructuredText that will be rendered to HTML containing
             the images. This is often produced by :func:`figure_rst`.
         """
-        # New file, so close all currently open figures
-        if block_vars['src_file'] != self.current_src_file:
-            for fig in self.plotted_figures:
-                plt.close(fig)
-            self.plotted_figures = set()
-            self.current_src_file = block_vars['src_file']
+
+        from matplotlib.figure import Figure
 
         image_path_iterator = block_vars['image_path_iterator']
-        image_rsts = []
-
-        # Check for animations
-        anims = {}
-        if gallery_conf['matplotlib_animations']:
-            for ani in block_vars['example_globals'].values():
-                if isinstance(ani, Animation):
-                    anims[ani._fig] = ani
-        # Then standard images
+        image_paths = list()
         new_figures = set(plt.get_fignums()) - self.plotted_figures
         last_line = block[1].strip().split('\n')[-1]
-        variable, *attributes = last_line.split(".")
-        try:
-            output = block_vars['example_globals'][variable]
-            for attribute in attributes:
-                output = getattr(output, attribute)
-        except (KeyError, AttributeError):
-            pass
-        else:
-            if isinstance(output, Figure):
-                new_figures.add(output.number)
-            elif isinstance(output, go.Figure) and write_plotly_image is not None:
-                image_path = PurePosixPath(next(image_path_iterator))
-                if "format" in kwargs:
-                    image_path = image_path.with_suffix("." + kwargs["format"])
-                write_plotly_image(output, str(image_path), kwargs.get('format'))
+        output = block_vars['example_globals'].get(last_line)
+        if isinstance(output, Figure):
+            new_figures.add(output.number)
 
         for fig_num, image_path in zip(new_figures, image_path_iterator):
-            image_path = PurePosixPath(image_path)
-            if "format" in kwargs:
-                image_path = image_path.with_suffix("." + kwargs["format"])
-            # Convert figure number to Figure.
+            if 'format' in kwargs:
+                image_path = '%s.%s' % (os.path.splitext(image_path)[0],
+                                        kwargs['format'])
+            # Set the fig_num figure as the current figure as we can't
+            # save a figure that's not the current figure.
             fig = plt.figure(fig_num)
             self.plotted_figures.add(fig_num)
-            # Deal with animations
-            if anim := anims.get(fig):
-                image_rsts.append(_anim_rst(anim, image_path, gallery_conf))
-                continue
-            # get fig titles
-            fig_titles = _matplotlib_fig_titles(fig)
             to_rgba = matplotlib.colors.colorConverter.to_rgba
             # shallow copy should be fine here, just want to avoid changing
             # "kwargs" for subsequent figures processed by the loop
@@ -176,38 +152,9 @@ class GalleryScraper():
             for attr in ['facecolor', 'edgecolor']:
                 fig_attr = getattr(fig, 'get_' + attr)()
                 default_attr = matplotlib.rcParams['figure.' + attr]
-                if to_rgba(fig_attr) != to_rgba(default_attr) and attr not in kwargs:
+                if to_rgba(fig_attr) != to_rgba(default_attr) and \
+                        attr not in kwargs:
                     these_kwargs[attr] = fig_attr
-            these_kwargs['bbox_inches'] = "tight"
             fig.savefig(image_path, **these_kwargs)
-            image_rsts.append(
-                figure_rst([image_path], gallery_conf['src_dir'], fig_titles))
-        rst = ''
-        if len(image_rsts) == 1:
-            rst = image_rsts[0]
-        elif len(image_rsts) > 1:
-            image_rsts = [
-                re.sub(r':class: sphx-glr-single-img', ':class: sphx-glr-multi-img', image)
-                for image in image_rsts]
-            image_rsts = [
-                HLIST_IMAGE_MATPLOTLIB + indent(image, ' ' * 6) for image in image_rsts
-            ]
-            rst = HLIST_HEADER + ''.join(image_rsts)
-        return rst
-
-
-class ResetNumPyRandomSeed:
-
-    def __init__(self):
-        self.state = None
-
-    def __call__(self, gallery_conf, fname, when):
-        if when == 'before':
-            self.state = np.random.get_state()
-        elif when == 'after':
-            # Set state attribute back to `None`
-            self.state = np.random.set_state(self.state)
-
-
-gallery_scraper = GalleryScraper()
-reset_numpy_random_seed = ResetNumPyRandomSeed()
+            image_paths.append(image_path)
+        return figure_rst(image_paths, gallery_conf['src_dir'])
