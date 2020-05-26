@@ -1,18 +1,11 @@
+# -*- coding: utf-8 -*-
 import enum
 
-import numpy as np
 try:
     import tensorflow as tf
-
-    try:
-        _tf_version = int(tf.__version__.split('.')[0])
-    except TypeError:
-        # Occurs with Sphinx due to mock imports
-        _tf_version = 1
-    if _tf_version > 1:
+    if int(tf.__version__.split('.')[0]) > 1:
         import tensorflow.compat.v1 as tf
         tf.disable_v2_behavior()
-
     import tensornets
     from tensornets import datasets
 except ImportError as error:
@@ -20,9 +13,11 @@ except ImportError as error:
         "Usage of 'stonesoup.detector.tensornets' requires that the optional"
         "package dependencies 'tensorflow' and 'tensornets' are installed.") \
         from error
+import numpy as np
 
-from ._video import _VideoAsyncBoxDetector
+from .base import Detector
 from ..base import Property
+from ..buffered_generator import BufferedGenerator
 from ..types.detection import Detection
 
 
@@ -47,7 +42,7 @@ class Networks(enum.Enum):
     YOLOv3COCO = enum.auto()  #: YOLOv3 tranined against COCO dataset
 
 
-class TensorNetsBoxObjectDetector(_VideoAsyncBoxDetector):
+class TensorNetsObjectDetector(Detector):
     """TensorNets Object Detection class
 
     This uses pre-trained networks from TensorNets for object detection in video
@@ -82,6 +77,12 @@ class TensorNetsBoxObjectDetector(_VideoAsyncBoxDetector):
         else:
             raise NotImplementedError("Unsupported network {!r}".format(self.net))
         return self._session.run(fetches, {self._inputs: self._model.preprocess(image)})
+
+    @BufferedGenerator.generator_method
+    def detections_gen(self):
+        for timestamp, frame in self.sensor:
+            detections = self._get_detections_from_frame(frame)
+            yield timestamp, detections
 
     def _get_detections_from_frame(self, frame):
         image_np_expanded = np.expand_dims(frame.pixels, axis=0)
