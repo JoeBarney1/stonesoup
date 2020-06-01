@@ -46,6 +46,12 @@ Simulation
 .. autoclass:: stonesoup.simulator.SensorSimulator
     :inherited-members:
     :noindex:
+.. autoclass:: stonesoup.platform.Platform
+    :inherited-members:
+    :noindex:
+.. autoclass:: stonesoup.sensor.sensor.Sensor
+    :inherited-members:
+    :noindex:
 
 
 Algorithm Components
@@ -55,6 +61,8 @@ Algorithm Components
 .. autoclass:: stonesoup.deleter.Deleter
     :noindex:
 .. autoclass:: stonesoup.hypothesiser.Hypothesiser
+    :noindex:
+.. autoclass:: stonesoup.gater.Gater
     :noindex:
 .. autoclass:: stonesoup.initiator.Initiator
     :noindex:
