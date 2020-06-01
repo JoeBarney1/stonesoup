@@ -4,14 +4,10 @@ Stone Soup Framework
 .. automodule:: stonesoup
 
 .. toctree::
-    interface
-    types
     stonesoup.base
     stonesoup.config
     stonesoup.functions
     stonesoup.measures
-    stonesoup.plotter
-    stonesoup.plugins
     stonesoup.serialise
 
 Components

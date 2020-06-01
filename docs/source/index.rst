@@ -67,11 +67,6 @@ Contents
     dataflow
     interface
     types
-    stonesoup.config
-    stonesoup.base
-    stonesoup.functions
-    stonesoup.measures
-    stonesoup.serialise
     stonesoup
     auto_tutorials/index
     auto_examples/index
