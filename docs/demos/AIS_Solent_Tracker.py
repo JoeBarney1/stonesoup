@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding: utf-8
 """
 Tracking AIS Reports Using Stone Soup
 =====================================
@@ -19,9 +20,8 @@ Tracking AIS Reports Using Stone Soup
 # %%
 # Building the detector
 # ---------------------
-# First we will prepare our detector for the |AIS|_ data, which is in a
-# :download:`CSV file <../../demos/SolentAIS_20160112_130211.csv>`, using the Stone Soup generic
-# CSV reader.
+# First we will prepare our detector for the |AIS|_ data, which is in CSV file, using the
+# Stone Soup generic CSV reader.
 
 from stonesoup.reader.generic import CSVDetectionReader
 detector = CSVDetectionReader(
@@ -31,8 +31,7 @@ detector = CSVDetectionReader(
 
 # %%
 # We use a feeder class to mimic a detector, passing our detections into the tracker, one detection
-# per vessel per minute. This is based on assumption that the identifier |MMSI|_ is unique per
-# vessel.
+# per vessel per minute. This is based on assumption that |MMSI|_ is unique per vessel.
 #
 # .. |MMSI| replace:: :abbr:`MMSI (Maritime Mobile Service Identity)`
 # .. _MMSI: https://en.wikipedia.org/wiki/Maritime_Mobile_Service_Identity
@@ -49,11 +48,12 @@ detector = MetadataReducer(detector, 'MMSI')
 # %%
 # In this instance, we want to convert the Latitude/Longitude information from the |AIS|_ file to
 # |UTM|_ projection, as this approximates to a local Cartesian space better suited for the models
-# we will use. The UTM zone will be fixed, based on the first detection processed.
+# we will use.
 #
 # .. |UTM| replace:: :abbr:`UTM (Universal Transverse Mercator)`
 # .. _UTM: https://en.wikipedia.org/wiki/Universal_Transverse_Mercator_coordinate_system
 
+# Convert to local |UTM|_ Zone, based on first received detection
 from stonesoup.feeder.geo import LongLatToUTMConverter
 detector = LongLatToUTMConverter(detector)
 
@@ -75,8 +75,8 @@ transition_model = CombinedLinearGaussianTransitionModel(
 
 # %%
 # Next we build a measurement model to describe the uncertainty on our detections. In this case, we
-# are just using the measured position (:math:`[0, 2]` dimensions of state space), assuming from
-# ship's |GNSS|_ receiver system with covariance of :math:`\begin{bmatrix}15&0\\0&15\end{bmatrix}`
+# are just using the measured position (`[0, 2]` dimensions of state space), assuming from ships
+# |GNSS|_ receiver system with covariance of :math:`\begin{bmatrix}15&0\\0&15\end{bmatrix}`
 #
 # .. |GNSS| replace:: :abbr:`GNSS (Global Navigation Satellite System)`
 # .. _GNSS: https://en.wikipedia.org/wiki/Satellite_navigation
@@ -101,7 +101,7 @@ updater = KalmanUpdater(measurement_model)
 # -------------------------
 # To associate our detections to track objects generate hypotheses using a hypothesiser. In this
 # case we are using a :class:`~.Mahalanobis` distance measure. In addition, we are exploiting the
-# fact that the detections should have the same |MMSI|_ for a single vessel, by gating out
+# fact that the detections should have the same |MMSI|_ for a single vessel, by "gating" out
 # detections that don't match the tracks |MMSI|_ (this being populated by detections used to create
 # the track).
 from stonesoup.gater.filtered import FilteredDetectionsGater
@@ -124,7 +124,7 @@ data_associator = NearestNeighbour(hypothesiser)
 # --------------------------------------
 # We need a method to initiate tracks. For this we will create an initiator component
 # and have it generate a :class:`~.GaussianState`. In this case, we'll use a measurement initiator
-# which uses the measurement's value and model covariance where possible. In this case, as we are
+# which uses the measurements value and model covariance where possible. In this case, as we are
 # using position from |AIS|_, we only need to be concerned about defining the velocity prior. The
 # prior we are using has the velocity state vector as zero, and variance of 10m/s.
 from stonesoup.types.state import GaussianState
@@ -137,7 +137,7 @@ initiator = SimpleMeasurementInitiator(
 # As well as an initiator we must also have a deleter. This deleter removes tracks which haven't
 # been updated for a defined time period, in this case 10 minutes.
 from stonesoup.deleter.time import UpdateTimeDeleter
-deleter = UpdateTimeDeleter(time_since_update=datetime.timedelta(minutes=10))
+deleter = UpdateTimeDeleter(datetime.timedelta(minutes=10))
 
 # %%
 # Building and running the tracker
@@ -160,7 +160,7 @@ tracker = MultiTargetTracker(
 # :class:`set` we can simply update this with `current_tracks` at each timestep, not worrying about
 # duplicates.
 tracks = set()
-for step, (time, current_tracks) in enumerate(tracker, 1):
+for step, (time, current_tracks) in enumerate(tracker.tracks_gen(), 1):
     tracks.update(current_tracks)
     if not step % 10:
         print("Step: {} Time: {}".format(step, time))
