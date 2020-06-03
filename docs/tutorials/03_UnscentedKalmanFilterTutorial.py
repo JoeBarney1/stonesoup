@@ -1,162 +1,274 @@
 #!/usr/bin/env python
+# coding: utf-8
 
 """
-==============================================
-3 - Non-linear models: unscented Kalman filter
-==============================================
+3 - Unscented Kalman filter tutorial
+======================
 """
 
 # %%
-# The previous tutorial showed how the extended Kalman filter propagates estimates using a
-# first-order linearisation of the transition and/or sensor models. Clearly there are limits to
-# such an approximation, and in situations where models deviate significantly from linearity,
-# performance can suffer.
+# **Handling divergence and sub-optimal performance with non-linear system tracking:**
 #
-# In such situations it can be beneficial to seek alternative approximations. One such comes via
-# the so-called *unscented transform* (UT). In this we characterise a Gaussian distribution using a
-# series of weighted samples, *sigma points*, and propagate these through the non-linear function.
-# A transformed Gaussian is then reconstructed from the new sigma points. This forms the basis for
-# the unscented Kalman filter (UKF).
+# The Extended Kalman filter propogates covariance matrices through linearisations of non-linear
+# models. In highly non-linear systems, this can lead to over-estimated covariances or divergence
+# of tracks, to the point where uncertainties make our estimates useless.
 #
-# This tutorial will first run a simulation in an entirely equivalent fashion to the previous
-# (EKF) tutorial. We'll then look into more precise details concerning the UT and try and develop
-# some intuition into the reasons for its effectiveness.
+# We take a deterministic sampling approach to the problem.
+# Using the *unscented transformation* technique, we characterize a relevant probability
+# distributions with a finite set of statistics. In the case of Kalman filtering that would concern
+# the mean and covariance of Gaussian states.  To attain this characterization, we create a minimal
+# selection of sample (sigma) points, distributed about the mean with corresponding weights, which
+# determine their relevance/contribution to the state mean and covariance.
+# As before, the state distribution is approximated as Gaussian. But now we create a minimal
+# selection of sample (sigma) points that can fully describe the distribution.
+# By distributing in the state space with appropriate weights, we attain a collection of discrete
+# point, mean weight and covariance weight triplets that capture the mean and covariance of the
+# underlying distribution.
+#
+# We can then propogate these points through the non-linear system, and define a new distribution
+# determined by their new layout.
+# Without proof, the posterior mean and covariance will be accurate to the 3rd order Taylor
+# expansion for all non-linearities that need approximation.
 
 # %%
-# Background
-# ----------
-# Limited detail on how Stone Soup does the UKF is provided below. See Julier et al. (2000) [#]_
-# for fuller, better details of the UKF.
-#
-# For dimension :math:`D`, a set of :math:`2 D + 1` sigma points are calculated at:
-#
-# .. math::
-#           \mathbf{s}_j &= \mathbf{x}, \ \ j = 0 \\
-#           \mathbf{s}_j &= \mathbf{x} + \alpha \sqrt{\kappa} A_j, \ \ j = 1, ..., D \\
-#           \mathbf{s}_j &= \mathbf{x} - \alpha \sqrt{\kappa} A_j, \ \ j = D + 1, ..., 2 D
-#
-# where :math:`A_j` is the :math:`j` th column of :math:`A`, a *square root matrix* of the
-# covariance, :math:`P = AA^T`, of the state to be approximated, and :math:`\mathbf{x}` is its
-# mean.
-#
-# Two sets of weights, mean and covariance, are calculated:
-#
-# .. math::
-#           W^m_0 &= \frac{\lambda}{c} \\
-#           W^c_0 &= \frac{\lambda}{c} + (1 - \alpha^2 + \beta) \\
-#           W^m_j &= W^c_j = \frac{1}{2 c}
-#
-# where :math:`c = \alpha^2 (D + \kappa)`, :math:`\lambda = c - D`. The parameters
-# :math:`\alpha, \ \beta, \ \kappa` are user-selectable parameters with default values of
-# :math:`0.5, \ 2, \ 3 - D`.
-#
-# After the sigma points are transformed :math:`\mathbf{s^{\prime}} = f( \mathbf{s} )`, the
-# distribution is reconstructed as:
-#
-# .. math::
-#           \mathbf{x}^\prime &= \sum\limits^{2 D}_{0} W^{m}_j \mathbf{s}^{\prime}_j \\
-#           P^\prime &= (\mathbf{s}^{\prime} - \mathbf{x}^\prime) \, diag(W^c) \,
-#           (\mathbf{s}^{\prime} - \mathbf{x}^\prime)^T + Q
-#
-# The posterior mean and covariance are accurate to the 2nd order Taylor expansion for any
-# non-linear model. [#]_
+# For a simple gaussian state near the origin we can create a set of sigma points around its centre
+# that will fully describe its mean and variance:
 
-# %%
-# Nearly-constant velocity example
-# --------------------------------
-# This example is equivalent to that in the previous (EKF) tutorial. As with that one, you are
-# invited to play with the parameters and watch what happens.
+# Some general imports.
+from datetime import datetime
 
-# Some general imports and initialise time
 import numpy as np
 
-from datetime import datetime, timedelta
-start_time = datetime.now().replace(microsecond=0)
+from stonesoup.functions import gauss2sigma
+from stonesoup.types.state import GaussianState
+
+# Make example gaussian state (high uncertainty in x, low uncertainty in y).
+some_gaussian_state = GaussianState([[2.5], [1], [1.5], [0]], np.diag([5, 1, 0.4, 1]),
+                                    timestamp=datetime.now())
 
 # %%
-
-np.random.seed(1991)
+# Create sigma points. 'alpha' defines the point spread.
+sigma_points, sigma_weights, sigma_covars = gauss2sigma(some_gaussian_state, alpha=0.3)
 
 # %%
-# Create ground truth
-# ^^^^^^^^^^^^^^^^^^^
-#
+# Set-up for plotting.
+from matplotlib import pyplot as plt
+fig1 = plt.figure(figsize=(10, 6))
+ax = fig1.add_subplot(1, 1, 1)
+ax.set_ylim(0, 3)
+ax.set_xlim(0, 5)
+
+# Plot gaussian distribution (for positional coordinates of the state (remember that state space
+# also has velocity coordinates) to one standard deviation).
+from matplotlib.patches import Ellipse
+w, v = np.linalg.eig(some_gaussian_state.covar)
+max_ind = np.argmax(v[0, :])
+orient = np.arctan2(v[max_ind, 1], v[max_ind, 0])
+ellipse = Ellipse(xy=(some_gaussian_state.state_vector[0],  # x-coord
+                      some_gaussian_state.state_vector[2]),  # y-coord
+                  width=np.sqrt(w[0])*2, height=np.sqrt(w[2])*2,
+                  angle=np.rad2deg(orient),
+                  alpha=0.2,
+                  color='b')
+ax.add_artist(ellipse)
+
+# Plot sigma points that describe this distribution (ellipse).
+x = [sigma.state_vector[0, 0] for sigma in sigma_points]
+y = [sigma.state_vector[2, 0] for sigma in sigma_points]
+ax.scatter(x, y, color='r', s=3)
+
+# %%
+# Where the individual sigma point weights are given by:
+sigma_weights
+
+# %%
+# We might be given data from a sensor that provides accurate range, but incredibly bad bearing
+# measurements of targets.
+# %%
+# Set up a prediction state for the sensor to create a predicted measurement from.
+
+from stonesoup.types.prediction import GaussianStatePrediction
+# Make prediction state that we will use to make our measurement predictions from.
+prediction = GaussianStatePrediction(state_vector=[[20], [1], [20], [1]],
+                                     covar=np.diag([5, 1, 5, 1]),
+                                     timestamp=datetime.now())
+
+from stonesoup.functions import cart2pol
+psigmas, pweights, pcovars = gauss2sigma(prediction, alpha=0.3)
+rthetas = [cart2pol(sigma.state_vector[0, 0], sigma.state_vector[2, 0]) for sigma in psigmas]
+rs = [coord[0] for coord in rthetas]
+thetas = [coord[1] for coord in rthetas]
+
+# %%
+# Create terrible bearing, range sensor.
+
+from stonesoup.models.measurement.nonlinear import CartesianToBearingRange
+
+sensor_x = 0
+sensor_y = 0
+
+measurement_model = CartesianToBearingRange(
+    ndim_state=4,
+    mapping=(0, 2),
+    noise_covar=np.diag([np.radians(10), 0.001]),  # bad bearing, good range uncertainties
+    translation_offset=np.array([[sensor_x], [sensor_y]])
+)
+
+# The Extended Kalman Filter would certainly handle the non-linearity of the mapping
+# :math:`cartesian\mapsto \polar`, but would fall short (or in fact too far) in its prediction.
+# Our sensor has a large bearing uncertainty. Consider the shape of this. We essentially have a
+# banana-shaped region of where we might find our measurement: A curve of possible bearings, and
+# a width of ranges.
+# The Unscented Kalman Filter will have sampled (made some sigma points) in the state space
+# (cartesian), and converted them to measurement space (polar) to form a new distribution.
+# However, the EKF will have simply converted the state distribution's mean to measurement space,
+# and approximated a covariance by taking the 1st order linearisation of the mapping from cartesian
+# to polar.
+# This results in the UKF giving a distribution that is 'shifted' back slightly from the EKF's,
+# better describing the banana distribution we would expect, and highlighting its advantage over
+# the EKF.
+
+# Create updaters
+from stonesoup.updater.kalman import UnscentedKalmanUpdater, ExtendedKalmanUpdater
+unscented_updater = UnscentedKalmanUpdater(measurement_model, alpha=0.3)
+extended_updater = ExtendedKalmanUpdater(measurement_model)
+
+# Get predicted measurements from the state prediction.
+ukf_pred_meas = unscented_updater.predict_measurement(prediction)
+ekf_pred_meas = extended_updater.predict_measurement(prediction)
+
+from matplotlib import pyplot as plt
+
+fig2 = plt.figure(figsize=(10, 6))
+ax = fig2.add_subplot(1, 1, 1, polar=True)
+ax.set_ylim(0, 40)
+ax.set_xlim(0, np.radians(90))
+
+# Plot the sigma points of the state after being converted to measurement space (granted, we are
+# actually still plotting in cartesian space here, just with range/bearing lines superimposed) that
+# are used by the UKF.
+ax.scatter([thetas], [rs], color='b', s=3)
+
+# Plot UKF's predicted measurement distribution (red)
+w, v = np.linalg.eig(ukf_pred_meas.covar)
+max_ind = np.argmax(v[0, :])
+orient = np.arctan2(v[max_ind, 1], v[max_ind, 0])
+ukf_ellipse = Ellipse(xy=(ukf_pred_meas.state_vector[0], ukf_pred_meas.state_vector[1]),
+                      width=np.sqrt(w[0])*2, height=np.sqrt(w[1])*2,
+                      angle=np.rad2deg(orient),
+                      alpha=0.2,
+                      color='r')
+ax.add_artist(ukf_ellipse)
+
+# Plot EKF's predicted measurement distribution (green)
+w, v = np.linalg.eig(ekf_pred_meas.covar)
+max_ind = np.argmax(v[0, :])
+orient = np.arctan2(v[max_ind, 1], v[max_ind, 0])
+ekf_ellipse = Ellipse(xy=(ekf_pred_meas.state_vector[0], ekf_pred_meas.state_vector[1]),
+                      width=np.sqrt(w[0])*2, height=np.sqrt(w[1])*2,
+                      angle=np.rad2deg(orient),
+                      alpha=0.2,
+                      color='g')
+ax.add_artist(ekf_ellipse)
+
+# %%
+# If we were to continue with applying the EKF, it is clear that deviation would be inevitable.
+# The clear shift of the UKF's distribution (red) closer to the sensor shows its better
+# approximation of the banana-shaped distribution that we would expect.
+
+# %%
+# Running the Unscented Kalman Filter
+# -----------------------------------
+# We will do a quick run of the UKF on a very noisy (uncertain) sensor that gives great range, but
+# awful bearing readings.
+
+# %%
+# Set-up plot and ground truth as before.
+fig = plt.figure(figsize=(10, 6))
+ax = fig.add_subplot()
+ax.set_xlabel("$x$")
+ax.set_ylabel("$y$")
+ax.axis('equal')
+
+from datetime import timedelta
 from stonesoup.types.groundtruth import GroundTruthPath, GroundTruthState
 from stonesoup.models.transition.linear import CombinedLinearGaussianTransitionModel, \
                                                ConstantVelocity
 
+start_time = datetime.now()
 transition_model = CombinedLinearGaussianTransitionModel([ConstantVelocity(0.05),
                                                           ConstantVelocity(0.05)])
-timesteps = [start_time]
-truth = GroundTruthPath([GroundTruthState([0, 1, 0, 1], timestamp=timesteps[0])])
+
+truth = GroundTruthPath([GroundTruthState([0, 1, 0, 1], timestamp=start_time)])
 
 for k in range(1, 21):
-    timesteps.append(start_time+timedelta(seconds=k))
     truth.append(GroundTruthState(
         transition_model.function(truth[k-1], noise=True, time_interval=timedelta(seconds=1)),
-        timestamp=timesteps[k]))
+        timestamp=start_time+timedelta(seconds=k)))
+
+# Plot the result
+ax.plot([state.state_vector[0] for state in truth],
+        [state.state_vector[2] for state in truth],
+        linestyle="--")
 
 # %%
-# Set-up plot to render ground truth, as before.
+# Create Kalman predictor
+# -----------------------
+# The transition of the target state is linear, so we have no need for a
+# :class:`~.ExtendedKalmanPredictor` or :class:`~.UnscentedKalmanPredictor`.
 
-from stonesoup.plotter import AnimatedPlotterly
-plotter = AnimatedPlotterly(timesteps, tail_length=0.3)
-plotter.plot_ground_truths(truth, [0, 2])
-plotter.fig
+from stonesoup.predictor.kalman import KalmanPredictor
+predictor = KalmanPredictor(transition_model)
 
 # %%
-# Simulate the measurement
-# ^^^^^^^^^^^^^^^^^^^^^^^^
-#
+# Simulate noisy measuring
+# ------------------------
+
 from stonesoup.models.measurement.nonlinear import CartesianToBearingRange
-# Sensor position
-sensor_x = 50
+
+sensor_x = 0
 sensor_y = 0
 
-# Make noisy measurement (with bearing variance = 0.2 degrees).
-measurement_model = CartesianToBearingRange(ndim_state=4,
-                                            mapping=(0, 2),
-                                            noise_covar=np.diag([np.radians(0.2), 1]),
-                                            translation_offset=np.array([[sensor_x], [sensor_y]]))
+# Make noisy measurement.
+measurement_model = CartesianToBearingRange(
+    ndim_state=4,
+    mapping=(0, 2),
+    noise_covar=np.diag([np.radians(3), 0.001]),  # bearing variance = 3 degrees
+    translation_offset=np.array([[sensor_x], [sensor_y]])
+)
 
 # %%
 from stonesoup.types.detection import Detection
+from stonesoup.functions import pol2cart
 
 # Make sensor that produces the noisy measurements.
 measurements = []
 for state in truth:
     measurement = measurement_model.function(state, noise=True)
-    measurements.append(Detection(measurement, timestamp=state.timestamp,
-                                  measurement_model=measurement_model))
+    measurements.append(Detection(measurement, timestamp=state.timestamp))
 
-# Plot the measurements
-# Where the model is nonlinear the plotting function uses the inverse function to get coordinates
-
-plotter.plot_measurements(measurements, [0, 2])
-plotter.fig
+# Plot the measurements (turning them back in to cartesian coordinates (for the sake of a nice
+# plot)).
+x, y = pol2cart(
+    np.hstack(state.state_vector[1, 0] for state in measurements),
+    np.hstack(state.state_vector[0, 0] for state in measurements))
+ax.scatter(x + sensor_x, y + sensor_y, color='b')
+fig
 
 # %%
-# Create unscented Kalman filter components
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Note that the transition of the target state is linear, so we have no real need for a
-# :class:`~.UnscentedKalmanPredictor`. But we'll use one anyway, if nothing else to demonstrate
-# that a linear model won't break anything.
-from stonesoup.predictor.kalman import UnscentedKalmanPredictor
-predictor = UnscentedKalmanPredictor(transition_model)
-# Create :class:`~.UnscentedKalmanUpdater`
+# Running the Unscented Kalman Filter
+# -----------------------------------
+
+# Create :class:`~.UnscentedKalmanUpdater`.
+
 from stonesoup.updater.kalman import UnscentedKalmanUpdater
 unscented_updater = UnscentedKalmanUpdater(measurement_model)  # Keep alpha as default = 0.5
 
-# %%
-# Run the Unscented Kalman Filter
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#
-# Create a prior
-from stonesoup.types.state import GaussianState
-prior = GaussianState([[0], [1], [0], [1]], np.diag([1.5, 0.5, 1.5, 0.5]), timestamp=start_time)
+prior = GaussianState([[0], [1], [0], [1]], np.diag([1, 1, 1, 1]), timestamp=start_time)
 
 # %%
-# Populate the track
+
+# Plot UKF track (red)
 from stonesoup.types.hypothesis import SingleHypothesis
 from stonesoup.types.track import Track
 
@@ -168,158 +280,27 @@ for measurement in measurements:
     track.append(post)
     prior = track[-1]
 
-# %%
-# And plot
+ax.plot([state.state_vector[0, 0] for state in track],
+        [state.state_vector[2, 0] for state in track],
+        marker=".", color='r')
 
-plotter.plot_tracks(track, [0, 2], uncertainty=True)
-plotter.fig
-
-# %%
-# The UT in slightly more depth
-# -----------------------------
-# Now try and get a sense of what actually happens to the uncertainty when a non-linear combination
-# of functions happens. Instead of deriving this analytically (and potentially getting bogged-down
-# in the maths), let's just use a sampling method.
-# We can start with a prediction, which is Gauss-distributed in state space, that we will use to
-# make our measurement predictions from.
-from stonesoup.types.prediction import GaussianStatePrediction
-prediction = GaussianStatePrediction(state_vector=[[0], [0], [20], [0]],
-                                     covar=np.diag([1.5, 0.5, 1.5, 0.5]),
-                                     timestamp=datetime.now())
-
-# %%
-# We'll recapitulate the fact that the sensor position is where it previously was. But this time
-# we'll make the measurement much noisier.
-sensor_x = 0
-sensor_y = 0
-
-measurement_model = CartesianToBearingRange(
-    ndim_state=4,
-    mapping=(0, 2),
-    noise_covar=np.diag([np.radians(5), 0.1]),  # bearing variance = 5 degrees (accurate range)
-    translation_offset=np.array([[sensor_x], [sensor_y]])
-)
-
-# %%
-# The next tutorial will go into much more detail on sampling methods. For the moment we'll just
-# assert that we're generating 2000 points from the state prediction above.
-#
-# We need these imports and parameters:
-from scipy.stats import multivariate_normal
-
-from stonesoup.types.particle import Particle
-from stonesoup.types.numeric import Probability  # Similar to a float type
-from stonesoup.types.state import ParticleState
-
-number_particles = 2000
-
-# Sample from the Gaussian prediction distribution
-samples = multivariate_normal.rvs(prediction.state_vector.ravel(),
-                                  prediction.covar,
-                                  size=number_particles)
-particles = [
-    Particle(sample.reshape(-1, 1), weight=Probability(1/number_particles)) for sample in samples]
-# Create prior particle state.
-pred_samples = ParticleState(None, particle_list=particles, timestamp=start_time)
-
-from stonesoup.resampler.particle import SystematicResampler
-resampler = SystematicResampler()
-from stonesoup.updater.particle import ParticleUpdater
-pupdater = ParticleUpdater(measurement_model, resampler)
-
-predict_meas_samples = pupdater.predict_measurement(pred_samples)
-
-# %%
-# Don't worry what all this means for the moment. It's a convenient way of showing the 'true'
-# distribution of the predicted measurement - which is rendered as a blue cloud. Note that
-# no noise is added by the :meth:`~.UnscentedKalmanUpdater.predict_measurement` method so we add
-# some noise below. This is additive Gaussian in the sensor coordinates.
-from matplotlib import pyplot as plt
-fig = plt.figure(figsize=(10, 6), tight_layout=True)
-ax = fig.add_subplot(1, 1, 1, polar=True)
-ax.set_ylim(0, 30)
-ax.set_xlim(0, np.radians(180))
-
-data = np.array([particle.state_vector for particle in predict_meas_samples.particles])
-noise = multivariate_normal.rvs(np.array([0, 0]), measurement_model.covar(), size=len(data))
-
-ax.plot(data[:, 0].ravel()+noise[:, 0],
-        data[:, 1].ravel()+noise[:, 1],
-        linestyle='',
-        marker=".",
-        markersize=1.5,
-        alpha=0.4,
-        label="Particles")
-ax.legend()
-
-# %%
-# We can now see what happens when we create EKF and UKF updaters and compare their effect.
-#
-# Create updaters:
-from stonesoup.updater.kalman import UnscentedKalmanUpdater, ExtendedKalmanUpdater
-unscented_updater = UnscentedKalmanUpdater(measurement_model, alpha=0.5, beta=4)
-extended_updater = ExtendedKalmanUpdater(measurement_model)
-
-# Get predicted measurements from the state prediction.
-ukf_pred_meas = unscented_updater.predict_measurement(prediction)
-ekf_pred_meas = extended_updater.predict_measurement(prediction)
-
-# %%
-# Plot UKF (red) and EKF (green) predicted measurement distributions.
-
-# Plot UKF's predicted measurement distribution
-from matplotlib.patches import Ellipse
-from stonesoup.plotter import Plotter
-w, v = np.linalg.eig(ukf_pred_meas.covar)
-max_ind = np.argmax(w)
-min_ind = np.argmin(w)
-orient = np.arctan2(v[1, max_ind], v[0, max_ind])
-ukf_ellipse = Ellipse(xy=(ukf_pred_meas.state_vector[0], ukf_pred_meas.state_vector[1]),
-                      width=2*np.sqrt(w[max_ind]), height=2*np.sqrt(w[min_ind]),
+# Plot UKF errors (red)
+HH = np.array([[1.,  0.,  0.,  0.],
+               [0.,  0.,  1.,  0.]])
+for state in track:
+    w, v = np.linalg.eig(HH@state.covar@HH.T)
+    max_ind = np.argmax(v[0, :])
+    orient = np.arctan2(v[max_ind, 1], v[max_ind, 0])
+    ellipse = Ellipse(xy=(state.state_vector[0], state.state_vector[2]),
+                      width=np.sqrt(w[0])*2, height=np.sqrt(w[1])*2,
                       angle=np.rad2deg(orient),
-                      alpha=0.4,
-                      color='r',)
-ax.add_artist(ukf_ellipse)
-
-
-# Plot EKF's predicted measurement distribution
-w, v = np.linalg.eig(ekf_pred_meas.covar)
-max_ind = np.argmax(w)
-min_ind = np.argmin(w)
-orient = np.arctan2(v[1, max_ind], v[0, max_ind])
-ekf_ellipse = Ellipse(xy=(ekf_pred_meas.state_vector[0], ekf_pred_meas.state_vector[1]),
-                      width=2*np.sqrt(w[max_ind]), height=2*np.sqrt(w[min_ind]),
-                      angle=np.rad2deg(orient),
-                      alpha=0.5,
-                      color='g',)
-ax.add_artist(ekf_ellipse)
-
-# Add ellipses to legend
-label_list = ["UKF Prediction", "EKF Prediction"]
-color_list = ['r', 'g']
-Plotter.ellipse_legend(ax, label_list, color_list)
+                      alpha=0.2,
+                      color='r')
+    ax.add_artist(ellipse)
 fig
 
-# %%
-# You may have to spend some time fiddling with the parameters to see major differences between the
-# EKF and UKF. Indeed the point to make is not that there is any great magic about the UKF. Its
-# power is that it harnesses some extra free parameters to give a more flexible description of the
-# transformed distribution.
+# sphinx_gallery_thumbnail_number = 2
 
 # %%
-# Key points
-# ----------
-# 1. The unscented Kalman filter offers a powerful alternative to the EKF when undertaking tracking
-#    in non-linear regimes.
-
-# %%
-# References
-# ----------
-# .. [#] Julier S., Uhlmann J., Durrant-Whyte H.F. 2000, A new method for the nonlinear
-#        transformation of means and covariances in filters and estimators," in IEEE Transactions
-#        on Automatic Control, vol. 45, no. 3, pp. 477-482, doi: 10.1109/9.847726.
-# .. [#] Julier S.J. 2002, The scaled unscented transformation, Proceedings of the 2002 American
-#        Control Conference (IEEE Cat. No.CH37301), Anchorage, AK, USA, 2002, pp. 4555-4559 vol.6,
-#        doi: 10.1109/ACC.2002.1025369.
-
-# sphinx_gallery_thumbnail_path = '_static/sphinx_gallery/Tutorial_3.PNG'
+# Although a bit manic, it is clear that the UKF better represents well the uncertainty of the
+# sensor throughout the filtering process.

@@ -1,207 +1,185 @@
 #!/usr/bin/env python
+# coding: utf-8
 
 """
-=====================================
-4 - Sampling methods: particle filter
-=====================================
+4 - Particle filter tutorial
+============================
 """
 
 # %%
-# In the previous tutorials we encountered some shortcomings in describing distributions as
-# Gaussians, albeit with considerable flexibility in coping with the non-linear transforms.
+# **Approximation via random sampling**
 #
-# Sampling methods offer an attractive alternative to such parametric methods in that there is
-# no need for complicated though approximate covariance calculations. In this tutorial we look at a
-# class of *sequential Monte Carlo sampling* methods, and in particular, the *particle filter*.
+# Obviously, if we could totally encapsulate a target's state probability distribution with some
+# description, send it through some transition model that perfectly describes the target's movement
+# and end-up with a distribution that completely describes the possible resultant states, we would
+# be happy.
+# The Extended and Unscented Kalman Filters handle non-linearity to a certain degree of accuracy.
+# The issue tends to lie in approximation of the state covariance. What if we tried a method that
+# didn't require us to convert the covariances?
+
+# %%
+# Instead of considering a state probability distribution as a whole, lets take a random sample
+# of points (states) within that distribution, send them individually through the
+# transition/measurement process, look at their resulting 'positions' and make sense of them from
+# there.
+# There are a few advantages to this: Once we have taken our random sample, we no longer need to
+# consider the covariance for the distribution, and only need to transit the particles' states
+# through the process; the underlying distribution need not be gaussian (as with EKF, UKF and the
+# normal Kalman Filter algorithm); we can model any non-linearities in their entirety.
 #
-# Colloquially we can think of a particle filter as a series of point samples being recursed
-# through the predict-update stages of a Bayesian filter. The diversity of samples compensates for
-# the lack of a covariance estimate, though often at the expense of increased computation
-# requirements.
+# Initially, the particles can be weighted equally, and normalised such that they sum to :math:`1`.
+# Through the update step, particles will have their weights adjusted such that those lying closer
+# to an incoming measurement will have greater weight.
 #
-# Background
-# ----------
-#
-# In more detail, we seek to approximate the posterior state estimate as a sum of samples, or
-# particles,
+# The posterior estimate is then made by the approximation:
 #
 # .. math::
 #       p(\textbf{x}_{k}|\textbf{z}_{1:k}) \approx
 #       \sum_{i} w_{k}^i \delta (\textbf{x}_{k} - \textbf{x}_{k}^i)
 #
-# where :math:`w_{k}^i` are weights such that :math:`\sum\limits_{i} w_{k}^i = 1`. This posterior
-# can be calculated, and subsequently maintained, by successive applications of the
-# Chapman-Kolmogorov equation and Bayes rule in an analogous manner to the Kalman family of
-# filters of previous tutorials. There is considerable flexibility in how to sample from these
-# various distributions and the interested reader can refer to [#]_ for more detail.
+# where :math:`p(\textbf{x}_{k}|\textbf{z}_{1:k})` is the resulting distribution
+# :math:`p(\textbf{x}_{k}|\textbf{z}_{1:k})` of the possible states of :math:`\textbf{x}_{k}` given
+# observations :math:`\textbf{z}_{1:k} = {\textbf{z}_{1}, ..., \textbf{z}_{k}}` from 'time'
+# :math:`1` to :math:`k` and :math:`w_{k}^i` are weights such that :math:`\sum_{i} w_{k}^i = 1`.
 #
-# The present tutorial focuses on a so-called *sequential importance resampling* filter. This is
-# facilitated by a number of Stone Soup classes. The weight-update equation is,
+# Simply put:
 #
-# .. math::
-#           w^i_k = w^i_{k-1}
-#           \frac{p(\mathbf{z}_k|\mathbf{x}^i_k) p(\mathbf{x}^i_k|\mathbf{x}^1_{k-1})}
-#                {q(\mathbf{x}^i_k|\mathbf{x}^1_{k-1},\mathbf{z}^i_{1:k})}
+# - Each particle goes through the predict/update process as with the Kalman Filters.
+# - The predict step 'moves' the particles.
+# - The update step will recalculate their weights for the next iteration.
 #
-# where :math:`p(\mathbf{z}_k | \mathbf{x}^i_k)` is the likelihood distribution (as defined by the
-# :class:`~.MeasurementModel`) and :math:`p(\mathbf{x}^i_k|\mathbf{x}^1_{k-1})` is the transition
-# probability distribution (:class:`~.TransitionModel`). The :math:`q(\cdot)` distribution -- the
-# importance density -- should approximate the posterior distribution, while still being easy to
-# sample from.
-#
-# A common occurrence in such methods is that of *sample impoverishment*. After a few iterations,
-# all but a small number of the particles will have negligible weight. This affects accuracy and
-# wastes computation on particles with little effect on the estimate. Many resampling schemes
-# exist and are designed to redistribute particles to areas where the posterior probability is
-# higher. In Stone Soup such resampling is accomplished by a :class:`~.Resampler`. More detail is
-# provided in the
-# example below.
+# One significant drawback of this is that we are going to be sending a lot of particles through
+# multiple steps, resulting in a decent computational complexity.
+# Also, we must be careful that we select an appropriate particle/sample sparsity to get a good
+# description of the prior distribution.
+# After a few iterations, most particles will have moved far enough away that they have
+# :math:`\sim 0` weight, hence provide no contribution to our estimates. But they are still being
+# processed through at each predict and update step, which is quite a computational waste. Hence a
+# re-sampling method would be useful to apply every so often (many exist, and are designed to
+# redistribute these particles to areas where the posterior probability is higher).
 
 # %%
-#
-# Nearly-constant velocity example
-# --------------------------------
-# We continue in the same vein as the previous tutorials.
-#
-# Ground truth
-# ^^^^^^^^^^^^
-# Import the necessary libraries
-
-import numpy as np
 
 from datetime import datetime
 from datetime import timedelta
-start_time = datetime.now().replace(microsecond=0)
 
-# %%
-
-np.random.seed(1991)
-
-# %%
-# Initialise Stone Soup ground-truth and transition models.
 from stonesoup.models.transition.linear import CombinedLinearGaussianTransitionModel, \
     ConstantVelocity
 from stonesoup.types.groundtruth import GroundTruthPath, GroundTruthState
 
+start_time = datetime.now()
 transition_model = CombinedLinearGaussianTransitionModel([ConstantVelocity(0.05),
                                                           ConstantVelocity(0.05)])
-timesteps = [start_time]
+
 truth = GroundTruthPath([GroundTruthState([0, 1, 0, 1], timestamp=start_time)])
 
-# %%
-# Create the truth path
 for k in range(1, 21):
-    timesteps.append(start_time+timedelta(seconds=k))
     truth.append(GroundTruthState(
         transition_model.function(truth[k-1], noise=True, time_interval=timedelta(seconds=1)),
-        timestamp=timesteps[k]))
+        timestamp=start_time+timedelta(seconds=k)))
 
 # %%
+
 # Plot the ground truth.
 
-from stonesoup.plotter import AnimatedPlotterly
-plotter = AnimatedPlotterly(timesteps, tail_length=0.3)
-plotter.plot_ground_truths(truth, [0, 2])
-plotter.fig
+from matplotlib import pyplot as plt
 
+fig = plt.figure(figsize=(10, 6))
+ax = fig.add_subplot()
+ax.set_xlabel("$x$")
+ax.set_ylabel("$y$")
+ax.axis('equal')
+
+ax.plot([state.state_vector[0] for state in truth],
+        [state.state_vector[2] for state in truth],
+        linestyle="--")
 
 # %%
-# Initialise the bearing, range sensor using the appropriate measurement model.
+# Create sensor with bearing, range measurement model.
+
+import numpy as np
+
 from stonesoup.models.measurement.nonlinear import CartesianToBearingRange
 from stonesoup.types.detection import Detection
 
-sensor_x = 50
+sensor_x = 0
 sensor_y = 0
 
 measurement_model = CartesianToBearingRange(
     ndim_state=4,
     mapping=(0, 2),
-    noise_covar=np.diag([np.radians(0.2), 1]),
+    noise_covar=np.diag([np.radians(0.1), 0.1]),  # bad bearing, good range uncertainties
     translation_offset=np.array([[sensor_x], [sensor_y]])
 )
 
-# %%
-# Populate the measurement array
 measurements = []
 for state in truth:
     measurement = measurement_model.function(state, noise=True)
-    measurements.append(Detection(measurement, timestamp=state.timestamp,
-                                  measurement_model=measurement_model))
+    measurements.append(Detection(measurement, timestamp=state.timestamp))
 
 # %%
-# Plot those measurements
+# Plot detections.
 
-plotter.plot_measurements(measurements, [0, 2])
-plotter.fig
+from stonesoup.functions import pol2cart
 
-# %%
-# Set up the particle filter
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Analogously to the Kalman family, we create a :class:`~.ParticlePredictor` and a
-# :class:`~.ParticleUpdater` which take responsibility for the predict and update steps
-# respectively. These require a :class:`~.TransitionModel` and :class:`~.MeasurementModel` as
-# before.
-# To cope with sample sparsity we also include a resampler, in this instance
-# :class:`~.SystematicResampler`, which is passed to the updater. It should be noted that there are
-# many resampling schemes, and almost as many choices as to when to undertake resampling. The
-# systematic resampler is described in [#]_, and in what follows below resampling is undertaken
-# at each time-step. More resamplers that are included in Stone Soup are covered in the
-# `Resampler Tutorial <https://stonesoup.readthedocs.io/en/latest/auto_tutorials/sampling/Resamp\
-# lingTutorial.html#sphx-glr-auto-tutorials-sampling-resamplingtutorial-py>`_
+x, y = pol2cart(
+    np.hstack(state.state_vector[1, 0] for state in measurements),
+    np.hstack(state.state_vector[0, 0] for state in measurements))
+ax.scatter(x + sensor_x, y + sensor_y, color='b')
+fig
 
 # %%
-# Use of Effective Sample Size resampler (ESS)
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Resampling removes particles with a low weight and duplicates particles with a high weight.
-# A side effect of this is that additional variance is added. Use of :class:`~.SystematicResampler`
-# at each time-step means that additional variance is being introduced when it may not necessarily
-# be required. To reduce the additional variance, it may be optimal to resample less frequently.
-#
-# The Effective Sample Size resampler (:class:`~.ESSResampler`) compares the variance of the
-# unnormalised weights of the particles to a pre-specified threshold, and only resamples when the
-# variance is greater than this threshold. This threshold is often calculated by the ESS criterion
-# (at time n) given by:
-#
-# .. math::
-#           ESS = \left(\sum_{i=1}^{N} (W_{n}^i)^2\right)^{-1}
+# Create a :class:`~.ParticlePredictor`, which takes a collection of particles, with a given
+# transition model, and predicts them forward as with the :class:`~.KalmanPredictor`.
 
 from stonesoup.predictor.particle import ParticlePredictor
 predictor = ParticlePredictor(transition_model)
-from stonesoup.resampler.particle import ESSResampler
-resampler = ESSResampler()
+
+# %%
+# We will need to re-sample from the distribution when more particles end-up with zero weights. So
+# we make the addition of a :class:`~.SystematicResampler`, which redistributes a given set of
+# particles as described earlier. The logic is left to the specified re-sampler to determine when
+# a new sample should be taken (in the case of :class:`~.SystematicResampler` that is at every
+# iteration).
+
+from stonesoup.resampler.particle import SystematicResampler
+resampler = SystematicResampler()
+
+# %%
+# The resampling process is contained within the update stage. Therefore the
+# :class:`~.ParticleUpdater` takes both a measurement model and a resampler as its arguments.
+
 from stonesoup.updater.particle import ParticleUpdater
 updater = ParticleUpdater(measurement_model, resampler)
 
 # %%
-# Initialise a prior
-# ^^^^^^^^^^^^^^^^^^
-# To start we create a prior estimate. This is a :class:`~.ParticleState` which describes
-# the state as a distribution of particles using :class:`~.StateVectors` and weights.
-# This is sampled from the Gaussian distribution (using the same parameters we
-# had in the previous examples).
+# To start, we'll need to create a prior estimate of where we think our target will be, but in this
+# case we'll need this to be a set of :class:`~.Particle`. For this, we sample from Gaussian
+# distribution (using same parameters we had in the previous examples).
 
 from scipy.stats import multivariate_normal
 
+from stonesoup.types.particle import Particle
 from stonesoup.types.numeric import Probability  # Similar to a float type
 from stonesoup.types.state import ParticleState
-from stonesoup.types.array import StateVectors
 
-number_particles = 1000
+number_particles = 200
 
 # Sample from the prior Gaussian distribution
 samples = multivariate_normal.rvs(np.array([0, 1, 0, 1]),
-                                  np.diag([1.5, 0.5, 1.5, 0.5]),
+                                  np.diag([1, 1, 1, 1]),
                                   size=number_particles)
 
+particles = [
+    Particle(sample.reshape(-1, 1), weight=Probability(1/number_particles)) for sample in samples]
+
 # Create prior particle state.
-prior = ParticleState(state_vector=StateVectors(samples.T),
-                      weight=np.array([Probability(1/number_particles)]*number_particles),
-                      timestamp=start_time)
+prior = ParticleState(particles, timestamp=start_time)
+
 # %%
-# Run the tracker
-# ^^^^^^^^^^^^^^^
-# We now run the predict and update steps, propagating the collection of particles and resampling
-# when told to (at every step).
+# We now run the predict and update steps, propagating the collection of particles and re-sampling
+# when required.
+
 from stonesoup.types.hypothesis import SingleHypothesis
 from stonesoup.types.track import Track
 
@@ -213,30 +191,21 @@ for measurement in measurements:
     track.append(post)
     prior = track[-1]
 
-# %%
-# Plot the resulting track with the sample points at each iteration. Can also change 'plot_history'
-# to True if wanted.
-
-plotter.plot_tracks(track, [0, 2], particle=True, plot_history=False)
-plotter.fig
-
-# %%
-# Key points
-# ----------
-# 1. Sampling methods offer an attractive alternative to Kalman-based filtering for recursive
-#    state estimation.
-# 2. The particle filter trades off a more subtle quantification of a non-Gaussian
-#    estimate against increased computational effort.
-# 3. Very often particle filters encounter sample impoverishment and require a resampling step.
+# Plot the resulting track
+ax.plot([state.state_vector[0, 0] for state in track],
+        [state.state_vector[2, 0] for state in track],
+        marker=".")
+fig
 
 # %%
-# References
-# ----------
-# .. [#] Sanjeev Arulampalam M., Maskell S., Gordon N., Clapp T. 2002, Tutorial on Particle Filters
-#        for Online Nonlinear/Non-Gaussian Bayesian Tracking,  IEEE transactions on signal
-#        processing, vol. 50, no. 2
-#
-# .. [#] Carpenter J., Clifford P., Fearnhead P. 1999, An improved particle filter for non-linear
-#        problems, IEE Proc., Radar Sonar Navigation, 146:2–7
+# Plotting the sample points at each iteration.
 
-# sphinx_gallery_thumbnail_path = '_static/sphinx_gallery/Tutorial_4.PNG'
+for state in track:
+    data = np.array([particle.state_vector for particle in state.particles])
+    ax.plot(data[:, 0], data[:, 2], linestyle='', marker=".", markersize=1, alpha=0.5)
+fig
+
+# sphinx_gallery_thumbnail_number = 4
+
+# %%
+# That covers the basics of single sensor, single target tracking.
