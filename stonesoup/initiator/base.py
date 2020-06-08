@@ -39,3 +39,11 @@ class GaussianInitiator(Initiator):
     Base class for initiator's which initialises tracks with a
     :class:`~.GaussianState`
     """
+
+
+class ParticleInitiator(Initiator):
+    """Particle Initiator base class
+
+    Base class for initiator's which initialises tracks with a
+    :class:`~.ParticleState`
+    """
