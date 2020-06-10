@@ -56,8 +56,8 @@ autodoc_mock_imports = ['ffmpeg', 'moviepy']
 autosectionlabel_prefix_document = True
 
 sphinx_gallery_conf = {
-     'examples_dirs': ['../tutorials', '../demos'],
-     'gallery_dirs': ['auto_tutorials', 'auto_demos'],
+     'examples_dirs': ['../tutorials', '../examples'],
+     'gallery_dirs': ['auto_tutorials', 'auto_examples'],
      'filename_pattern': re.escape(os.sep),
      'image_scrapers': (gallery_scraper(),),
      'abort_on_example_error': False,
