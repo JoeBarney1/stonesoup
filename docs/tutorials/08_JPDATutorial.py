@@ -1,71 +1,38 @@
 #!/usr/bin/env python
+# coding: utf-8
 
 """
-=================================================
-8 - Joint probabilistic data association tutorial
+8 - Joint Probabilistic Data Association Tutorial
 =================================================
 """
 
 # %%
-# When we have multiple targets we're going to want to arrive at a globally-consistent collection
-# of associations for PDA, in much the same way as we did for the global nearest neighbour
-# associator. This is the purpose of the *joint* probabilistic data association (JPDA) filter.
-#
-# Similar to the PDA, the JPDA algorithm calculates hypothesis pairs for every measurement
-# for every track. The probability of a track-measurement hypothesis is calculated by the sum of
-# normalised conditional probabilities that every other track is associated to every other
-# measurement (including missed detection). For example, with 3 tracks :math:`(A, B, C)` and 3
-# measurements :math:`(x, y, z)` (including missed detection :math:`None`), the probability of
-# track :math:`A` being associated with measurement :math:`x` (:math:`A \to x`) is given by:
+# A joint probabilistic data association (JPDA) filter handles multi-target tracking through
+# clutter. Similar to the PDA, the JPDA algorithm calculates hypothesis pairs for every measurement
+# for every track. The weight of a track-measurement hypothesis is calculated by the normalised sum
+# of conditional probabilities that every other track is associated to every other measurement
+# (including missed detection). For example, with 3 tracks :math:`(A, B, C)` and 3 measurements
+# :math:`(x, y, z)` (including missed detection :math:`None`), the probability of track :math:`A`
+# being associated with measurement :math:`x` (:math:`A \to x`) is given by:
 #
 # .. math::
-#       p(A \to x) &= \bar{p}(A \to x \cap B \to None \cap C \to None) +\\
-#                  &+ \bar{p}(A \to x \cap B \to None \cap C \to y) +\\
+#       p(A \to x) &= \bar{p}(A \to x \cap B \to y \cap C \to z)\\
+#                  &+ \bar{p}(A \to x \cap B \to z \cap C \to y) +\\
 #                  &+ \bar{p}(A \to x \cap B \to None \cap C \to z) +\\
-#                  &+ \bar{p}(A \to x \cap B \to y \cap C \to None) +\\
-#                  &+ \bar{p}(A \to x \cap B \to y \cap C \to z) +\\
-#                  &+ \bar{p}(A \to x \cap B \to z \cap C \to None) +\\
-#                  &+ \bar{p}(A \to x \cap B \to z \cap C \to y)
+#                  &+ \bar{p}(A \to x \cap B \to None \cap C \to y) + ...
 #
-# where :math:`\bar{p}(\textit{multi-hypothesis})` is the normalised probability of the
-# multi-hypothesis.
-#
-# This is demonstrated for 2 tracks associating to 3 measurements in the diagrams below:
-#
-# .. image:: ../_static/jpda_diag_1.png
-#   :width: 250
-#   :height: 300
-#   :alt: Image showing two tracks approaching 3 detections with associated probabilities
-#
-# Where the probability (for example) of the orange track associating to the green measurement is
-# :math:`0.25`.
-# The probability of every possible association set is calculated. These probabilities are then
-# normalised.
-#
-# .. image:: ../_static/jpda_diag_2.png
-#   :width: 350
-#   :height: 300
-#   :alt: Image showing calculation of the conditional probabilities of every possible occurrence
-#
-# A track-measurement hypothesis weight is then recalculated as the sum of the probabilities of
-# every occurrence where that track associates to that measurement.
-#
-# .. image:: ../_static/jpda_diag_3.png
-#   :width: 500
-#   :height: 450
-#   :alt: Image showing the recalculated probabilities of each track-measurement hypothesis
-#
+# where :math:`\bar{p}(multi-hypothesis)` is the normalised probability of the multi-hypothesis.
 
 # %%
 # Simulate ground truth
 # ---------------------
 # As with the multi-target data association tutorial, we simulate two targets moving in the
-# positive x, y Cartesian plane (intersecting approximately half-way through their transition).
-# We then add truth detections with clutter at each time-step.
+# positive x, y cartesian plane (intersecting approximately half-way through their transition).
+# We then add tru detections with clutter at each time-step.
 
 from datetime import datetime
 from datetime import timedelta
-from ordered_set import OrderedSet
+from matplotlib import pyplot as plt
 import numpy as np
 from scipy.stats import uniform
 
@@ -76,34 +43,38 @@ from stonesoup.types.detection import TrueDetection
 from stonesoup.types.detection import Clutter
 from stonesoup.models.measurement.linear import LinearGaussian
 
-np.random.seed(1991)
+truths = set()
 
-truths = OrderedSet()
-
-start_time = datetime.now().replace(microsecond=0)
+start_time = datetime.now()
 transition_model = CombinedLinearGaussianTransitionModel([ConstantVelocity(0.005),
                                                           ConstantVelocity(0.005)])
 
-timesteps = [start_time]
-truth = GroundTruthPath([GroundTruthState([0, 1, 0, 1], timestamp=timesteps[0])])
+truth = GroundTruthPath([GroundTruthState([0, 1, 0, 1], timestamp=start_time)])
 for k in range(1, 21):
-    timesteps.append(start_time + timedelta(seconds=k))
     truth.append(GroundTruthState(
         transition_model.function(truth[k-1], noise=True, time_interval=timedelta(seconds=1)),
-        timestamp=timesteps[k]))
+        timestamp=start_time+timedelta(seconds=k)))
 truths.add(truth)
 
-truth = GroundTruthPath([GroundTruthState([0, 1, 20, -1], timestamp=timesteps[0])])
+truth = GroundTruthPath([GroundTruthState([0, 1, 20, -1], timestamp=start_time)])
 for k in range(1, 21):
     truth.append(GroundTruthState(
         transition_model.function(truth[k-1], noise=True, time_interval=timedelta(seconds=1)),
-        timestamp=timesteps[k]))
+        timestamp=start_time+timedelta(seconds=k)))
 truths.add(truth)
+
+multi_fig = plt.figure(figsize=(10, 6))
+axm = multi_fig.add_subplot(1, 1, 1)
+axm.set_xlabel("$x$")
+axm.set_ylabel("$y$")
+axm.set_ylim(0, 25)
+axm.set_xlim(0, 25)
 
 # Plot ground truth.
-from stonesoup.plotter import AnimatedPlotterly
-plotter = AnimatedPlotterly(timesteps, tail_length=0.3)
-plotter.plot_ground_truths(truths, [0, 2])
+for truth in truths:
+    axm.plot([state.state_vector[0] for state in truth],
+             [state.state_vector[2] for state in truth],
+             linestyle="--",)
 
 # Generate measurements.
 all_measurements = []
@@ -126,8 +97,7 @@ for k in range(20):
             measurement = measurement_model.function(truth[k], noise=True)
             measurement_set.add(TrueDetection(state_vector=measurement,
                                               groundtruth_path=truth,
-                                              timestamp=truth[k].timestamp,
-                                              measurement_model=measurement_model))
+                                              timestamp=truth[k].timestamp))
 
         # Generate clutter at this time-step
         truth_x = truth[k].state_vector[0]
@@ -135,13 +105,20 @@ for k in range(20):
         for _ in range(np.random.randint(10)):
             x = uniform.rvs(truth_x - 10, 20)
             y = uniform.rvs(truth_y - 10, 20)
-            measurement_set.add(Clutter(np.array([[x], [y]]), timestamp=truth[k].timestamp,
-                                        measurement_model=measurement_model))
+            measurement_set.add(Clutter(np.array([[x], [y]]), timestamp=truth[k].timestamp))
     all_measurements.append(measurement_set)
 
-# Plot true detections and clutter.
-plotter.plot_measurements(all_measurements, [0, 2])
-plotter.fig
+# Plot measurements.
+for set_ in all_measurements:
+    # Plot actual detections.
+    axm.scatter([state.state_vector[0] for state in set_ if isinstance(state, TrueDetection)],
+                [state.state_vector[1] for state in set_ if isinstance(state, TrueDetection)],
+                color='g')
+    # Plot clutter.
+    axm.scatter([state.state_vector[0] for state in set_ if isinstance(state, Clutter)],
+                [state.state_vector[1] for state in set_ if isinstance(state, Clutter)],
+                color='y',
+                marker='2')
 
 # %%
 from stonesoup.predictor.kalman import KalmanPredictor
@@ -155,9 +132,8 @@ updater = KalmanUpdater(measurement_model)
 # Initial hypotheses are calculated (per track) in the same manner as the PDA.
 # Therefore, in Stone Soup, the JPDA filter uses the :class:`~.PDAHypothesiser` to create these
 # hypotheses.
-# Unlike the :class:`~.PDA` data associator, in Stone Soup, the :class:`~.JPDA` associator takes
-# this collection of hypotheses and adjusts their weights according to the method described above,
-# before returning key-value pairs of tracks and detections to be associated with them.
+# The :class:`~.JPDA` assocaitor then adjusts hypothesis weights according to the method described
+# above.
 from stonesoup.hypothesiser.probability import PDAHypothesiser
 # This doesn't need to be created again, but for the sake of visualising the process, it has been
 # added.
@@ -219,14 +195,26 @@ for n, measurements in enumerate(all_measurements):
 
 # %%
 # Plot the resulting tracks.
+tracks_list = list(tracks)
+for track in tracks:
+    # Plot track.
+    axm.plot([state.state_vector[0, 0] for state in track[1:]],  # Skip plotting the prior
+             [state.state_vector[2, 0] for state in track[1:]],
+             marker=".")
 
-plotter.plot_tracks(tracks, [0, 2], uncertainty=True)
-plotter.fig
+# Plot ellipses representing the gaussian estimate state at each update.
+from matplotlib.patches import Ellipse
+for track in tracks:
+    for state in track[1:]:  # Skip the prior
+        w, v = np.linalg.eig(measurement_model.matrix()@state.covar@measurement_model.matrix().T)
+        max_ind = np.argmax(v[0, :])
+        orient = np.arctan2(v[max_ind, 1], v[max_ind, 0])
+        ellipse = Ellipse(xy=state.state_vector[(0, 2), 0],
+                          width=np.sqrt(w[0])*2,
+                          height=np.sqrt(w[1])*2,
+                          angle=np.rad2deg(orient),
+                          alpha=0.2)
+        axm.add_artist(ellipse)
+multi_fig
 
-# %%
-# References
-# ----------
-# 1. Bar-Shalom Y, Daum F, Huang F 2009, The Probabilistic Data Association Filter, IEEE Control
-# Systems Magazine
-
-# sphinx_gallery_thumbnail_path = '_static/sphinx_gallery/Tutorial_8.PNG'
+# sphinx_gallery_thumbnail_number = 2
