@@ -1,8 +1,9 @@
 #!/usr/bin/env python
+# coding: utf-8
 
 """
-UAV Tracking Demonstration
-==========================
+UAV Tracking Demonstation
+=========================
 """
 
 # %%
@@ -10,7 +11,7 @@ UAV Tracking Demonstration
 # --------
 # Starting with GPS data from an instrumented UAV, we will generate range, bearing, and
 # elevation measurements (from a given radar position). We will use Stone Soup's simple
-# :class:`~.SingleTargetTracker` to perform the tracking. At this point we are primarily interested
+# :class:`~.SingleTargetTracker` to perform the tracking. At this point we are primarly interested
 # in the necessary motion models that may be needed so the example is fairly simple, but
 # we want to be able to easily expand the simulation to handle more complex scenarios.
 #
@@ -104,18 +105,18 @@ ground_truth_reader = LLAtoENUConverter(ground_truth_reader, sensor_location, [0
 # The sensor is then mounted onto a platform (stationary in this case)
 
 from stonesoup.platform.base import FixedPlatform
-from stonesoup.sensor.radar.radar import RadarElevationBearingRange
+from stonesoup.sensor.radar.radar import RadarRangeBearingElevation
 from stonesoup.simulator.platform import PlatformDetectionSimulator
 from stonesoup.types.state import State
 
-sensor = RadarElevationBearingRange(
-    position_mapping=[0, 2, 4],
-    noise_covar=meas_covar,
-    ndim_state=6,
+sensor = RadarRangeBearingElevation(
+    [0, 2, 4],
+    meas_covar,
+    6,
 )
 platform = FixedPlatform(
     State([0, 0, 0, 0, 0, 0]),  # Sensor at reference point, zero velocity
-    position_mapping=[0, 2, 4],
+    [0, 2, 4],
     sensors=[sensor]
 )
 
@@ -144,9 +145,8 @@ from stonesoup.initiator.simple import SimpleMeasurementInitiator
 from stonesoup.types.track import Track
 from stonesoup.types.hypothesis import SingleHypothesis
 
-
 class Initiator(SimpleMeasurementInitiator):
-    def initiate(self, detections, timestamp, **kwargs):
+    def initiate(self, detections, **kwargs):
         MAX_DEV = 400.
         tracks = set()
         measurement_model = self.measurement_model
@@ -154,9 +154,9 @@ class Initiator(SimpleMeasurementInitiator):
             state_vector = measurement_model.inverse_function(
                             detection)
             model_covar = measurement_model.covar()
-
+            
             el_az_range = np.sqrt(np.diag(model_covar)) #elev, az, range
-
+            
             std_pos = detection.state_vector[2, 0]*el_az_range[1]
             stdx = np.abs(std_pos*np.sin(el_az_range[1]))
             stdy = np.abs(std_pos*np.cos(el_az_range[1]))
@@ -168,7 +168,7 @@ class Initiator(SimpleMeasurementInitiator):
             if stdz > MAX_DEV:
                 print('Warning - Z Deviation exceeds limit!!')
             C0 = np.diag(np.array([stdx, 30.0, stdy, 30.0, stdz, 30.0])**2)
-
+        
             tracks.add(Track([GaussianStateUpdate(
                 state_vector,
                 C0,
@@ -176,8 +176,8 @@ class Initiator(SimpleMeasurementInitiator):
                 timestamp=detection.timestamp)
             ]))
         return tracks
-
-
+            
+   
 prior_state = GaussianState(
         np.array([[0], [0], [0], [0], [0], [0]]),
         np.diag([0, 30.0, 0, 30.0, 0, 30.0])**2)
@@ -188,12 +188,12 @@ initiator = Initiator(prior_state, meas_model)
 # Setup Deleter for the Tracker
 # -----------------------------
 # In the simple case of 1 target, we never want to delete the track. Because
-# this Deleter is so simple we haven't bothered using a subtype/inheritance
+# this Deletor is so simple we haven't bothered using a subtype/inheritance
 # and instead make use of Python's duck typing. 
 class MyDeleter:
     def delete_tracks(self, tracks):
         return set()
-
+ 
 deleter = MyDeleter()
 
 # %%
@@ -250,7 +250,7 @@ for time, tracks in tracker:
         xyz = meas_model.inverse_function(detection)
         meas_X.append(xyz[0])
         meas_Y.append(xyz[2])
-
+        
         vec = track.states[-1].state_vector
         est_X.append(vec[0])
         est_Y.append(vec[2])
@@ -276,7 +276,7 @@ ax2.legend()
 # --------------
 # What happens when:
 #
-# - Increase the bearing standard deviation?
+# - Increase the bearing std deviation?
 # - Increase the model process noise?
 # - Move the radar?
 #
