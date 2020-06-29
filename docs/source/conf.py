@@ -64,7 +64,8 @@ sphinx_gallery_conf = {
      'abort_on_example_error': False,
      'reference_url': {'stonesoup': None},
      'remove_config_comments': True,
-     'ignore_repr_types': r'matplotlib.figure',
+     'ignore_repr_types': r'matplotlib\.(?:figure|animation)',
+     'within_subsection_order': FileNameSortKey,
      'matplotlib_animations': True,
 }
 
