@@ -17,9 +17,9 @@ Please see the
 [Stone Soup documentation](https://stonesoup.readthedocs.org/) for more
 information.
 
-Please see the
-[Stone Soup Notebooks repository](https://github.com/dstl/Stone-Soup-Notebooks)
-for examples.
+Please see the [tutorials](https://stonesoup.readthedocs.io/en/latest/auto_tutorials/index.html),
+[examples](https://stonesoup.readthedocs.io/en/latest/auto_examples/index.html),
+and [demonstrations](https://stonesoup.readthedocs.io/en/latest/auto_demos/index.html).
 
 ## Dependencies
 Stone Soup uses the following dependencies:
@@ -50,9 +50,8 @@ These dependencies are required for building Stone Soup documentation.
 | Name | License |
 | ---- | ------- |
 | [Sphinx](https://www.sphinx-doc.org/) | BSD |
-| [pytest](https://docs.pytest.org/) | MIT |
-| [Flake8](https://flake8.pycqa.org/) | MIT |
-| [Coverage.py](https://coverage.readthedocs.io/) | Apache 2.0 |
+| [sphinx-gallery](https://sphinx-gallery.github.io/) | BSD |
+| [folium](https://python-visualization.github.io/folium/) | MIT |
 
 ## License
 Stone Soup is released under MIT License. Please see [License](LICENSE) for details.
