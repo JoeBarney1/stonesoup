@@ -55,10 +55,10 @@ This is equivalent to the following:
 """
 import inspect
 import sys
+import weakref
 from abc import ABCMeta
 from collections import OrderedDict
-from copy import copy
-from functools import cached_property
+from copy import deepcopy
 from types import MappingProxyType
 
 
@@ -377,20 +377,26 @@ class Base(metaclass=BaseMeta):
             raise TypeError(f'got an unexpected keyword argument {next(iter(kwargs))!r}')
 
     def __repr__(self):
-        # Indents every line
-        whitespace = ' ' * 4 if Base._repr.indent is None else Base._repr.indent
-        max_len_whitespace = 80  # Ensures whitespace doesn't get rid of space on RHS too much
-        max_out = 50000  # Keeps total length from being too excessive
-        params = []
-        for name in type(self).properties:
-            value = getattr(self, name)
-            extra_whitespace = ' ' * (len(name) + 1) + whitespace  # Lines up rows of arrays
-            repr_value = Base._repr.repr(value)
-            if '\n' in repr_value:
-                value = repr_value.replace('\n', '\n' + extra_whitespace)
-            params.append(f'{whitespace}{name}={value}')
-        value = "{}(\n{})".format(type(self).__name__, ",\n".join(params))
-        rep = Base._repr.whitespace_remove(max_len_whitespace, value)
-        fillvalue = Base._repr.fillvalue
-        truncate = f'\n{fillvalue}\n{fillvalue}  (truncated due to length)\n{fillvalue}'
-        return ''.join([rep[:max_out], truncate]) if len(rep) > max_out else rep
+        params = ("{}={!r}".format(name, getattr(self, name))
+                  for name in type(self).properties)
+        return "{}({})".format(type(self).__name__, ", ".join(params))
+
+    def __deepcopy__(self, memodict={}):
+        # Create a new class
+        new = object.__new__(type(self))
+        memodict[id(self)] = new   # add the new class to the memo
+        # Insert a deepcopy of all instance attributes
+        new.__dict__.update(deepcopy(self.__dict__, memodict))
+        # Manually update any weakrefs to point to copies, if they exist.
+        for name, prop in new.__dict__.items():
+            if isinstance(prop, weakref.ref):
+                original_target = prop()  # call the weakref to get a reference
+                try:
+                    # if we are copying the parent as well, the copy should be in memodict
+                    copy_of_target = memodict[id(original_target)]
+                except KeyError:
+                    # if we can't find the parent, then leave the original ref in place
+                    pass
+                else:
+                    new.__setattr__(name, weakref.ref(copy_of_target))
+        return new
