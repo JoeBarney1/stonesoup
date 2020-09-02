@@ -13,17 +13,6 @@ class FileReader(Reader):
         if not isinstance(path, Path):
             path = Path(path)  # Ensure Path
         super().__init__(path, *args, **kwargs)
-        self._file = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        if getattr(self, '_file', None):
-            self._file.close()
-
-    def __del__(self):
-        self.__exit__()
 
 
 class BinaryFileReader(FileReader):
