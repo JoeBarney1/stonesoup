@@ -108,7 +108,7 @@ class Property:
     empty = inspect.Parameter.empty
     _property_name = None
 
-    def __init__(self, cls, *, default=inspect.Parameter.empty, doc=None,
+    def __init__(self, cls=None, *, default=inspect.Parameter.empty, doc=None,
                  readonly=False):
         self.cls = cls
         self.default = default
@@ -257,6 +257,13 @@ class BaseMeta(ABCMeta):
             if type(bcls) is mcls:
                 bcls._subclasses.add(cls)
                 cls._properties.update(bcls._properties)
+        for key, value in namespace.items():
+            if isinstance(value, Property):
+                cls._properties[key] = value
+                if value.cls is None and '__annotations__' in namespace:
+                    value.cls = namespace['__annotations__'][key]
+                    if isinstance(value.cls, str) and value.cls == name:
+                        value.cls = cls
         cls._properties.update(
             (key, value) for key, value in namespace.items()
             if isinstance(value, Property))

@@ -184,8 +184,7 @@ class GNNWith2DAssignment(DataAssociator):
     distances and a "shortest path" assignment algorithm.
     """
 
-    hypothesiser = Property(
-        Hypothesiser,
+    hypothesiser: Hypothesiser = Property(
         doc="Generate a set of hypotheses for each prediction-detection pair")
 
     def associate(self, tracks, detections, time):

@@ -13,7 +13,7 @@ class Feeder(Reader):
     modify the sequence, duplicate or drop data.
     """
 
-    reader = Property(Reader, doc="Source of detections")
+    reader: Reader = Property(doc="Source of detections")
 
     @abstractmethod
     @BufferedGenerator.generator_method

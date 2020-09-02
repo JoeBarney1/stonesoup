@@ -1,7 +1,6 @@
 import copy
 from abc import abstractmethod
-from datetime import timedelta
-from typing import Iterable, List, Optional, Sequence, Union
+from typing import Sequence
 
 from scipy.linalg import block_diag
 
@@ -24,7 +23,7 @@ class TransitionModel(Model):
 
 
 class _CombinedGaussianTransitionModel(TransitionModel, GaussianModel):
-    model_list = Property([GaussianModel], doc="List of Transition Models.")
+    model_list: Sequence[GaussianModel] = Property(doc="List of Transition Models.")
 
     @property
     def ndim_state(self):
