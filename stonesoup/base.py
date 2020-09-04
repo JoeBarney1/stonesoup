@@ -54,7 +54,6 @@ This is equivalent to the following:
 
 """
 import inspect
-import sys
 import weakref
 from abc import ABCMeta
 from collections import OrderedDict
@@ -275,10 +274,6 @@ class BaseMeta(ABCMeta):
             # Optional arguments must follow mandatory
             if cls._properties[name].default is not Property.empty:
                 cls._properties.move_to_end(name)
-
-        if sys.version_info <= (3, 6):  # pragma: no cover
-            for name, property_ in cls._properties.items():
-                property_.__set_name__(cls, name)
 
         cls._validate_init()
         cls._generate_signature()
