@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding: utf-8
 
 """
 =============================================================
@@ -59,8 +60,7 @@ timestep_size = datetime.timedelta(seconds=5)
 number_of_steps = 20
 birth_rate = 0.3
 death_probability = 0.05
-start_time = datetime.datetime.now().replace(microsecond=0)
-initial_state = GaussianState(initial_state_mean, initial_state_covariance, start_time)
+initial_state = GaussianState(initial_state_mean, initial_state_covariance)
 
 # %%
 # Create the transition model - default set to 2d nearly-constant velocity with small (0.05)
@@ -70,7 +70,7 @@ from stonesoup.models.transition.linear import (
 transition_model = CombinedLinearGaussianTransitionModel(
     [ConstantVelocity(0.05), ConstantVelocity(0.05)])
 
-# %%
+## %
 # Put this all together in a multi-target simulator.
 from stonesoup.simulator.simple import MultiTargetGroundTruthSimulator
 groundtruth_sim = MultiTargetGroundTruthSimulator(
@@ -158,12 +158,12 @@ data_associator = GNNWith2DAssignment(hypothesiser)
 # Create deleter - get rid of anything with a covariance trace greater than 2
 from stonesoup.deleter.error import CovarianceBasedDeleter
 covariance_limit_for_delete = 2
-deleter = CovarianceBasedDeleter(covar_trace_thresh=covariance_limit_for_delete)
+deleter = CovarianceBasedDeleter(covariance_limit_for_delete)
 
 # %%
-# Set a standard prior state and the minimum number of detections required to qualify for
+# Set a standard prior state abd the minimum number of detections required to qualify for
 # initiation
-s_prior_state = GaussianState([[0], [0], [0], [0]], np.diag([0, 0.5, 0, 0.5]))
+s_prior_state=GaussianState([[0], [0], [0], [0]], np.diag([0, 0.5, 0, 0.5]))
 min_detections = 3
 
 # %%
@@ -196,36 +196,23 @@ tracker = MultiTargetTracker(
 )
 
 # %%
-# In the case of using (J)PDA like in :ref:`auto_tutorials/07_PDATutorial:Run the PDA Filter`
-# and :ref:`auto_tutorials/08_JPDATutorial:Running the JPDA filter`, then the
-# :class:`~.MultiTargetMixtureTracker` would be used instead on the
-# :class:`~.MultiTargetTracker` used above.
-#
 # Plot the outputs
 # ^^^^^^^^^^^^^^^^
-# We plot the ground truth, detections and the tracker output
-# using the Stone Soup :class:`AnimatedPlotterly`. First, get the ground truths, detections,
-# and tracks from the tracker:
+# We plot the output using a Stone Soup :class:`MetricGenerator` which does plots (in this instance
+# :class:`TwoDPlotter`. This will produce plots equivalent to that seen in previous tutorials.
 groundtruth = set()
 detections = set()
 tracks = set()
-
 for time, ctracks in tracker:
     groundtruth.update(groundtruth_sim.groundtruth_paths)
     detections.update(detection_sim.detections)
     tracks.update(ctracks)
 
-# %%
-# And plot them:
+from stonesoup.metricgenerator.plotter import TwoDPlotter
+plotter = TwoDPlotter(track_indices=[0, 2], gtruth_indices=[0, 2], detection_indices=[0, 1])
+fig = plotter.plot_tracks_truth_detections(tracks, groundtruth, detections).value
 
-# sphinx_gallery_thumbnail_path = '_static/sphinx_gallery/Tutorial_10.PNG'
+ax = fig.axes[0]
+ax.set_xlim([-30, 30])
+_ = ax.set_ylim([-30, 30])
 
-from stonesoup.plotter import AnimatedPlotterly
-
-timesteps = [start_time + timestep_size*k for k in range(number_of_steps)]
-
-plotter = AnimatedPlotterly(timesteps, tail_length=1)
-plotter.plot_ground_truths(groundtruth, mapping=[0, 2])
-plotter.plot_measurements(detections, mapping=[0, 2])
-plotter.plot_tracks(tracks, mapping=[0, 2])
-plotter.show()
