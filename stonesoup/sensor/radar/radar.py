@@ -1,24 +1,25 @@
 # -*- coding: utf-8 -*-
+import numpy as np
+import scipy.constants as const
+
 import copy
 from math import erfc
-from typing import Tuple
+from typing import Set, Union
 
-import scipy.constants as const
-import numpy as np
-
-from ...sensor.sensor import Sensor
-from ...functions import cart2sphere, rotx, roty, rotz, mod_bearing
+from .beam_pattern import BeamTransitionModel
+from .beam_shape import BeamShape
 from ...base import Property
+from ...functions import cart2sphere, rotx, roty, rotz
+from ...models.measurement.base import MeasurementModel
 from ...models.measurement.nonlinear import \
     (CartesianToBearingRange, CartesianToElevationBearingRange,
      CartesianToBearingRangeRate, CartesianToElevationBearingRangeRate)
+from ...sensor.sensor import Sensor
 from ...types.array import CovarianceMatrix
 from ...types.detection import Detection
-from ...types.state import State, StateVector
-from .beam_shape import BeamShape
-from .beam_pattern import BeamTransitionModel
-from ...models.measurement.base import MeasurementModel
+from ...types.groundtruth import GroundTruthState
 from ...types.numeric import Probability
+from ...types.state import State, StateVector
 
 
 class RadarBearingRange(Sensor):
@@ -43,12 +44,13 @@ class RadarBearingRange(Sensor):
             "(and follow in format) the underlying "
             ":class:`~.CartesianToBearingRange` model")
 
-    def measure(self, ground_truths, noise=True, **kwargs):
+    def measure(self, ground_truths: Set[GroundTruthState], noise: Union[np.ndarray, bool] = True,
+                **kwargs) -> Set[Detection]:
         """Generate a measurement for a given state
 
         Parameters
         ----------
-        ground_truths : :class:`~.State`
+        ground_truths : Set[:class:`~.GroundTruthState`]
             A set of :class:`~.GroundTruthState`
         noise: :class:`numpy.ndarray` or bool
             An externally generated random process noise sample (the default is
@@ -57,9 +59,10 @@ class RadarBearingRange(Sensor):
 
         Returns
         -------
-        :class:`~.Detection`
-            A measurement generated from the given state. The timestamp of the\
-            measurement is set equal to that of the provided state.
+        Set[:class:`~.Detection`]
+            A set of measurements generated from the given states. The timestamps of the
+            measurements are set equal to that of the corresponding states that they were
+            calculated from.
         """
         measurement_model = CartesianToBearingRange(
             ndim_state=self.ndim_state,
@@ -104,12 +107,13 @@ class RadarRotatingBearingRange(RadarBearingRange):
     max_range: float = Property(doc="The maximum detection range of the radar (in meters)")
     fov_angle: float = Property(doc="The radar field of view (FOV) angle (in radians).")
 
-    def measure(self, ground_truths, noise=True, **kwargs):
+    def measure(self, ground_truths: Set[GroundTruthState], noise: Union[np.ndarray, bool] = True,
+                **kwargs) -> Set[Detection]:
         """Generate a measurement for a given state
 
         Parameters
         ----------
-        ground_truths : :class:`~.State`
+        ground_truths : Set[:class:`~.GroundTruthState`]
             A set of :class:`~.GroundTruthState`
         noise: :class:`numpy.ndarray` or bool
             An externally generated random process noise sample (the default is
@@ -118,11 +122,10 @@ class RadarRotatingBearingRange(RadarBearingRange):
 
         Returns
         -------
-        :class:`~.Detection` or ``None``
-            A measurement generated from the given state, if the state falls\
-            in the sensor's field of view, or ``None``, otherwise. The\
-            timestamp of the measurement is set equal to that of the provided\
-            state.
+        Set[:class:`~.Detection`]
+            A set of measurements generated from the given states. If a state falls in the sensor's
+            field of view, a measurement is added. The timestamps of the measurements are set equal
+            to that of the corresponding states that they were calculated from.
         """
 
         # Read timestamp from ground truth
@@ -218,12 +221,13 @@ class RadarElevationBearingRange(RadarBearingRange):
             "(and follow in format) the underlying "
             ":class:`~.CartesianToElevationBearingRange` model")
 
-    def measure(self, ground_truths, noise=True, **kwargs):
+    def measure(self, ground_truths: Set[GroundTruthState], noise: Union[np.ndarray, bool] = True,
+                **kwargs) -> Set[Detection]:
         """Generate a measurement for a given state
 
         Parameters
         ----------
-        ground_truths : :class:`~.State`
+        ground_truths : Set[:class:`~.GroundTruthState`]
             A set of :class:`~.GroundTruthState`
         noise: :class:`numpy.ndarray` or bool
             An externally generated random process noise sample (the default is
@@ -232,9 +236,10 @@ class RadarElevationBearingRange(RadarBearingRange):
 
         Returns
         -------
-        :class:`~.Detection`
-            A measurement generated from the given state. The timestamp of the\
-            measurement is set equal to that of the provided state.
+        Set[:class:`~.Detection`]
+            A set of measurements generated from the given states. The timestamps of the
+            measurements are set equal to that of the corresponding states that they were
+            calculated from.
         """
         measurement_model = CartesianToElevationBearingRange(
             ndim_state=self.ndim_state,
@@ -278,12 +283,13 @@ class RadarBearingRangeRate(RadarBearingRange):
             "(and follow in format) the underlying "
             ":class:`~.CartesianToBearingRangeRate` model")
 
-    def measure(self, ground_truths, noise=True, **kwargs) -> Detection:
+    def measure(self, ground_truths: Set[GroundTruthState], noise: Union[np.ndarray, bool] = True,
+                **kwargs) -> Set[Detection]:
         """Generate a measurement for a given state
 
         Parameters
         ----------
-        ground_truths : :class:`~.State`
+        ground_truths : Set[:class:`~.GroundTruthState`]
             A set of :class:`~.GroundTruthState` which include position and velocity information
         noise: :class:`numpy.ndarray` or bool
             An externally generated random process noise sample (the default is
@@ -292,9 +298,10 @@ class RadarBearingRangeRate(RadarBearingRange):
 
         Returns
         -------
-        :class:`~.Detection`
-            A measurement generated from the given state. The timestamp of the\
-            measurement is set equal to that of the provided state.
+        Set[:class:`~.Detection`]
+            A set of measurements generated from the given states. The timestamps of the
+            measurements are set equal to that of the corresponding states that they were
+            calculated from.
         """
         measurement_model = CartesianToBearingRangeRate(
             ndim_state=self.ndim_state,
@@ -339,12 +346,13 @@ class RadarElevationBearingRangeRate(RadarBearingRangeRate):
             "(and follow in format) the underlying "
             ":class:`~.CartesianToElevationBearingRangeRate` model")
 
-    def measure(self, ground_truths, noise=True, **kwargs) -> Detection:
+    def measure(self, ground_truths: Set[GroundTruthState], noise: Union[np.ndarray, bool] = True,
+                **kwargs) -> Set[Detection]:
         """Generate a measurement for a given state
 
         Parameters
         ----------
-        ground_truths : :class:`~.State`
+        ground_truths : Set[:class:`~.GroundTruthState`]
             A set of :class:`~.GroundTruthState` which include position and velocity information
         noise: :class:`numpy.ndarray` or bool
             An externally generated random process noise sample (the default is
@@ -353,9 +361,10 @@ class RadarElevationBearingRangeRate(RadarBearingRangeRate):
 
         Returns
         -------
-        :class:`~.Detection`
-            A measurement generated from the given state. The timestamp of the\
-            measurement is set equal to that of the provided state.
+        Set[:class:`~.Detection`]
+            A set of measurements generated from the given states. The timestamps of the
+            measurements are set equal to that of the corresponding states that they were
+            calculated from.
         """
         measurement_model = CartesianToElevationBearingRangeRate(
             ndim_state=self.ndim_state,
@@ -631,12 +640,13 @@ class AESARadar(Sensor):
         return det_prob, snr, rcs, directed_power,\
             10 * np.log10(spoiled_gain), spoiled_width
 
-    def measure(self, ground_truths, noise=True, **kwargs):
+    def measure(self, ground_truths: Set[GroundTruthState], noise: Union[np.ndarray, bool] = True,
+                **kwargs) -> Set[Detection]:
         """Generate a measurement for a given state
 
         Parameters
         ----------
-        ground_truths : :class:`~.State`
+        ground_truths : Set[:class:`~.GroundTruthState`]
             A set of :class:`~.GroundTruthState` in 3-D cartesian space
         noise: :class:`numpy.ndarray` or bool
             An externally generated random process noise sample (the default is
@@ -645,11 +655,10 @@ class AESARadar(Sensor):
 
         Returns
         -------
-        : :class:`~.Detection` or ``None``
-            A measurement generated from the given state, if np.random.rand()
-            is less than the probability of detection, or returns ``None``.
-            The timestamp of the measurement is equal to that of
-            the input state.
+        Set[:class:`~.Detection`]
+            A set of measurements generated from the given states. If np.random.rand() is less than
+            the probability of detection a measurement is added. The timestamps of the measurements
+            are set equal to that of the corresponding states that they were calculated from.
         """
 
         detections = set()
