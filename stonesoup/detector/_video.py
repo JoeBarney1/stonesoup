@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import threading
 from abc import abstractmethod
 from copy import copy
@@ -7,7 +8,7 @@ from ..base import Property
 from ..buffered_generator import BufferedGenerator
 
 
-class _VideoAsyncBoxDetector(Detector):
+class _VideoAsyncDetector(Detector):
     """Video Async Detector Abstract Class
 
     Abstract class for use with Video based detectors, which includes an async
