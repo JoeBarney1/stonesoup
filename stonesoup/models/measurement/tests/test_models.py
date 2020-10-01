@@ -284,6 +284,87 @@ def test_models(h, ModelClass, state_vec, R,
         cov=R)
 
 
+position_measurement_sets = [((0, 1, 0, 0, 0, 0), (1, 0, 0, 0, 0, 0),
+                              (0, 0, 1, -1)),
+                             ((0, 0, -50, 0.25, 0, 0), (0, 0, 130, -0.25, 0, 0),
+                              (0, 0, 180, -0.5)),
+                             ((0, 0, 0, 1, 0, 0), (10, 0, 10, 0, 0, 0),
+                              (0, -np.pi/4, np.sqrt(200), -1/np.sqrt(2))),
+                             ((0, 1, 0, 0, 0, 0), (10, 0, 10, 0, 0, 0),
+                              (0, np.pi / 4, np.sqrt(200), -1/np.sqrt(2))),
+                             ((0, 1, 0, 1, 0, 0), (10, 0, 10, 0, 0, 0),
+                              (0, 0, np.sqrt(200), -np.sqrt(2))),
+                             ((0, 1, 0, 0, 0, 0), (10, 0, 0, 0, 10, 0),
+                              (np.pi/4, 0, np.sqrt(200), -1/np.sqrt(2))),
+                             ((1, 1, 0, 0, 1, 0), (10, 0, 0, 0, 10, 0),
+                              (np.pi/4, 0, np.sqrt(81*2), -1/np.sqrt(2))),
+                             ((-1, 1, 0, 0, -1, 0), (10, 0, 0, 0, 10, 0),
+                              (np.pi/4, 0, np.sqrt(121*2), -1/np.sqrt(2))),
+                             ((0, 1, 0, 0, 0, 1), (10, 0, 0, 0, 10, 0),
+                              (0, 0, np.sqrt(200), -np.sqrt(2))),
+                             ((0, 1, 0, 0, 0, 1), (10, 0, 0, 0, 0, 0),
+                              (-np.pi/4, 0, 10, -1)),
+                             ((0, 1, 0, 0, 0, 0), (10, 0, 0, 0, -10, 0),
+                              (-np.pi / 4, 0, np.sqrt(200), -1 / np.sqrt(2))),
+                             ((0, 0, 0, 0, 0, 1), (0, 0, 0, 0, 10, 0),
+                              (0, 0, 10, -1)),
+                             ]
+
+
+@pytest.mark.parametrize('sensor_state, target_state, expected_measurement',
+                         position_measurement_sets)
+@pytest.mark.parametrize('model_class, measure_mapping, use_velocity',
+                         [(CartesianToElevationBearing, [0, 1], False),
+                          (CartesianToElevationBearingRange, [0, 1, 2], False),
+                          (CartesianToElevationBearingRangeRate, [0, 1, 2, 3], True)])
+def test_model_predictions(sensor_state, target_state, expected_measurement, model_class,
+                           measure_mapping, use_velocity):
+    sensor_state = StateVector(sensor_state)
+    target_state = State(StateVector(target_state), timestamp=None)
+    expected_measurement = StateVector([Elevation(expected_measurement[0]),
+                                        Bearing(expected_measurement[1]),
+                                        expected_measurement[2],  # range
+                                        expected_measurement[3]])  # range rate
+    pos_mapping = [0, 2, 4]
+    vel_mapping = [1, 3, 5]
+    sensor_velocity = sensor_state[vel_mapping]
+    _, bearing, elevation = cart2sphere(*sensor_velocity)
+    orientation = StateVector([0, elevation, bearing])
+    model = model_class(ndim_state=6,
+                        translation_offset=sensor_state[pos_mapping],
+                        rotation_offset=orientation,
+                        mapping=pos_mapping,
+                        noise_covar=np.eye(len(expected_measurement)))
+    if use_velocity:
+        model.velocity = sensor_velocity
+    actual_measurement = model.function(target_state, noise=False)
+    assert np.allclose(actual_measurement, expected_measurement[measure_mapping])
+
+
+def test_angle_pdf():
+    model = CartesianToBearingRange(ndim_state=2,
+                                    mapping=(0, 1),
+                                    noise_covar=np.diag([np.radians(10), 2]))
+
+    # Around 0 degrees
+    measurement = State(StateVector([[Bearing(np.radians(1.))], [10.]]))
+    x, y = pol2cart(10, np.radians(-1))
+    state = State(StateVector([[x], [y]]))
+    reference_probability = model.pdf(measurement, state)
+
+    # Check same result around 90 degrees
+    measurement.state_vector[0, 0] += np.radians(90)
+    x, y = pol2cart(10, np.radians(89))
+    state = State(StateVector([[x], [y]]))
+    assert approx(reference_probability) == model.pdf(measurement, state)
+
+    # Check same result around 180 degrees
+    measurement.state_vector[0, 0] += np.radians(90)
+    x, y = pol2cart(10, np.radians(179))
+    state = State(StateVector([[x], [y]]))
+    assert approx(reference_probability) == model.pdf(measurement, state)
+
+
 def h2d_rr(state_vector, pos_map, vel_map, translation_offset, rotation_offset, velocity):
 
     xyz = StateVector([[state_vector[pos_map[0], 0] - translation_offset[0, 0]],
