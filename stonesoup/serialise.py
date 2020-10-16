@@ -92,7 +92,7 @@ class YAML:
         return stream.getvalue()
 
     def dump_all(self, documents, stream, **kwargs):
-        return self._yaml.dump_all(self, documents, stream, **kwargs)
+        return self._yaml.dump_all(documents, stream, **kwargs)
 
     def load(self, stream):
         return self._yaml.load(stream)
