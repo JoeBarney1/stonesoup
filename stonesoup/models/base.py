@@ -355,7 +355,6 @@ class GaussianModel(Model):
         ----------
         state1 : :class:`~.State`
         state2 : :class:`~.State`
-        return_order : :boolean
 
         Returns
         -------
