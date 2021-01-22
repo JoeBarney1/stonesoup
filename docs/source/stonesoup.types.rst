@@ -98,6 +98,9 @@ State Types
     :show-inheritance:
     :inherited-members: stonesoup.types.state.StateMutableSequence
 
+.. automodule:: stonesoup.types.orbitalstate
+    :show-inheritance:
+
 Time Types
 ----------------
 
