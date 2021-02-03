@@ -1,9 +1,8 @@
-import datetime
+# -*- coding: utf-8 -*-
 from abc import abstractmethod
 from typing import Set, Mapping, Tuple
 
 from ..base import Base, Property
-from ..types.hypothesis import JointHypothesis
 from ..hypothesiser import Hypothesiser
 from ..types.detection import Detection
 from ..types.hypothesis import Hypothesis
@@ -48,77 +47,6 @@ class DataAssociator(Base):
             Mapping of track to Hypothesis
         """
         raise NotImplementedError
-
-
-class Associator(Base):
-    """Associator base class
-
-    An associator is used to associate objects for the generation of
-    metrics. It returns an :class:`~.AssociationSet` containing
-    a set of :class:`~.Association`
-    objects.
-    """
-
-
-class TrackToTrackAssociator(Associator):
-    """Associates *n* sets of :class:`~.Track` objects together"""
-
-    @abstractmethod
-    def associate_tracks(self, *tracks_sets: Set[Track]) \
-            -> AssociationSet:
-        """Associate *n* sets of tracks together.
-
-        Parameters
-        ----------
-        joint_hypothesis : :class:`JointHypothesis`
-            A set of hypotheses linking each prediction to a single detection
-
-        Returns
-        -------
-        AssociationSet
-            Contains a set of :class:`~.Association` objects
-
-        """
-
-        number_hypotheses = len(joint_hypothesis)
-        unique_hypotheses = len(
-            {hyp.measurement for hyp in joint_hypothesis if hyp})
-        number_null_hypotheses = sum(not hyp for hyp in joint_hypothesis)
-
-        # joint_hypothesis is invalid if one detection is assigned to more than
-        # one prediction. Multiple missed detections are valid.
-        if unique_hypotheses + number_null_hypotheses == number_hypotheses:
-            return True
-        else:
-            return False
-
-    @classmethod
-    def enumerate_joint_hypotheses(cls, hypotheses):
-        """Enumerate the possible joint hypotheses.
-
-        Create a list of all possible joint hypotheses from the individual
-        hypotheses and determine whether each is valid.
-
-        Parameters
-        ----------
-        tracks_sets : *n* sets of :class:`~.Track` objects
-            Tracks to associate to other track sets
-
-        Returns
-        -------
-        joint_hypotheses : list of :class:`JointHypothesis`
-            A list of all valid joint hypotheses with a score on each
-        """
-
-        # Create a list of dictionaries of valid track-hypothesis pairs
-        joint_hypotheses = [
-            JointHypothesis({
-                track: hypothesis
-                for track, hypothesis in zip(hypotheses, joint_hypothesis)})
-            for joint_hypothesis in itertools.product(*hypotheses.values())
-            if cls.isvalid(joint_hypothesis)]
-
-        return joint_hypotheses
 
 
 class Associator(Base):
