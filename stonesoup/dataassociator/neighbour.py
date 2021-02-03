@@ -20,15 +20,28 @@ class NearestNeighbour(DataAssociator):
     hypothesiser: Hypothesiser = Property(
         doc="Generate a set of hypotheses for each prediction-detection pair")
 
-    def associate(self, tracks, detections, timestamp, **kwargs):
+    def associate(self, tracks, detections, timestamp):
+        """Associate detections with predicted states.
+
+        Parameters
+        ----------
+        tracks : list of :class:`Track`
+            Current tracked objects
+        detections : list of :class:`Detection`
+            Retrieved measurements
+        timestamp : datetime.datetime
+            Detection time to predict to
+
+        Returns
+        -------
+        dict
+            Key value pair of tracks with associated detection
+        """
 
         # Generate a set of hypotheses for each track on each detection
-        hypotheses = self.generate_hypotheses(tracks, detections, timestamp, **kwargs)
-
-        # Only associate tracks with one or more hypotheses
-        associate_tracks = {track
-                            for track, track_hypotheses in hypotheses.items()
-                            if track_hypotheses}
+        hypotheses = {
+            track: self.hypothesiser.hypothesise(track, detections, timestamp)
+            for track in tracks}
 
         # Only associate tracks with one or more hypotheses
         associate_tracks = {track
@@ -68,89 +81,7 @@ class GlobalNearestNeighbour(DataAssociator):
     hypothesiser: Hypothesiser = Property(
         doc="Generate a set of hypotheses for each prediction-detection pair")
 
-    def associate(self, tracks, detections, timestamp, **kwargs):
-
-        # Generate a set of hypotheses for each track on each detection
-        hypotheses = self.generate_hypotheses(tracks, detections, timestamp, **kwargs)
-
-        # Link hypotheses into a set of joint_hypotheses and evaluate
-        joint_hypotheses = self.enumerate_joint_hypotheses(hypotheses)
-        associations = max(joint_hypotheses)
-
-        return associations
-
-    @staticmethod
-    def isvalid(joint_hypothesis):
-        """Determine whether a joint_hypothesis is valid.
-
-        Check the set of hypotheses that define a joint hypothesis to ensure a
-        single detection is not associated to more than one track.
-
-        Parameters
-        ----------
-        joint_hypothesis : :class:`JointHypothesis`
-            A set of hypotheses linking each prediction to a single detection
-
-        Returns
-        -------
-        bool
-            Whether joint_hypothesis is a valid set of hypotheses
-        """
-
-        number_hypotheses = len(joint_hypothesis)
-        unique_hypotheses = len(
-            {hyp.measurement for hyp in joint_hypothesis if hyp})
-        number_null_hypotheses = sum(not hyp for hyp in joint_hypothesis)
-
-        # joint_hypothesis is invalid if one detection is assigned to more than
-        # one prediction. Multiple missed detections are valid.
-        if unique_hypotheses + number_null_hypotheses == number_hypotheses:
-            return True
-        else:
-            return False
-
-    @classmethod
-    def enumerate_joint_hypotheses(cls, hypotheses):
-        """Enumerate the possible joint hypotheses.
-
-        Create a list of all possible joint hypotheses from the individual
-        hypotheses and determine whether each is valid.
-
-        Parameters
-        ----------
-        hypotheses : dict of :class:`~.Track`: :class:`~.Hypothesis`
-            A list of all hypotheses linking predictions to detections,
-            including missed detections
-
-        Returns
-        -------
-        joint_hypotheses : list of :class:`JointHypothesis`
-            A list of all valid joint hypotheses with a score on each
-        """
-
-        # Create a list of dictionaries of valid track-hypothesis pairs
-        joint_hypotheses = [
-            JointHypothesis({
-                track: hypothesis
-                for track, hypothesis in zip(hypotheses, joint_hypothesis)})
-            for joint_hypothesis in itertools.product(*hypotheses.values())
-            if cls.isvalid(joint_hypothesis)]
-
-        return joint_hypotheses
-
-
-class GNNWith2DAssignment(DataAssociator):
-    """Global Nearest Neighbour Associator
-
-    Associates detections to a predicted state using the
-    Global Nearest Neighbour method, utilising a 2D matrix of
-    distances and a "shortest path" assignment algorithm.
-    """
-
-    hypothesiser: Hypothesiser = Property(
-        doc="Generate a set of hypotheses for each prediction-detection pair")
-
-    def associate(self, tracks, detections, timestamp, **kwargs):
+    def associate(self, tracks, detections, timestamp):
         """Associate a set of detections with predicted states.
 
         Parameters
@@ -169,7 +100,9 @@ class GNNWith2DAssignment(DataAssociator):
         """
 
         # Generate a set of hypotheses for each track on each detection
-        hypotheses = self.generate_hypotheses(tracks, detections, timestamp, **kwargs)
+        hypotheses = {
+            track: self.hypothesiser.hypothesise(track, detections, timestamp)
+            for track in tracks}
 
         # Link hypotheses into a set of joint_hypotheses and evaluate
         joint_hypotheses = self.enumerate_joint_hypotheses(hypotheses)
@@ -248,7 +181,7 @@ class GNNWith2DAssignment(DataAssociator):
     hypothesiser: Hypothesiser = Property(
         doc="Generate a set of hypotheses for each prediction-detection pair")
 
-    def associate(self, tracks, detections, time):
+    def associate(self, tracks, detections, timestamp):
         """Associate a set of detections with predicted states.
 
         Parameters
@@ -257,7 +190,7 @@ class GNNWith2DAssignment(DataAssociator):
             Current tracked objects
         detections : set of :class:`Detection`
             Retrieved measurements
-        time : datetime
+        timestamp : datetime.datetime
             Detection time to predict to
 
         Returns
@@ -268,7 +201,7 @@ class GNNWith2DAssignment(DataAssociator):
 
         # Generate a set of hypotheses for each track on each detection
         hypotheses = {
-            track: self.hypothesiser.hypothesise(track, detections, time)
+            track: self.hypothesiser.hypothesise(track, detections, timestamp)
             for track in tracks}
 
         # Create dictionary for associations

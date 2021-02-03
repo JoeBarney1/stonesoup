@@ -13,8 +13,7 @@ class Hypothesiser(Base):
     Given a track and set of detections, generate hypothesis of association.
     """
 
-    def hypothesise(self, track: Track, detections: Set[Detection], timestamp: datetime.datetime,
-                    **kwargs) -> Sequence[Hypothesis]:
+    def hypothesise(self, track, detections, timestamp, **kwargs):
         """Hypothesise track and detection association
 
         Parameters
@@ -23,7 +22,7 @@ class Hypothesiser(Base):
             Track which hypotheses will be generated for.
         detections : set of :class:`~.Detection`
             Detections used to generate hypotheses.
-        timestamp : datetime.datetime
+        timestamp: :class:`datetime.datetime`
             A timestamp used when evaluating the state and measurement
             predictions. Note that if a given detection has a non empty
             timestamp, then prediction will be performed according to
