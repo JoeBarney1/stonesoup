@@ -1,38 +1,13 @@
 import pytest
 import numpy as np
 from numpy import deg2rad
-from scipy.linalg import cholesky, LinAlgError
-from pytest import approx, raises
+from pytest import approx
 
 from .. import (
-    cholesky_eps, jacobian, gm_reduce_single, mod_bearing, mod_elevation, gauss2sigma,
-    rotx, roty, rotz, cart2sphere, cart2angles, pol2cart, sphere2cart, dotproduct, gm_sample,
-    gauss2cubature, cubature2gauss, cubature_transform)
-from ...types.array import StateVector, StateVectors, Matrix, CovarianceMatrix
+    jacobian, gm_reduce_single, mod_bearing, mod_elevation, gauss2sigma,
+    rotx, roty, rotz, cart2sphere, cart2angles, pol2cart, sphere2cart, dotproduct)
+from ...types.array import StateVector, StateVectors, Matrix
 from ...types.state import State, GaussianState
-
-
-def test_cholesky_eps():
-    matrix = np.array([[0.4, -0.2, 0.1],
-                       [0.3, 0.1, -0.2],
-                       [-0.3, 0.0, 0.4]])
-    matrix = matrix@matrix.T
-
-    cholesky_matrix = cholesky(matrix)
-
-    assert cholesky_eps(matrix) == approx(cholesky_matrix)
-    assert cholesky_eps(matrix, True) == approx(cholesky_matrix.T)
-
-
-def test_cholesky_eps_bad():
-    matrix = np.array(
-        [[ 0.05201447,  0.02882126, -0.00569971, -0.00733617],  # noqa: E201
-         [ 0.02882126,  0.01642966, -0.00862847, -0.00673035],  # noqa: E201
-         [-0.00569971, -0.00862847,  0.06570757,  0.03251551],
-         [-0.00733617, -0.00673035,  0.03251551,  0.01648615]])
-    with raises(LinAlgError):
-        cholesky(matrix)
-    cholesky_eps(matrix)
 
 
 def test_jacobian():
@@ -58,14 +33,14 @@ def test_jacobian2():
 
     def fun1d(ins):
         """ test function with vector input, scalar output"""
-        out = 2*ins.state_vector[0, :]+3*ins.state_vector[1, :]
-        return np.atleast_2d(out)
+        out = 2*ins.state_vector[0]+3*ins.state_vector[1]
+        return out
 
     def fun2d(vec):
         """ test function with 2d input and 2d output"""
-        out = np.empty(vec.state_vector.shape)
-        out[0, :] = 2*vec.state_vector[0, :]**2 + 3*vec.state_vector[1, :]**2
-        out[1, :] = 2*vec.state_vector[0, :]+3*vec.state_vector[1, :]
+        out = np.empty((2, 1))
+        out[0] = 2*vec.state_vector[0]**2 + 3*vec.state_vector[1]**2
+        out[1] = 2*vec.state_vector[0]+3*vec.state_vector[1]
         return out
 
     x = 3
@@ -91,20 +66,6 @@ def test_jacobian2():
     assert len(FOM[0]) == 0
 
 
-def test_jacobian_param():
-    """ jacobian function test """
-
-    # Sample functions to compute Jacobian on
-    def fun(x, value=0.0):
-        """ function for jabcobian parameter passing"""
-        return value*x.state_vector
-
-    x = 4
-    value = 2.0
-    jac = jacobian(fun, State(StateVector([[x]])), value=value)
-    assert np.allclose(value, jac)
-
-
 def test_jacobian_large_values():
     # State related variables
     state = State(StateVector([[1E10], [1.0]]))
@@ -125,13 +86,6 @@ def test_gm_reduce_single():
     weights = np.array([1, 2, 5])
 
     mean, covar = gm_reduce_single(means, covars, weights)
-
-    assert np.allclose(mean, np.array([[4], [5]]))
-    assert np.allclose(covar, np.array([[3.675, 3.35],
-                                        [3.2, 3.3375]]))
-
-    # Test handling of means as array instead of StateVectors
-    mean, covar = gm_reduce_single(means.view(np.ndarray), covars, weights)
 
     assert np.allclose(mean, np.array([[4], [5]]))
     assert np.allclose(covar, np.array([[3.675, 3.35],
@@ -175,18 +129,6 @@ def test_gauss2sigma(mean):
 
     for n, sigma_point_state in zip((0, 1, -1), sigma_points_states):
         assert sigma_point_state.state_vector[0, 0] == approx(mean + n*covar**0.5)
-
-
-def test_gauss2sigma_bad_covar():
-    covar = np.array(
-        [[ 0.05201447,  0.02882126, -0.00569971, -0.00733617],  # noqa: E201
-         [ 0.02882126,  0.01642966, -0.00862847, -0.00673035],  # noqa: E201
-         [-0.00569971, -0.00862847,  0.06570757,  0.03251551],
-         [-0.00733617, -0.00673035,  0.03251551,  0.01648615]])
-    state = GaussianState([[0], [0], [0], [0]], covar)
-
-    with pytest.warns(UserWarning, match="Matrix is not positive definite"):
-        sigma_points_states, mean_weights, covar_weights = gauss2sigma(state, kappa=0)
 
 
 @pytest.mark.parametrize(
@@ -256,19 +198,13 @@ def test_cart_sphere_inversions(x, y, z):
         (StateVector([-1, 1, -4]), StateVector([-2, 1, 1])),
         (StateVector([-2, 0, 3, -1]), StateVector([1, 0, -1, 4])),
         (StateVector([-1, 0]), StateVector([1, -2, 3])),
-        (Matrix([[1, 0], [0, 1]]), Matrix([[3, 1], [1, -3]])),
-        (StateVectors([[1, 0], [0, 1]]), StateVectors([[3, 1], [1, -3]])),
-        (StateVectors([[1, 0], [0, 1]]), StateVector([3, 1]))
+        (Matrix([[1, 0], [0, 1]]), Matrix([[3, 1], [1, -3]]))
      ]
 )
 def test_dotproduct(state_vector1, state_vector2):
 
     # Test that they raise the right error if not 1d, i.e. vectors
-    if type(state_vector1) is not type(state_vector2):
-        with pytest.raises(ValueError):
-            dotproduct(state_vector1, state_vector2)
-    elif type(state_vector1) is not StateVectors and type(state_vector2) is not StateVectors and \
-            type(state_vector2) is not StateVector and type(state_vector1) is not StateVector:
+    if np.shape(state_vector1)[1] != 1 | np.shape(state_vector2)[1] != 1:
         with pytest.raises(ValueError):
             dotproduct(state_vector1, state_vector2)
     else:
@@ -282,101 +218,4 @@ def test_dotproduct(state_vector1, state_vector2):
             for a_i, b_i in zip(state_vector1, state_vector2):
                 out += a_i * b_i
 
-            assert np.allclose(dotproduct(state_vector1, state_vector2),
-                               np.reshape(out, np.shape(dotproduct(state_vector1, state_vector2))))
-
-
-@pytest.mark.parametrize(
-    "means, covars, weights, size",
-    [
-        (
-            [np.array([10, 10]), np.array([20, 20]), np.array([30, 30])],  # means
-            [np.eye(2), np.eye(2), np.eye(2)],  # covars
-            np.array([1/3]*3),  # weights
-            20  # size
-        ), (
-            StateVectors(np.array([[20, 30, 40, 50], [20, 30, 40, 50]])),  # means
-            [np.eye(2), np.eye(2), np.eye(2), np.eye(2)],  # covars
-            np.array([1/4]*4),  # weights
-            20  # size
-        ), (
-            [np.array([10, 10]), np.array([20, 20]), np.array([30, 30])],  # means
-            np.array([np.eye(2), np.eye(2), np.eye(2)]),  # covars
-            np.array([1/3]*3),  # weights
-            20  # size
-        ), (
-            [StateVector(np.array([10, 10])), StateVector(np.array([20, 20])),
-             StateVector(np.array([30, 30]))],  # means
-            [np.eye(2), np.eye(2), np.eye(2)],  # covars
-            np.array([1/3]*3),  # weights
-            20  # size
-        ), (
-            StateVector(np.array([10, 10])),  # means
-            [np.eye(2)],  # covars
-            np.array([1]),  # weights
-            20  # size
-        ), (
-            np.array([10, 10]),  # means
-            [np.eye(2)],  # covars
-            np.array([1]),  # weights
-            20  # size
-        ), (
-            [np.array([10, 10]), np.array([20, 20]), np.array([30, 30])],  # means
-            [np.eye(2), np.eye(2), np.eye(2)],  # covars
-            None,  # weights
-            20  # size
-        ), (
-            StateVectors(np.array([[20, 30, 40, 50], [20, 30, 40, 50]])),  # means
-            [np.eye(2), np.eye(2), np.eye(2), np.eye(2)],  # covars
-            None,  # weights
-            20  # size
-        )
-    ], ids=["mean_list", "mean_statevectors", "3d_covar_array", "mean_statevector_list",
-            "single_statevector_mean", "single_ndarray_mean", "no_weight_mean_list",
-            "no_weight_mean_statevectors"]
-)
-def test_gm_sample(means, covars, weights, size):
-    samples = gm_sample(means, covars, size, weights=weights)
-
-    # check orientation and size of samples
-    assert samples.shape[1] == size
-    # check number of dimensions
-    if isinstance(means, list):
-        assert samples.shape[0] == means[0].shape[0]
-    else:
-        assert samples.shape[0] == means.shape[0]
-
-
-@pytest.mark.parametrize(
-    "mean, covar, alp",
-    [
-        (StateVector([0]), CovarianceMatrix([[1]]), None),
-        (StateVector([-7, 5]), CovarianceMatrix([[1.1, -0.04], [-0.04, 1.2]]), 2.0),
-        (StateVector([12, -4, 0, 5]), CovarianceMatrix([[0.7, 0.04, -0.02, 0],
-                                                        [0.04, 1.1, 0.09, 0.06],
-                                                        [-0.02, 0.09, 0.9, -0.01],
-                                                        [0, 0.06, -0.01, 1.1]]), 0.7)
-    ]
-)
-def test_cubature_transform(mean, covar, alp):
-
-    instate = GaussianState(mean, covar)
-
-    def identity_function(inpu):
-        return inpu.state_vector
-
-    # First test the cubature points conversions
-    if alp is None:
-        cub_pts = gauss2cubature(instate)
-        outsv, outcovar = cubature2gauss(cub_pts)
-        mean, covar, cross_covar, cubature_points = cubature_transform(instate, identity_function)
-    else:
-        cub_pts = gauss2cubature(instate, alpha=alp)
-        outsv, outcovar = cubature2gauss(cub_pts, alpha=alp)
-        mean, covar, cross_covar, cubature_points = cubature_transform(instate, identity_function,
-                                                                       alpha=alp)
-
-    assert np.allclose(outsv, instate.state_vector)
-    assert np.allclose(outcovar, instate.covar)
-    assert np.allclose(mean, instate.state_vector)
-    assert np.allclose(covar, instate.covar)
+            assert dotproduct(state_vector1, state_vector2) == out
