@@ -8,7 +8,7 @@ class Smoother(Base):
     """Smoother Base Class
 
     (Fixed interval) Smoothers in general are used to infer a state, or series of states,
-    :math:`x_k` from measurements :math:`z_K` where :math:`k < K`.
+    :math:`\mathbf{x}_k` from measurements :math:`\mathbf{z}_{1:K}` where :math:`k < K`.
 
     The calculation is forward-backward in nature. The forward algorithm is "standard" filtering,
     provided by other Stone Soup components. The Smoother's input is therefore a :class:`~.Track`
@@ -21,3 +21,7 @@ class Smoother(Base):
     @abstractmethod
     def smooth(self, *args, **kwargs):
         raise NotImplementedError
+
+    #@abstractmethod
+    #def track_smooth(self, *args, **kwargs):
+    #    raise NotImplementedError
