@@ -5,7 +5,7 @@ from ..models.transition import TransitionModel
 
 
 class Smoother(Base):
-    """Smoother Base Class
+    r"""Smoother Base Class
 
     (Fixed interval) Smoothers in general are used to infer a state, or series of states,
     :math:`\mathbf{x}_k` from measurements :math:`\mathbf{z}_{1:K}` where :math:`k < K`.
@@ -22,6 +22,6 @@ class Smoother(Base):
     def smooth(self, *args, **kwargs):
         raise NotImplementedError
 
-    #@abstractmethod
-    #def track_smooth(self, *args, **kwargs):
+    # @abstractmethod
+    # def track_smooth(self, *args, **kwargs):
     #    raise NotImplementedError
