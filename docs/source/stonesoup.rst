@@ -32,7 +32,6 @@ Enabling Components
     stonesoup.sensor
     stonesoup.sensormanager
     stonesoup.simulator
-    stonesoup.smoother
     stonesoup.tracker
     stonesoup.writer
     stonesoup.platform
@@ -51,6 +50,7 @@ Algorithm Components
     stonesoup.models
     stonesoup.predictor
     stonesoup.resampler
+    stonesoup.smoother
     stonesoup.updater
 
 Data Types
