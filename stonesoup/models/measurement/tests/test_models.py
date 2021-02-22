@@ -1162,8 +1162,7 @@ def test_models_with_particles(h, ModelClass, state_vec, R,
     ndim_meas = np.shape(meas_pred_wo_noise)[0]
     for particle in range(nparticles):
         for dimension in range(ndim_meas):
-            assert np.array_equal(meas_pred_wo_noise[dimension][particle],
-                                  np.atleast_1d(eval_m)[dimension])
+            assert approx(meas_pred_wo_noise[dimension][particle]) == eval_m[dimension]
 
     # Ensure inverse function returns original
     # TODO Would be nice if this worked
@@ -1189,8 +1188,7 @@ def test_models_with_particles(h, ModelClass, state_vec, R,
     test_meas = h(single_state_vec, mapping, model.translation_offset, model.rotation_offset)
     for particle in range(nparticles):
         for dimension in range(ndim_meas):
-            assert np.array_equal(meas_pred_wo_noise[dimension][particle],
-                                  np.atleast_1d(test_meas)[dimension])
+            assert approx(meas_pred_wo_noise[dimension][particle]) == test_meas[dimension]
 
     # Evaluate the likelihood of the predicted measurement, given the state
     # (without noise)
@@ -1217,8 +1215,7 @@ def test_models_with_particles(h, ModelClass, state_vec, R,
 
     for particle in range(nparticles):
         for dimension in range(ndim_meas):
-            assert not np.array_equal(meas_pred_w_inoise[dimension][particle],
-                                      np.atleast_1d(test_meas)[dimension])
+            assert not approx(meas_pred_w_inoise[dimension][particle]) == test_meas[dimension]
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
@@ -1246,8 +1243,7 @@ def test_models_with_particles(h, ModelClass, state_vec, R,
 
     for particle in range(nparticles):
         for dimension in range(ndim_meas):
-            assert np.array_equal(meas_pred_w_enoise[dimension][particle],
-                                  np.atleast_1d(test_meas)[dimension])
+            assert approx(meas_pred_w_enoise[dimension][particle]) == test_meas[dimension]
 
     # Evaluate the likelihood of the predicted state, given the prior
     # (with noise)
