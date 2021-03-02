@@ -1,11 +1,11 @@
-from functools import lru_cache
+# -*- coding: utf-8 -*-
+
 
 import numpy as np
 
-from ..base import Property
-from ..updater import Updater
-from ..types.prediction import MeasurementPrediction
-from ..types.update import Update
+from stonesoup.base import Property
+from stonesoup.updater import Updater
+from stonesoup.types.update import Update
 
 
 class AlphaBetaUpdater(Updater):
@@ -60,38 +60,25 @@ class AlphaBetaUpdater(Updater):
     beta: float = Property(doc="The beta parameter. Controls the amount of variation allowed in "
                                "the velocity component.")
 
-    vmap: np.ndarray = Property(default=None, doc="Binary map of the velocity elements in the "
-                                                  "state vector. If left default, the class will "
+    vmap: np.ndarray = Property(default=None, doc="Binary map of the velocity elements in the"
+                                                  "state vector. If left default, the class will"
                                                   "assume that the velocity elements interleave "
                                                   "the position elements in the state vector.")
 
-    @lru_cache()
-    def predict_measurement(self, prediction, measurement_model=None, measurement_noise=False,
-                            **kwargs):
+    def predict_measurement(self, prediction, **kwargs):
         """Return the predicted measurement
 
         Parameters
         ----------
         prediction : :class:`~.StatePrediction`
             The state prediction
-        measurement_model : :class:`~.MeasurementModel`
-            The measurement model. If omitted, the model in the updater object
-            is used
-        measurement_noise : bool
-            Whether to include measurement noise, in this case on `False` is valid.
-            Default `False`
 
         Returns
         -------
          : :class:`~.StateVector`
             The predicted measurement
         """
-        if measurement_noise:
-            raise ValueError("measurement noise must be False")
-        # This necessary if predict_measurement called on its own
-        measurement_model = self._check_measurement_model(measurement_model)
-        pred_meas = measurement_model.matrix(**kwargs) @ prediction.state_vector
-        return MeasurementPrediction.from_state(prediction, pred_meas)
+        return self.measurement_model.matrix(**kwargs) @ prediction.state_vector
 
     def update(self, hypothesis, time_interval, **kwargs):
         """Calculate the inferred state following update
@@ -109,27 +96,16 @@ class AlphaBetaUpdater(Updater):
             The updated state
         """
         out_statevector = hypothesis.prediction.state_vector.copy()
+        pred_meas = self.predict_measurement(hypothesis.prediction)
 
-        # Check for the measurement_model in the measurement, if not present use the one in this
-        # updater
-        measurement_model = hypothesis.measurement.measurement_model
-        measurement_model = self._check_measurement_model(measurement_model)
-
-        # Check for a measurement prediction in the hypothesis
-        if hypothesis.measurement_prediction is None:
-            pred_meas = self.predict_measurement(hypothesis.prediction,
-                                                 measurement_model=measurement_model)
-        else:
-            pred_meas = hypothesis.measurement_prediction
-
-        pmap = np.array(measurement_model.mapping)
+        pmap = np.array(self.measurement_model.mapping)
         if self.vmap is None:
             vmap = pmap + 1
         else:
             vmap = self.vmap
 
-        innovation = hypothesis.measurement.state_vector - pred_meas.state_vector
-        out_statevector[pmap] = hypothesis.prediction.state_vector[pmap] + self.alpha * innovation
+        innovation = hypothesis.measurement.state_vector - pred_meas
+        out_statevector[pmap] = pred_meas + self.alpha * innovation
         out_statevector[vmap] = hypothesis.prediction.state_vector[vmap] +\
             (self.beta / time_interval.total_seconds()) * innovation
 
