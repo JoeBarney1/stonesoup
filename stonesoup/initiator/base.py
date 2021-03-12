@@ -14,8 +14,7 @@ class Initiator(Base):
     """
 
     @abstractmethod
-    def initiate(self, detections: Set[Detection], timestamp: datetime.datetime,
-                 **kwargs) -> Set[Track]:
+    def initiate(self, detections, timestamp, **kwargs):
         """Generate tracks from detections.
 
         Parameters
