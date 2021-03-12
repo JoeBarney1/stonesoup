@@ -83,6 +83,9 @@ class Property:
     flag. Such properties can be written only once (when the parent object is
     instantiated). Any subsequent write raises an ``AttributeError``
 
+    Property also can be used in similar way to Python standard `property`
+    using `getter`, `setter` and `deleter` decorators.
+
     Parameters
     ----------
     cls : class, optional
@@ -94,6 +97,7 @@ class Property:
     doc : str, optional
         Doc string for property
     readonly : bool, optional
+        If `True`, then property can only be set during initialisation.
 
     Attributes
     ----------
