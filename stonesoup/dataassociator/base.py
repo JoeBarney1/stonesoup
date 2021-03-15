@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
+import datetime
 from abc import abstractmethod
-from typing import Set, Mapping, Tuple
+from typing import Set, Mapping
 
 from ..base import Base, Property
 from ..hypothesiser import Hypothesiser
 from ..types.detection import Detection
 from ..types.hypothesis import Hypothesis
 from ..types.track import Track
-from ..types.association import AssociationSet
 
 
 class DataAssociator(Base):
@@ -39,7 +39,7 @@ class DataAssociator(Base):
         detections : set of :class:`~.Detection`
             Detections to be associated to tracks.
         timestamp : datetime.datetime
-            Timestamp to be used for missed detections.
+            Timestamp to be used for missed detections and to predict to.
 
         Returns
         -------
