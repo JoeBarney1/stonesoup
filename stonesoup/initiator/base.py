@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import datetime
 from abc import abstractmethod
 from typing import Set
@@ -14,7 +15,8 @@ class Initiator(Base):
     """
 
     @abstractmethod
-    def initiate(self, detections, timestamp, **kwargs):
+    def initiate(self, detections: Set[Detection], timestamp: datetime.datetime,
+                 **kwargs) -> Set[Track]:
         """Generate tracks from detections.
 
         Parameters
