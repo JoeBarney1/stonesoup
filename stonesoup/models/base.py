@@ -1,17 +1,17 @@
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Union, Optional
-from collections import namedtuple
-from datetime import timedelta
-import numpy as np
-from scipy.stats import multivariate_normal
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 from scipy.stats import multivariate_normal
 
 from ..base import Base
 from ..functions import jacobian as compute_jac
-from ..types.array import StateVector, StateVectors
+from ..types.array import StateVector, StateVectors, CovarianceMatrix
 from ..types.numeric import Probability
+from ..types.state import State
+
+if TYPE_CHECKING:
+    from ..types.detection import Detection
 
 
 class Model(Base):
@@ -21,24 +21,69 @@ class Model(Base):
 
     @property
     @abstractmethod
-    def ndim(self):
+    def ndim(self) -> int:
         """Number of dimensions of model"""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
-    def function(self, state_vector, noise=False):
-        """ Model function"""
-        pass
+    def function(self, state: State, noise: Union[bool, np.ndarray] = False,
+                 **kwargs) -> Union[StateVector, StateVectors]:
+        """Model function :math:`f_k(x(k),w(k))`
+
+        Parameters
+        ----------
+        state: State
+            An input state
+        noise: :class:`numpy.ndarray` or bool
+            An externally generated random process noise sample (the default is
+            `False`, in which case no noise will be added
+            if 'True', the output of :meth:`~.Model.rvs` is used)
+
+        Returns
+        -------
+        : :class:`StateVector` or :class:`StateVectors`
+            The StateVector(s) with the model function evaluated.
+        """
+        raise NotImplementedError
 
     @abstractmethod
-    def rvs(self, num_samples=1):
-        """Model noise/sample generation method"""
-        pass
+    def rvs(self, num_samples: int = 1, **kwargs) -> Union[StateVector, StateVectors]:
+        r"""Model noise/sample generation function
+
+        Generates noise samples from the model.
+
+
+        Parameters
+        ----------
+        num_samples: scalar, optional
+            The number of samples to be generated (the default is 1)
+
+        Returns
+        -------
+        noise : 2-D array of shape (:attr:`ndim`, ``num_samples``)
+            A set of Np samples, generated from the model's noise
+            distribution.
+        """
+        raise NotImplementedError
 
     @abstractmethod
-    def pdf(self, state1, state2):
-        """Model pdf/likelihood evaluator method"""
-        pass
+    def pdf(self, state1: State, state2: State, **kwargs) -> Union[Probability, np.ndarray]:
+        r"""Model pdf/likelihood evaluation function
+
+        Evaluates the pdf/likelihood of ``state1``, given the state
+        ``state2`` which is passed to :meth:`function()`.
+
+        Parameters
+        ----------
+        state1 : State
+        state2 : State
+
+        Returns
+        -------
+        : :class:`~.Probability` or :class:`~.numpy.ndarray` of :class:`~.Probability`
+            The likelihood of ``state1``, given ``state2``
+        """
+        raise NotImplementedError
 
 
 class LinearModel(Model):
@@ -51,13 +96,14 @@ class LinearModel(Model):
         """Model matrix"""
         raise NotImplementedError
 
-    def function(self, state_vector, noise=False, **kwargs):
+    def function(self, state: State, noise: Union[bool, np.ndarray] = False,
+                 **kwargs) -> Union[StateVector, StateVectors]:
         """Model linear function :math:`f_k(x(k),w(k)) = F_k(x_k) + w_k`
 
         Parameters
         ----------
-        state_vector: :class:`~.StateVector`
-            An input state vector
+        state: State
+            An input state
         noise: :class:`numpy.ndarray` or bool
             An externally generated random process noise sample (the default is
             `False`, in which case no noise will be added
@@ -65,8 +111,8 @@ class LinearModel(Model):
 
         Returns
         -------
-        : :class:`State`
-            The updated State with the model function evaluated.
+        : :class:`StateVector` or :class:`StateVectors`
+            The StateVector(s) with the model function evaluated.
         """
 
         if isinstance(noise, bool) or noise is None:
@@ -86,8 +132,8 @@ class ReversibleModel(Model):
     Contains an inverse function which computes the reverse
     of the relevant linear-to-non-linear function"""
 
-    def jacobian(self, state, **kwargs):
-        """Model jacobian matrix :math:`H_{jac}`
+    def jacobian(self, state: State, **kwargs) -> np.ndarray:
+        """Model Jacobian matrix :math:`H_{jac}`
 
         Parameters
         ----------
@@ -96,35 +142,14 @@ class ReversibleModel(Model):
 
         Returns
         -------
-        :class:`numpy.ndarray` of shape (:py:attr:`~ndim_meas`, \
-        :py:attr:`~ndim_state`)
-            The model jacobian matrix evaluated around the given state vector.
+        :class:`numpy.ndarray` of shape (attr:`~ndim_meas`, :attr:`~ndim_state`)
+            The model Jacobian matrix evaluated around the given state vector.
         """
 
         def fun(x):
-            return self.function(x, noise=False)
+            return self.function(x, noise=False, **kwargs)
 
         return compute_jac(fun, state)
-
-    @abstractmethod
-    def function(self, state_vector, noise=False, **kwargs):
-        """Model function :math:`f(t,x(t),w(t))`
-
-        Parameters
-        ----------
-        state_vector: :class:`~.StateVector`
-            An input state vector
-        noise: :class:`numpy.ndarray` or bool
-            An externally generated random process noise sample (the default is
-            `False`, in which case no noise will be added
-            if 'True', the output of :meth:`~.Model.rvs` is added)
-
-        Returns
-        -------
-        : :class:`numpy.ndarray`
-            The model function evaluated.
-        """
-        pass
 
 
 class ReversibleModel(NonLinearModel):
@@ -136,7 +161,7 @@ class ReversibleModel(NonLinearModel):
     of the relevant linear-to-non-linear function"""
 
     @abstractmethod
-    def inverse_function(self, detection, **kwargs):
+    def inverse_function(self, detection: 'Detection', **kwargs) -> StateVector:
         """Takes in the result of the function and
         computes the inverse function, returning the initial
         input of the function.
@@ -148,10 +173,10 @@ class ReversibleModel(NonLinearModel):
 
         Returns
         -------
-        : :class:`numpy.ndarray`
+        StateVector
             The linear co-ordinates
         """
-        pass
+        raise NotImplementedError
 
 
 class TimeVariantModel(Model):
@@ -292,7 +317,7 @@ class GaussianModel(Model):
 
         return likelihood
 
-    def rvs(self, num_samples=1, **kwargs):
+    def rvs(self, num_samples: int = 1, **kwargs) -> Union[StateVector, StateVectors]:
         r"""Model noise/sample generation function
 
         Generates noise samples from the model.
@@ -336,7 +361,7 @@ class GaussianModel(Model):
         else:
             return noise.view(StateVectors)
 
-    def pdf(self, state1, state2, **kwargs):
+    def pdf(self, state1: State, state2: State, **kwargs) -> Union[Probability, np.ndarray]:
         r"""Model pdf/likelihood evaluation function
 
         Evaluates the pdf/likelihood of ``state1``, given the state
@@ -353,12 +378,12 @@ class GaussianModel(Model):
 
         Parameters
         ----------
-        state1 : :class:`~.State`
-        state2 : :class:`~.State`
+        state1 : State
+        state2 : State
 
         Returns
         -------
-        : :class:`~.Probability`
+        : :class:`~.Probability` or :class:`~.numpy.ndarray` of :class:`~.Probability`
             The likelihood of ``state1``, given ``state2``
         """
 
@@ -381,5 +406,5 @@ class GaussianModel(Model):
         return likelihood
 
     @abstractmethod
-    def covar(self):
+    def covar(self, **kwargs) -> CovarianceMatrix:
         """Model covariance"""
