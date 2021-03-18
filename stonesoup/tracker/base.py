@@ -3,26 +3,21 @@ from abc import abstractmethod
 from typing import Iterator, Set, Tuple
 
 from ..base import Base
-from ..buffered_generator import BufferedGenerator
 
 
-class Tracker(Base, BufferedGenerator):
+class Tracker(Base):
     """Tracker base class"""
 
     @property
-    def tracks(self):
-        return self.current[1]
-
     @abstractmethod
-    @BufferedGenerator.generator_method
-    def tracks_gen(self):
-        """Returns a generator of tracks for each time step.
+    def tracks(self):
+        raise NotImplementedError
 
-    def __iter__(self) -> Iterator[Tuple[datetime.datetime, Set[Track]]]:
+    def __iter__(self):
         return self
 
     @abstractmethod
-    def __next__(self) -> Tuple[datetime.datetime, Set[Track]]:
+    def __next__(self):
         """
         Returns
         -------
