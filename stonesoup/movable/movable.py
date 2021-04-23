@@ -1,22 +1,22 @@
+# -*- coding: utf-8 -*-
 import datetime
 from abc import abstractmethod, ABC
 from functools import lru_cache
-from typing import Sequence, Tuple, MutableSequence, Optional
+from math import cos, sin
+from typing import Sequence, Tuple
 
 import numpy as np
-from math import cos, sin
 from scipy.linalg import expm
 
-from stonesoup.base import Property
 from stonesoup.functions import cart2sphere, cart2pol, build_rotation_matrix, rotz
-from stonesoup.models.transition import TransitionModel
 from stonesoup.types.array import StateVector
+from stonesoup.base import Property
 from stonesoup.types.state import State, StateMutableSequence
-from stonesoup.sensormanager.action import Actionable
+from stonesoup.models.transition import TransitionModel
 
 
-class Movable(StateMutableSequence, Actionable, ABC):
-    states: MutableSequence[State] = Property(
+class Movable(StateMutableSequence, ABC):
+    states: Sequence[State] = Property(
         doc="A list of States which enables the platform's history to be "
             "accessed in simulators and for plotting. Initiated as a "
             "state, for a static platform, this would usually contain its "
@@ -27,7 +27,7 @@ class Movable(StateMutableSequence, Actionable, ABC):
         doc="Mapping between platform position and state vector. For a "
             "position-only 3d platform this might be ``[0, 1, 2]``. For a "
             "position and velocity platform: ``[0, 2, 4]``")
-    velocity_mapping: Optional[Sequence[int]] = Property(
+    velocity_mapping: Sequence[int] = Property(
         default=None,
         doc="Mapping between platform velocity and state dims. If not "
             "set, it will default to ``[m+1 for m in position_mapping]``")
@@ -44,11 +44,6 @@ class Movable(StateMutableSequence, Actionable, ABC):
 
         if self.velocity_mapping is None:
             self.velocity_mapping = [p + 1 for p in self.position_mapping]
-        if not self.states:
-            raise ValueError('States must not be empty: it must contain least one state.')
-
-    def validate_timestamp(self):
-        pass
 
     @property
     def position(self) -> StateVector:
@@ -98,13 +93,14 @@ class Movable(StateMutableSequence, Actionable, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def move(self, timestamp: datetime.datetime, noise: bool = True, **kwargs) -> None:
+    def move(self, timestamp: datetime.datetime, **kwargs) -> None:
         """Update the platform position using the :attr:`transition_model`.
 
         Parameters
         ----------
-        timestamp: :class:`datetime.datetime`
-            A timestamp signifying when the end of the maneuver
+        timestamp: :class:`datetime.datetime`, optional
+            A timestamp signifying when the end of the maneuver \
+            (the default is ``None``)
 
         Notes
         -----
@@ -197,11 +193,7 @@ class FixedMovable(Movable):
         doc='A fixed orientation of the static platform. Defaults to the zero vector')
 
     def __init__(self, *args, **kwargs):
-        velocity_mapping = kwargs.get('velocity_mapping', None)
-        if velocity_mapping:
-            raise ValueError('Velocity mapping should not be set for a FixedMovable')
         super().__init__(*args, **kwargs)
-        self.velocity_mapping = None
         if self.orientation is None:
             self.orientation = StateVector([0, 0, 0])
 
@@ -222,8 +214,9 @@ class FixedMovable(Movable):
 
     def move(self, timestamp: datetime.datetime, **kwargs) -> None:
         """For a fixed platform this method has no effect other than to update the timestamp."""
-        new_state = State.from_state(self.state, timestamp=timestamp)
-        self.states.append(new_state)
+        # TODO Is this a sensible implementation?
+        # Return without moving static platforms
+        self.state.timestamp = timestamp
 
 
 class MovingMovable(Movable):
@@ -255,10 +248,9 @@ class MovingMovable(Movable):
 
         This is defined as a 3x1 StateVector of angles (rad), specifying the sensor orientation in
         terms of the counter-clockwise rotation around each Cartesian axis in the order
-        :math:`x,y,z`. The x and z rotation angles are positive if the rotation is in the
-        counter-clockwise direction when viewed by an observer looking along the respective
-        rotation axis, towards the origin. The y rotation angle is the opposite (matching
-        'elevation').
+        :math:`x,y,z`. The rotation angles are positive if the rotation is in the counter-clockwise
+        direction when viewed by an observer looking along the respective rotation axis,
+        towards the origin.
 
         The orientation of this platform is defined as along the direction of its velocity, with
         roll always set to zero (as this is the angle the platform is rotated about the velocity
@@ -305,7 +297,7 @@ class MovingMovable(Movable):
             raise AttributeError('Cannot set the position of a moving platform with a '
                                  'transition model')
 
-    def move(self, timestamp=None, noise=True, **kwargs) -> None:
+    def move(self, timestamp=None, **kwargs) -> None:
         """Propagate the platform position using the :attr:`transition_model`.
 
         Parameters
@@ -320,7 +312,8 @@ class MovingMovable(Movable):
 
         Any provided ``kwargs`` are forwarded to the :attr:`transition_model`.
 
-        If `timestamp`` is ``None``, the method has no effect, but will return successfully.
+        If :attr:`transition_model` or ``timestamp`` is ``None``, the method has
+        no effect, but will return successfully.
 
         """
 
@@ -338,13 +331,14 @@ class MovingMovable(Movable):
         if self.transition_model is None:
             raise AttributeError('Platform without a transition model cannot be moved')
 
-        state_vector = self.transition_model.function(state=self.state,
-                                                      noise=noise,
-                                                      timestamp=timestamp,
-                                                      time_interval=time_interval,
-                                                      **kwargs)
-        new_state = State.from_state(self.state, state_vector=state_vector, timestamp=timestamp)
-        self.states.append(new_state)
+        self.states.append(State(
+            state_vector=self.transition_model.function(
+                state=self.state,
+                noise=True,
+                timestamp=timestamp,
+                time_interval=time_interval,
+                **kwargs),
+            timestamp=timestamp))
 
 
 class MultiTransitionMovable(MovingMovable):
@@ -370,7 +364,7 @@ class MultiTransitionMovable(MovingMovable):
     def transition_model(self):
         return self.transition_models[self.transition_index]
 
-    def move(self, timestamp=None, noise=True, **kwargs) -> None:
+    def move(self, timestamp=None, **kwargs) -> None:
         """Propagate the platform position using the :attr:`transition_model`.
 
         Parameters
@@ -406,35 +400,31 @@ class MultiTransitionMovable(MovingMovable):
             return
 
         temp_state = self.state
-        while time_interval.total_seconds() != 0:
+        while time_interval != 0:
             if time_interval >= self.current_interval:
-
-                temp_state_vector = self.transition_model.function(
-                    state=temp_state,
-                    noise=noise,
-                    time_interval=self.current_interval,
-                    **kwargs
+                temp_state = State(
+                    state_vector=self.transition_model.function(
+                        state=temp_state,
+                        noise=True,
+                        time_interval=self.current_interval,
+                        **kwargs),
+                    timestamp=timestamp
                 )
-                temp_state = State.from_state(self.state,
-                                              state_vector=temp_state_vector,
-                                              timestamp=timestamp)
-
                 time_interval -= self.current_interval
                 self.transition_index = (self.transition_index + 1) % len(self.transition_models)
                 self.current_interval = self.transition_times[self.transition_index]
 
             else:
-                temp_state_vector = self.transition_model.function(
-                    state=temp_state,
-                    noise=noise,
-                    time_interval=time_interval,
-                    **kwargs
+                temp_state = State(
+                    state_vector=self.transition_model.function(
+                        state=temp_state,
+                        noise=True,
+                        time_interval=time_interval,
+                        **kwargs),
+                    timestamp=timestamp
                 )
-                temp_state = State.from_state(self.state,
-                                              state_vector=temp_state_vector,
-                                              timestamp=timestamp)
                 self.current_interval -= time_interval
-                break
+                time_interval = 0
         self.states.append(temp_state)
 
 
@@ -446,7 +436,7 @@ def _get_rotation_matrix(vel: StateVector) -> np.ndarray:
     [cos[theta] -sin[theta]]
     [cos[theta]  sin[theta]]
 
-    In the 3d case this will be a 3x3 matrix which rotates around the Z axis
+    In the 2d case this will be a 3x3 matrix which rotates around the Z axis
     followed by a rotation about the new Y axis.
 
     Parameters
@@ -488,8 +478,8 @@ def _get_angle(vec: StateVector, axis: np.ndarray) -> float:
     Angle : float
         Angle, in radians, between the two vectors
     """
-    vel_norm = (vec / np.linalg.norm(vec)).ravel()
-    axis_norm = (axis / np.linalg.norm(axis)).ravel()
+    vel_norm = vec / np.linalg.norm(vec)
+    axis_norm = axis / np.linalg.norm(axis)
 
     return np.arccos(np.clip(np.dot(axis_norm, vel_norm), -1.0, 1.0))
 
