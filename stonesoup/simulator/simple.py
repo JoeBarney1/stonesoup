@@ -203,16 +203,14 @@ class SimpleDetectionSimulator(DetectionSimulator):
     meas_range: np.ndarray = Property()
     detection_probability: Probability = Property(default=0.9)
     clutter_rate: float = Property(default=2.0)
+    seed: Optional[int] = Property(default=None, doc="Seed for random number generation. Default None")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.real_detections = set()
         self.clutter_detections = set()
-        self.index = None
-
-    @property
-    def detections(self):
-        return self.real_detections | self.clutter_detections
+        self.index = 0
+        self.random_state = np.random.RandomState(self.seed)
 
     @property
     def clutter_spatial_density(self):
@@ -231,13 +229,14 @@ class SimpleDetectionSimulator(DetectionSimulator):
         return True
 
     @BufferedGenerator.generator_method
-    def detections_gen(self):
+    def detections_gen(self, random_state=None):
         for time, tracks in self.groundtruth:
             self.real_detections.clear()
             self.clutter_detections.clear()
+            random_state = random_state if random_state is not None else self.random_state
             for track in tracks:
                 self.index = track[-1].metadata.get("index")
-                if np.random.rand() < self.detection_probability:
+                if random_state.rand() < self.detection_probability:
                     detection = TrueDetection(
                         self.measurement_model.function(
                             track[-1].state_vector, noise=True),
@@ -248,9 +247,9 @@ class SimpleDetectionSimulator(DetectionSimulator):
                     self.real_detections.add(detection)
 
             # generate clutter
-            for _ in range(np.random.poisson(self.clutter_rate)):
+            for _ in range(random_state.poisson(self.clutter_rate)):
                 detection = Clutter(
-                    np.random.rand(self.measurement_model.ndim_meas, 1) *
+                    random_state.rand(self.measurement_model.ndim_meas, 1) *
                     np.diff(self.meas_range) + self.meas_range[:, :1],
                     timestamp=time,
                     measurement_model=self.measurement_model)
