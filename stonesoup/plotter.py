@@ -1,9 +1,11 @@
 import warnings
 from abc import ABC, abstractmethod
 from itertools import chain
-from typing import Collection
+from typing import Sequence
+
 
 import numpy as np
+from scipy.stats import kde
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Ellipse
@@ -17,11 +19,8 @@ except ImportError:
     go = None
 
 from .types import detection
-from .types.groundtruth import GroundTruthPath
-from .types.state import State, StateMutableSequence
-from .types.update import Update
-
-from .models.base import LinearModel, Model
+from .types.state import StateMutableSequence
+from .models.base import LinearModel, NonLinearModel, Model
 
 from enum import Enum
 
@@ -412,78 +411,31 @@ class Plotter(_Plotter):
         else:
             self.ax.legend(handles=self.legend_dict.values(), labels=self.legend_dict.keys())
 
-    def plot_sensors(self, sensors, sensor_label="Sensors", **kwargs):
-        """Plots sensor(s)
+    def plot_density(self, state_sequences: Sequence[StateMutableSequence], index=-1, mapping=(0, 2), n_bins=300,
+                     **kwargs):
 
-        Plots sensors.  Users can change the color and marker of detections using keyword
-        arguments. Default is a black 'x' marker.
+        if index is None:
+            x = np.array([a_state.state_vector[mapping[0]]
+                          for a_state_sequence in state_sequences
+                          for a_state in a_state_sequence])
+            y = np.array([a_state.state_vector[mapping[1]]
+                          for a_state_sequence in state_sequences
+                          for a_state in a_state_sequence])
+        else:
+            x = np.array([a_state_sequence.states[index].state_vector[mapping[0]]
+                          for a_state_sequence in state_sequences])
+            y = np.array([a_state_sequence.states[index].state_vector[mapping[1]]
+                          for a_state_sequence in state_sequences])
 
-        Parameters
-        ----------
-        sensors : Collection of :class:`~.Sensor`
-            Sensors to plot
-        sensor_label: str
-            Label to apply to all tracks for legend.
-        \\*\\*kwargs: dict
-            Additional arguments to be passed to plot function for detections. Defaults are
-            ``marker='x'`` and ``color='black'``.
-        """
+        # Evaluate a gaussian kde on a regular grid of n_bins x n_bins over data extents
+        k = kde.gaussian_kde([x, y])
+        xi, yi = np.mgrid[x.min():x.max():n_bins * 1j, y.min():y.max():n_bins * 1j]
+        zi = k(np.vstack([xi.flatten(), yi.flatten()]))
 
-        sensor_kwargs = dict(marker='x', color='black')
-        sensor_kwargs.update(kwargs)
+        # Make the plot
+        self.ax.pcolormesh(xi, yi, zi.reshape(xi.shape), shading='auto', **kwargs)
 
-        if not isinstance(sensors, Collection):
-            sensors = {sensors}  # Make a set of length 1
-
-        for sensor in sensors:
-            if self.dimension is Dimension.TWO:  # plots the sensors in xy
-                self.ax.scatter(sensor.position[0],
-                                sensor.position[1],
-                                **sensor_kwargs)
-            elif self.dimension is Dimension.THREE:  # plots the sensors in xyz
-                self.ax.plot3D(sensor.position[0],
-                               sensor.position[1],
-                               sensor.position[2],
-                               **sensor_kwargs)
-            else:
-                raise NotImplementedError('Unsupported dimension type for sensor plotting')
-        self.legend_dict[sensor_label] = Line2D([], [], linestyle='', **sensor_kwargs)
-        self.ax.legend(handles=self.legend_dict.values(), labels=self.legend_dict.keys())
-
-    def set_equal_3daxis(self, axes=None):
-        """Plots minimum/maximum points with no linestyle to increase the plotting region to
-        simulate `.ax.axis('equal')` from matplotlib 2d plots which is not possible using 3d
-        projection.
-
-        Parameters
-        ----------
-        axes: list
-            List of dimension index specifying the equal axes, equal x and y = [0,1].
-            Default is x,y [0,1].
-        """
-        if not axes:
-            axes = [0, 1]
-        if self.dimension is Dimension.THREE:
-            min_xyz = [0, 0, 0]
-            max_xyz = [0, 0, 0]
-            for n in range(3):
-                for line in self.ax.lines:
-                    min_xyz[n] = np.min([min_xyz[n], *line.get_data_3d()[n]])
-                    max_xyz[n] = np.max([max_xyz[n], *line.get_data_3d()[n]])
-
-            extremes = np.max([x - y for x, y in zip(max_xyz, min_xyz)])
-            equal_axes = [0, 0, 0]
-            for i in axes:
-                equal_axes[i] = 1
-            lower = ([np.mean([x, y]) for x, y in zip(max_xyz, min_xyz)] - extremes/2) * equal_axes
-            upper = ([np.mean([x, y]) for x, y in zip(max_xyz, min_xyz)] + extremes/2) * equal_axes
-            ghosts = GroundTruthPath(states=[State(state_vector=lower),
-                                             State(state_vector=upper)])
-
-            self.ax.plot3D([state.state_vector[0] for state in ghosts],
-                           [state.state_vector[1] for state in ghosts],
-                           [state.state_vector[2] for state in ghosts],
-                           linestyle="")
+        plt.show(block=False)
 
     # Ellipse legend patch (used in Tutorial 3)
     @staticmethod
