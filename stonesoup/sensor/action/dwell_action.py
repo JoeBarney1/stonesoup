@@ -1,41 +1,23 @@
+# -*- coding: utf-8 -*-
 import datetime
-from copy import copy
 from typing import Iterator
-
+from copy import copy
 import numpy as np
 
-from ...sensormanager.action import Action, RealNumberActionGenerator
+from . import Action, ActionGenerator
 from ...base import Property
 from ...functions import mod_bearing
-from ...types.angle import Angle, Bearing
+from ...types.angle import Angle
+from .action_utils import contains_angle
 
 
 class ChangeDwellAction(Action):
-    """The action of changing the dwell centre of sensors where `dwell_centre` is an
-    :class:`~.ActionableProperty`"""
 
-    rotation_end_time: datetime.datetime = Property(readonly=True,
-                                                    doc="End time of rotation.")
-    increasing_angle: bool = Property(default=None, readonly=True,
-                                      doc="Indicated the direction of change in the "
-                                          "dwell centre angle.")
+    rotation_end_time: datetime.datetime = Property(readonly=True)
+    increasing_angle: bool = Property(default=None, readonly=True)
 
-    def act(self, current_time, timestamp, init_value, **kwargs):
-        """Assumes that duration keeps within the action end time
-
-        Parameters
-        ----------
-        current_time: datetime.datetime
-            Current time
-        timestamp: datetime.datetime
-            Modification of attribute ends at this time stamp
-        init_value: Any
-            Current value of the dwell centre
-
-        Returns
-        -------
-        Any
-            The new value of the dwell centre"""
+    def act(self, current_time, timestamp, init_value):
+        """Assumes that duration keeps within the action end time."""
 
         if self.increasing_angle is None:
             return init_value
@@ -51,7 +33,7 @@ class ChangeDwellAction(Action):
             # so rotate then stay
             duration = self.rotation_end_time - current_time
 
-        dwell_centre = np.asarray(copy(init_value), dtype=np.float64)  # in case value is mutable
+        dwell_centre = np.asfarray(copy(init_value))  # in case value is mutable
 
         angle_delta = duration.total_seconds() * self.generator.rps * 2 * np.pi
         if self.increasing_angle:
@@ -62,46 +44,31 @@ class ChangeDwellAction(Action):
         return dwell_centre
 
 
-class DwellActionsGenerator(RealNumberActionGenerator):
-    """Generates possible actions for changing the dwell centre of a sensor in a given
-    time period."""
-
+class DwellActionsGenerator(ActionGenerator):
     owner: object = Property(doc="Object with `timestamp`, `rpm` (revolutions per minute) and "
-                                 "`resolution`.")
-    resolution: Angle = Property(default=np.radians(1),
-                                 doc="Resolution of the action space.")
-    rpm: float = Property(default=60,
-                          doc="The number of rotations per minute (RPM).")
+                                 "dwell-centre attributes")
+    attribute: str = Property()
+    start_time: datetime.datetime = Property()
+    end_time: datetime.datetime = Property()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.epsilon = Angle(np.radians(1e-6))
+        self.resolution = Angle(np.radians(1))
 
     @property
     def default_action(self):
         return ChangeDwellAction(rotation_end_time=self.end_time,
                                  generator=self,
                                  end_time=self.end_time,
-                                 target_value=self.initial_value,
                                  increasing_angle=True)
 
-    def __call__(self, resolution=None, epsilon=None):
-        """
-        Parameters
-        ----------
-        resolution : Angle
-            Resolution of yielded action target values
-        epsilon: float
-            Tolerance of equality check in iteration
-        """
+    def __call__(self, resolution=None):
         if resolution is not None:
             self.resolution = resolution
-        if epsilon is not None:
-            self.epsilon = epsilon
 
     @property
-    def initial_value(self):
-        return Angle(self.current_value[0, 0])
+    def initial_bearing(self):
+        return self.current_value[0, 0]
 
     @property
     def duration(self):
@@ -109,7 +76,7 @@ class DwellActionsGenerator(RealNumberActionGenerator):
 
     @property
     def rps(self):
-        return self.rpm / 60
+        return self.owner.rpm / 60
 
     @property
     def angle_delta(self):
@@ -117,115 +84,80 @@ class DwellActionsGenerator(RealNumberActionGenerator):
 
     @property
     def min(self):
-        return Angle(self.initial_value - self.angle_delta)
+        if self.angle_delta >= np.pi:
+            return Angle(-np.pi)
+        else:
+            return Angle(self.initial_bearing - self.angle_delta)
 
     @property
     def max(self):
-        return Angle(self.initial_value + self.angle_delta)
+        if self.angle_delta >= np.pi:
+            return Angle(np.pi)
+        else:
+            return Angle(self.initial_bearing + self.angle_delta)
 
     def __contains__(self, item):
 
-        if self.angle_delta >= np.pi:
-            # Left turn and right turn are > 180, so all angles hit
-            return True
-
         if isinstance(item, ChangeDwellAction):
-            item = item.target_value
+            item = item.value
 
         if isinstance(item, (float, int)):
             item = Angle(item)
 
-        return self.min <= item <= self.max
+        left, right = Angle(self.min), Angle(self.max)
 
-    def _end_time_direction(self, angle):
+        return contains_angle(left, right, item)
+
+    def _get_end_time_direction(self, bearing):
         """Given a target bearing, should the dwell centre rotate so as to increase its angle
         value, or decrease? And how long until it reaches the target."""
-
-        angle = Angle(angle)
-
-        if self.initial_value - self.epsilon \
-                <= angle \
-                <= self.initial_value + self.epsilon:
-            return self.start_time, None  # no rotation, target bearing achieved
-
-        angle_delta = np.abs(angle - self.initial_value)
+        if self.initial_bearing <= bearing:
+            if bearing - self.initial_bearing < self.initial_bearing + 2 * np.pi - bearing:
+                angle_delta = bearing - self.initial_bearing
+                increasing = True
+            else:
+                angle_delta = self.initial_bearing + 2 * np.pi - bearing
+                increasing = False
+        else:
+            if self.initial_bearing - bearing < bearing + 2 * np.pi - self.initial_bearing:
+                angle_delta = self.initial_bearing - bearing
+                increasing = False
+            else:
+                angle_delta = bearing + 2 * np.pi - self.initial_bearing
+                increasing = True
 
         return (
             self.start_time + datetime.timedelta(seconds=angle_delta / (self.rps * 2 * np.pi)),
-            angle > self.initial_value
+            increasing
         )
 
     def __iter__(self) -> Iterator[ChangeDwellAction]:
         """Returns ChangeDwellAction types, where the value is a possible value of the [0, 0]
         element of the dwell centre's state vector."""
-
-        current_angle = self.min
-
-        while current_angle <= self.max + self.epsilon:
-            rot_end_time, increasing = self._end_time_direction(current_angle)
+        current_bearing = self.min
+        while current_bearing <= self.max:
+            rot_end_time, increasing = self._get_end_time_direction(current_bearing)
             yield ChangeDwellAction(rotation_end_time=rot_end_time,
                                     generator=self,
                                     end_time=self.end_time,
-                                    target_value=Bearing(current_angle),
                                     increasing_angle=increasing)
-            current_angle += self.resolution
+            current_bearing += self.resolution
 
     def action_from_value(self, value):
-        """Given a value for dwell centre, what action would achieve that dwell centre
-        value.
-
-        Parameters
-        ----------
-        value: Any
-            Dwell centre value for which the action is required.
-
-        Returns
-        -------
-        ChangeDwellAction
-            Action which will achieve this dwell centre.
-        """
 
         if isinstance(value, (int, float)):
             value = Angle(value)
-        elif isinstance(value, Angle):
-            value = value
-        else:
+        if not isinstance(value, Angle):
             raise ValueError("Can only generate action from an Angle/float/int type")
 
         if value not in self:
             return None  # Should this raise an error?
 
-        # Use resolution to reach target value from initial value - does not exceed
-        current_value = previous_value = self.initial_value
+        value -= value % self.resolution
 
-        if value > self.initial_value:
-            while not np.isclose(float(abs(current_value)), float(abs(value)), atol=1e-6):
-                if current_value > value:
-                    current_value = previous_value
-                    break
-                previous_value = current_value
-                current_value += self.resolution
-
-        elif value < self.initial_value:
-            while not np.isclose(float(abs(current_value)), float(abs(value)), atol=1e-6):
-                if current_value < value:
-                    current_value = previous_value
-                    break
-                previous_value = current_value
-                current_value -= self.resolution
-
-        elif value == self.initial_value:
-            current_value = value
-
-        else:
-            raise ValueError()
-
-        target_value = current_value
-
-        rot_end_time, increasing = self._end_time_direction(target_value)
+        rot_end_time, increasing = self._get_end_time_direction(value)
 
         return ChangeDwellAction(rotation_end_time=rot_end_time,
                                  generator=self,
                                  end_time=self.end_time,
-                                 target_value=target_value,
                                  increasing_angle=increasing)

@@ -3,24 +3,21 @@ import numpy as np
 import pytest
 
 from ...predictor import Predictor
-from ...predictor.categorical import HMMPredictor
 from ...types.prediction import (
-    GaussianMeasurementPrediction, GaussianStatePrediction, CategoricalStatePrediction,
-    CategoricalMeasurementPrediction)
+    GaussianMeasurementPrediction, GaussianStatePrediction)
 from ...updater import Updater
-from ...updater.categorical import HMMUpdater
 
 
 @pytest.fixture()
 def predictor():
     class TestGaussianPredictor(Predictor):
+        @property
+        def transition_model(self):
+            pass
+
         def predict(self, prior, control_input=None, timestamp=None, **kwargs):
             return GaussianStatePrediction(prior.state_vector + 1,
                                            prior.covar * 2, timestamp)
-
-        @property
-        def transition_model(self):
-            return None
 
     return TestGaussianPredictor()
 
@@ -28,6 +25,10 @@ def predictor():
 @pytest.fixture()
 def updater():
     class TestGaussianUpdater(Updater):
+        @property
+        def measurement_model(self):
+            pass
+
         def predict_measurement(self, state_prediction,
                                 measurement_model=None, **kwargs):
             return GaussianMeasurementPrediction(state_prediction.state_vector,
@@ -36,10 +37,6 @@ def updater():
 
         def update(self, hypothesis, **kwargs):
             pass
-
-        @property
-        def measurement_model(self):
-            return None
 
     return TestGaussianUpdater()
 
