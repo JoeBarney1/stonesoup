@@ -4,17 +4,15 @@ import numpy as np
 import pytest
 
 from ..dwell_action import DwellActionsGenerator, ChangeDwellAction
-from ....sensormanager.action import Actionable, ActionableProperty
+from ...actionable import Actionable, ActionableProperty
 from ...base import Property
-from ....types.angle import Bearing, Angle
+from ....types.angle import Bearing
 from ....types.array import StateVector
 
 
 class DummyActionable(Actionable):
-    dwell_centre: StateVector = ActionableProperty(
-        doc="Actionable dwell centre.",
-        generator_cls=DwellActionsGenerator,
-        generator_kwargs_mapping={'rpm': 'rpm'})
+    dwell_centre: StateVector = ActionableProperty(doc="Actionable dwell centre.",
+                                                   generator_cls=DwellActionsGenerator)
     timestamp: datetime = Property(doc="Current time that actionable exists at.")
     rpm: float = Property(doc="Dwell centre revolutions per minute")
 
@@ -38,21 +36,15 @@ def test_dwell_action(initial_bearing):
                                  1)  # 1 revolution per minute
 
     generator = DwellActionsGenerator(actionable,
-                                      attribute="dwell_centre",
-                                      start_time=start,
-                                      end_time=end,
-                                      rpm=actionable.rpm)  # 15s maximum action duration
+                                      "dwell_centre",
+                                      start,
+                                      end)  # 15s maximum action duration
 
     # Test call and resolution
     generator()
     assert generator.resolution == np.radians(1)  # default resolution is 1 degree
-    assert generator.epsilon == np.radians(1e-6)
-    generator(np.radians(15))
-    assert generator.resolution == np.radians(15)  # calling with arg sets resolution to arg
-    assert generator.epsilon == np.radians(1e-6)  # tolerance does not change
-    generator(np.radians(30), np.radians(1e-7))
-    assert generator.resolution == np.radians(30)
-    assert generator.epsilon == np.radians(1e-7)
+    generator(np.radians(30))
+    assert generator.resolution == np.radians(30)  # calling with arg sets resolution to arg
 
     # Test value
     assert np.array_equal(generator.current_value, actionable.dwell_centre)
@@ -65,15 +57,15 @@ def test_dwell_action(initial_bearing):
     assert generator.rps == actionable.rpm / 60
 
     # Test angles
-    assert generator.angle_delta == pytest.approx(np.radians(90))
-    assert generator.min == pytest.approx(Angle(actionable.dwell_centre[0, 0]) - np.radians(90))
-    assert generator.max == pytest.approx(Angle(actionable.dwell_centre[0, 0]) + np.radians(90))
+    assert pytest.approx(generator.angle_delta, np.radians(90))
+    assert pytest.approx(generator.min, actionable.dwell_centre[0, 0] - np.radians(90))
+    assert pytest.approx(generator.max, actionable.dwell_centre[0, 0] + np.radians(90))
 
     # Test contains and end-time/direction
     for angle in np.linspace(0, 90, 10):
 
-        angle1 = Angle(actionable.dwell_centre[0, 0]) + Angle(np.radians(angle))
-        angle2 = Angle(actionable.dwell_centre[0, 0]) - Angle(np.radians(angle))
+        angle1 = actionable.dwell_centre[0, 0] + np.radians(angle)
+        angle2 = actionable.dwell_centre[0, 0] - np.radians(angle)
 
         # any bearing in [dwell - 90, dwell + 90] should be achievable
         assert angle1 in generator
@@ -107,8 +99,8 @@ def test_dwell_action(initial_bearing):
         else:
             assert increasing1
             assert not increasing2
-        assert rot_end1 == pytest.approx(rot_end)
-        assert rot_end2 == pytest.approx(rot_end)
+        assert pytest.approx(rot_end1, rot_end)
+        assert pytest.approx(rot_end2, rot_end)
 
     # Test iterable
     actions = [action for action in generator]
@@ -118,13 +110,12 @@ def test_dwell_action(initial_bearing):
     target_bearings = target_bearings.tolist()
     for action, target_bearing in zip(actions, target_bearings):
         # actions in value order and all values accounted for
-        assert action.target_value == pytest.approx(target_bearing)
+        assert pytest.approx(action.target_value, target_bearing)
 
     # Test action from value
-    generator(np.radians(20))
     for angle in np.linspace(0, 180, 10):
-        angle1 = Angle(actionable.dwell_centre[0, 0]) + np.radians(angle)
-        angle2 = Angle(actionable.dwell_centre[0, 0]) - np.radians(angle)
+        angle1 = actionable.dwell_centre[0, 0] + np.radians(angle)
+        angle2 = actionable.dwell_centre[0, 0] - np.radians(angle)
 
         action1 = generator.action_from_value(angle1)
         action2 = generator.action_from_value(angle2)
@@ -134,19 +125,9 @@ def test_dwell_action(initial_bearing):
             assert action2 is None
         else:
             assert isinstance(action1, ChangeDwellAction)
-            assert pytest.approx(action1.target_value) == angle1
+            assert pytest.approx(action1.target_value, angle1)
             assert isinstance(action2, ChangeDwellAction)
-            assert pytest.approx(action2.target_value) == angle2
-
-            # Test equality
-            if np.isclose(angle, 180) or np.isclose(angle, 0):
-                assert action1 == action2
-                assert hash(action1) == hash(action2)
-            else:
-                assert action1 != action2
-                assert hash(action1) != hash(action2)
-
-            assert action1 != 180  # not an action
+            assert pytest.approx(action2.target_value, angle2)
 
     # Test action from invalid
     with pytest.raises(ValueError, match="Can only generate action from an Angle/float/int type"):
