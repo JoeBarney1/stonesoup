@@ -77,6 +77,7 @@ class SensorDataReader(Reader):
 
 class FrameReader(SensorDataReader):
     """FrameReader base class
+
     A FrameReader produces :class:`~.SensorData` in the form of
     :class:`~ImageFrame` objects.
     """
@@ -89,6 +90,7 @@ class FrameReader(SensorDataReader):
     @BufferedGenerator.generator_method
     def frames_gen(self):
         """Returns a generator of frames for each time step.
+
         Yields
         ------
         : :class:`datetime.datetime`
@@ -101,10 +103,12 @@ class FrameReader(SensorDataReader):
     @BufferedGenerator.generator_method
     def sensor_data_gen(self):
         """Returns a generator of frames for each time step.
+
         Note
         ----
         This is just a wrapper around (and therefore performs identically
         to) :meth:`~frames_gen`.
+
         Yields
         ------
         : :class:`datetime.datetime`
