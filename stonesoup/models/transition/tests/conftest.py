@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import pytest
 import numpy as np
 from scipy.linalg import block_diag
@@ -37,7 +38,7 @@ class CT_helper:
 
         Q = np.array([[dt**3 / 3., dt**2 / 2.],
                       [dt**2 / 2., dt]])
-        C = block_diag(Q*q_x, Q*q_y, q*dt)
+        C = block_diag(Q*q_x**2, Q*q_y**2, q**2/dt)
 
         return C
 
