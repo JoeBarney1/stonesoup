@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from .base import Hypothesiser
 from ..base import Property
 from ..measures import ObservationAccuracy
@@ -9,7 +10,7 @@ from ..types.numeric import Probability
 from ..updater.categorical import HMMUpdater
 
 
-class HMMHypothesiser(Hypothesiser):
+class CategoricalHypothesiser(Hypothesiser):
     r"""Hypothesiser based on categorical distribution accuracy.
 
     This hypothesiser generates track predictions at detection times and scores each hypothesised
@@ -19,13 +20,14 @@ class HMMHypothesiser(Hypothesiser):
 
     predictor: HMMPredictor = Property(doc="Predictor used to predict tracks to detection times")
     updater: HMMUpdater = Property(doc="Updater used to get measurement prediction")
-    prob_detect: Probability = Property(default=Probability(0.99),
-                                        doc="Target Detection Probability")
-    prob_gate: Probability = Property(default=Probability(0.95),
-                                      doc="Gate Probability - prob. gate contains true "
-                                          "measurement if detected")
+    prob_detect: Probability = Property(
+        default=Probability(0.85),
+        doc="Target Detection Probability")
+    prob_gate: Probability = Property(
+        default=Probability(0.95),
+        doc="Gate Probability - prob. gate contains true measurement if detected")
 
-    def hypothesise(self, track, detections, timestamp, **kwargs):
+    def hypothesise(self, track, detections, timestamp):
         """ Evaluate and return all track association hypotheses.
 
         For a given track and a set of N available detections, return a MultipleHypothesis object
@@ -38,7 +40,7 @@ class HMMHypothesiser(Hypothesiser):
         track: :class:`~.Track`
             The track object to hypothesise on. Composed of :class:`~.CategoricalState` types.
         detections: :class:`set`
-            A set of :class:`~.CategoricalDetection` objects, representing the available
+            A set of :class:`~CategoricalDetection` objects, representing the available
             detections.
         timestamp: :class:`datetime.datetime`
             A timestamp used when evaluating the state and measurement predictions. Note that if a
@@ -48,15 +50,13 @@ class HMMHypothesiser(Hypothesiser):
         Returns
         -------
         : :class:`~.MultipleHypothesis`
-            A container of :class:`~.SingleProbabilityHypothesis` objects
+            A container of :class:`~SingleProbabilityHypothesis` objects
         """
 
         hypotheses = list()
 
         prediction = self.predictor.predict(track, timestamp=timestamp)
-
         probability = Probability(1 - self.prob_detect * self.prob_gate)
-
         hypotheses.append(
             SingleProbabilityHypothesis(
                 prediction,
@@ -65,13 +65,11 @@ class HMMHypothesiser(Hypothesiser):
             ))
 
         for detection in detections:
-            prediction = self.predictor.predict(track, timestamp=detection.timestamp)
+            prediction = self.predictor.predict(
+                track, timestamp=detection.timestamp)
 
             measurement_prediction = self.updater.predict_measurement(
-                predicted_state=prediction,
-                measurement_model=detection.measurement_model,
-                measurement_noise=False
-            )
+                prediction, detection.measurement_model, noise=False)
 
             probability = self.measure(measurement_prediction, detection)
             probability = probability * self.prob_detect
@@ -84,7 +82,6 @@ class HMMHypothesiser(Hypothesiser):
                     detection,
                     probability,
                     measurement_prediction))
-
         return MultipleHypothesis(hypotheses, normalise=False, total_weight=1)
 
     @property
