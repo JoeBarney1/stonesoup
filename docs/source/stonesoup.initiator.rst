@@ -15,18 +15,8 @@ Wrappers
 .. automodule:: stonesoup.initiator.wrapper
     :show-inheritance:
 
-Wrappers
---------
-.. automodule:: stonesoup.initiator.wrapper
-    :show-inheritance:
-
 Categorical
 -----------
 .. automodule:: stonesoup.initiator.categorical
     :show-inheritance:
 
-Composite
----------
-
-.. automodule:: stonesoup.initiator.composite
-    :show-inheritance:
