@@ -9,6 +9,7 @@ from scipy.stats import multivariate_normal
 
 from stonesoup.base import Property
 from stonesoup.types.groundtruth import GroundTruthState
+from stonesoup.types.state import CreatableFromState
 from ..angle import Bearing
 from ..array import StateVector, CovarianceMatrix
 from ..numeric import Probability
@@ -407,3 +408,14 @@ def test_from_state():
     assert np.array_equal(new_state.state_vector, states[2].state_vector)
     assert new_state.timestamp == states[2].timestamp
     assert new_state.metadata == new_metadata
+
+
+# noinspection PyUnusedLocal
+def test_creatable_from_state_error():
+    class SubclassCfs(CreatableFromState):
+        pass
+    with pytest.raises(TypeError,
+                       match='The first superclass of a CreatableFromState subclass must be a '
+                             'CreatableFromState \\(or a subclass\\)'):
+        class SubSubclassCfs(State, SubclassCfs):
+            pass
