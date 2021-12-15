@@ -6,7 +6,7 @@ from typing import Sequence
 from .base import MetricGenerator
 from ..base import Property
 from ..types.state import GaussianState
-from ..types.groundtruth import GroundTruthState, GroundTruthPath
+from ..types.groundtruth import GroundTruthPath
 from ..types.array import StateVectors
 from ..models.transition import TransitionModel
 from ..models.measurement import MeasurementModel
@@ -16,17 +16,13 @@ from ..types.time import TimeRange
 
 class PCRBMetric(MetricGenerator):
     """
-    Computes the Posterior Cramer-Rao Bound (PCRB) [1] for a given ground truth prior, using a
-    Riccati recursion [2]. PCRB provides a MSE bound on the performance of unbiased filtering
-    algorithms.
+    Computes the Posterior Cramer Rao Bound (PCRB) [1] for a given ground truth prior. PCRB
+    provides a MSE bound on the performance of unbiased filtering algorithms.
 
     Reference:
-        [1] M. L. Hernandez, B. Ristic and A. Farina, "A performance bound for maneuvering target
-        tracking using best-fitting Gaussian distributions," 2005 7th International Conference on
-        Information Fusion, 2005, pp. 8 pp.-, doi: 10.1109/ICIF.2005.1591829.
-        [2] P. Tichavsky, C. H. Muravchik and A. Nehorai, "Posterior Cramer-Rao bounds for
-        discrete-time nonlinear filtering," in IEEE Transactions on Signal Processing, vol. 46,
-        no. 5, pp. 1386-1396, May 1998, doi: 10.1109/78.668800.
+        [1] M. L. Hernandez and A. Farina, "Posterior Cramér-Rao Bound for Target Tracking in the
+        Presence of Multipath," 2018 21st International Conference on Information Fusion (FUSION),
+        2018, pp. 151-158, doi: 10.23919/ICIF.2018.8455619.
     """
     prior: GaussianState = Property(doc="The prior used to initiate the track")
     transition_model: TransitionModel = Property(
@@ -44,11 +40,6 @@ class PCRBMetric(MetricGenerator):
         doc="Mapping for velocity coordinates. Default `None`, in which case velocity RMSE is not "
             "computed")
     irf: float = Property(doc="Information reduction factor. Default is 1", default=1.)
-    truths_key: str = Property(doc="Key to access set of ground truths added to MetricManager",
-                               default='groundtruth_paths')
-    generator_name: str = Property(doc="Unique identifier to use when accessing generated "
-                                       "metrics from MultiManager",
-                                   default='pcrb_generator')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,15 +47,8 @@ class PCRBMetric(MetricGenerator):
             self.position_mapping = self.measurement_model.mapping
 
     def compute_metric(self, manager, **kwargs):
-        groundtruth_paths = self._get_data(manager, self.truths_key)
         pcrb_metrics = []
-
-        # if groundtruth is a set of states not paths, make states into a path
-        if isinstance(next(iter(groundtruth_paths)), GroundTruthState):
-            groundtruth_paths = sorted(list(groundtruth_paths), key=lambda x: x.timestamp)
-            groundtruth_paths = [GroundTruthPath(groundtruth_paths)]
-
-        for gnd_path in groundtruth_paths:
+        for gnd_path in manager.groundtruth_paths:
             pcrb_metric = self._compute_pcrb_single(self.prior, self.transition_model,
                                                     self.measurement_model, gnd_path,
                                                     self.sensor_locations, self.irf,
