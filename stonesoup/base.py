@@ -228,10 +228,6 @@ class BaseMeta(ABCMeta):
 
     _repr = BaseRepr()
 
-    @classmethod
-    def __prepare__(mcls, name, bases, **kwargs):
-        return OrderedDict()
-
     def __new__(mcls, name, bases, namespace):
 
         properties = OrderedDict()
