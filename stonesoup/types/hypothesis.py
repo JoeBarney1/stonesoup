@@ -2,12 +2,14 @@
 
 from abc import abstractmethod
 from collections import UserDict
+from typing import Sequence
 
 import numpy as np
 
 from .base import Type
-from .detection import Detection, MissedDetection
-from .prediction import MeasurementPrediction, Prediction
+from .detection import Detection, MissedDetection, CompositeDetection
+from .prediction import MeasurementPrediction, Prediction, CompositePrediction, \
+    CompositeMeasurementPrediction
 from ..base import Property
 from ..types.numeric import Probability
 
