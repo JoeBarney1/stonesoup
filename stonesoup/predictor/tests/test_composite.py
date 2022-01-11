@@ -1,12 +1,15 @@
+# coding: utf-8
 from datetime import datetime, timedelta
 
 import numpy as np
 import pytest
 from scipy.stats import multivariate_normal
 
-from ...models.transition.categorical import MarkovianTransitionModel
+from ...models.transition.categorical import CategoricalTransitionModel
 from ...models.transition.linear import RandomWalk, \
     CombinedLinearGaussianTransitionModel
+from ...models.transition.tests.test_categorical import create_categorical, \
+    create_categorical_matrix
 from ...predictor.categorical import HMMPredictor
 from ...predictor.composite import CompositePredictor
 from ...predictor.kalman import KalmanPredictor, ExtendedKalmanPredictor, \
@@ -15,6 +18,7 @@ from ...predictor.particle import ParticlePredictor, ParticleFlowKalmanPredictor
 from ...types.array import StateVector
 from ...types.array import StateVectors
 from ...types.numeric import Probability
+from ...types.particle import Particles
 from ...types.prediction import CompositePrediction
 from ...types.state import ParticleState, CategoricalState
 from ...types.state import State, GaussianState, CompositeState
@@ -31,14 +35,14 @@ def create_state(gaussian: bool, particles: bool, ndim_state: int, timestamp: da
             # create particle state
             number_particles = 1000
             samples = multivariate_normal.rvs(sv.flatten(), cov, size=number_particles)
-            return ParticleState(state_vector=StateVectors(samples.T),
-                                 weight=np.array(
-                                     [Probability(1 / number_particles)] * number_particles),
-                                 timestamp=timestamp)
+            particles = Particles(state_vector=StateVectors(samples.T),
+                                  weight=np.array(
+                                      [Probability(1 / number_particles)] * number_particles))
+            return ParticleState(particles, timestamp=timestamp)
         return GaussianState(sv, cov, timestamp=timestamp)
     else:
         # create categorical state
-        return CategoricalState(np.random.rand(ndim_state), timestamp=timestamp)
+        return CategoricalState(create_categorical(ndim_state), timestamp=timestamp)
 
 
 def create_transition_model(gaussian: bool, ndim_state: int):
@@ -48,7 +52,7 @@ def create_transition_model(gaussian: bool, ndim_state: int):
         models = ndim_state * [RandomWalk(0.1)]
         return CombinedLinearGaussianTransitionModel(models)
     else:
-        return MarkovianTransitionModel(np.random.rand(ndim_state, ndim_state))
+        return CategoricalTransitionModel(create_categorical_matrix(ndim_state, ndim_state).T)
 
 
 def random_predictor_and_prior(num_predictors, timestamp):
@@ -82,6 +86,7 @@ def random_predictor_and_prior(num_predictors, timestamp):
 
 @pytest.mark.parametrize('num_predictors', [1, 2, 3, 4, 5, 6])
 def test_composite_predictor(num_predictors):
+
     now = datetime.now()
     future = now + timedelta(seconds=5)
 
