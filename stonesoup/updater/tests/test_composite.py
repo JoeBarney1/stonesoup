@@ -1,11 +1,13 @@
+# coding: utf-8
 import datetime
 from copy import copy
 
 import numpy as np
 import pytest
 
-from ...models.measurement.categorical import MarkovianMeasurementModel
+from ...models.measurement.categorical import CategoricalMeasurementModel
 from ...models.measurement.linear import LinearGaussian
+from ...models.transition.tests.test_categorical import create_categorical_matrix
 from ...predictor.tests.test_composite import create_state
 from ...types.detection import Detection, CompositeDetection, CategoricalDetection, MissedDetection
 from ...types.hypothesis import SingleHypothesis, CompositeHypothesis
@@ -25,8 +27,10 @@ def create_measurement_model(gaussian: bool, ndim_state: int):
                               noise_covar=np.eye(ndim_state),
                               mapping=np.arange(ndim_state))
     else:
-        return MarkovianMeasurementModel(
-            emission_matrix=np.random.rand(ndim_state, ndim_state)
+        return CategoricalMeasurementModel(
+            ndim_state=ndim_state,
+            emission_matrix=create_categorical_matrix(ndim_state, ndim_state),
+            emission_covariance=0.1 * np.eye(2)
         )
 
 
@@ -63,7 +67,7 @@ def random_updater_prediction_and_measurement(num_updaters, timestamp):
             timestamp=timestamp,
             measurement_model=sub_updaters[2].measurement_model),
         Detection(
-            state_vector=create_state(True, False, ndim_states[3], timestamp).state_vector,
+            state_vector=create_state(True, True, ndim_states[3], timestamp).state_vector,
             timestamp=timestamp,
             measurement_model=sub_updaters[3].measurement_model),
         CategoricalDetection(
@@ -84,8 +88,6 @@ def test_composite_updater(num_updaters):
     now = datetime.datetime.now()
 
     updater, prediction, measurement = random_updater_prediction_and_measurement(num_updaters, now)
-    if any(isinstance(updater, ParticleUpdater) for updater in updater.sub_updaters):
-        pytest.xfail("Can't use ParticleState within CompositeState")
 
     sub_updaters = updater.sub_updaters
 
