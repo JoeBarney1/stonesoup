@@ -1,10 +1,10 @@
+# -*- coding: utf-8 -*-
 from datetime import datetime
 
 import numpy as np
 import pytest
 
-from stonesoup.updater.categorical import HMMUpdater
-from ..categorical import SimpleCategoricalMeasurementInitiator
+from ..categorical import SimpleCategoricalInitiator
 from ..composite import CompositeUpdateInitiator
 from ..simple import SinglePointInitiator, GaussianParticleInitiator
 from ...predictor.tests.test_composite import create_state
@@ -43,7 +43,7 @@ def composite_measurements(num_sub_states, ndim_states, timestamp):
                 timestamp=timestamp,
                 measurement_model=measurement_models[2]),
             Detection(
-                state_vector=create_state(True, False, ndim_states[3], timestamp).state_vector,
+                state_vector=create_state(True, True, ndim_states[3], timestamp).state_vector,
                 timestamp=timestamp,
                 measurement_model=measurement_models[3]),
             CategoricalDetection(
@@ -92,7 +92,7 @@ def initiators_measurement(num_sub_states, timestamp):
         SinglePointInitiator(sub_priors[1]),
         SinglePointInitiator(sub_priors[2]),
         GaussianParticleInitiator(SinglePointInitiator(sub_priors[3])),
-        SimpleCategoricalMeasurementInitiator(sub_priors[4], HMMUpdater())
+        SimpleCategoricalInitiator(sub_priors[4])
     ]
 
     measurements = composite_measurements(num_sub_states, ndim_states, timestamp)
