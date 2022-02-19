@@ -6,13 +6,11 @@ import pytest
 import scipy.linalg
 
 from ..angle import Bearing
-from ..array import StateVector, CovarianceMatrix
-from ..groundtruth import GroundTruthState
+from ..array import StateVector, StateVectors CovarianceMatrix
 from ..numeric import Probability
 from ..particle import Particle
-from ..state import CreatableFromState
-from ..state import State, GaussianState, ParticleState, StateMutableSequence, \
-    WeightedGaussianState, SqrtGaussianState, CategoricalState, CompositeState
+from ..state import State, GaussianState, ParticleState, EnsembleState, \
+    StateMutableSequence, WeightedGaussianState, SqrtGaussianState, CategoricalState
 from ...base import Property
 
 
@@ -367,61 +365,54 @@ def test_categorical_state():
     assert str(state) == "P(0) = 0.25,\nP(1) = 0.3,\nP(2) = 0.45"
 
     # Test category
-    assert state.category == '2'
+    assert state.category == 'yellow'
+    
+def test_ensemblestate():
 
+    # 1D
+    state_vector1 = StateVector(np.array([1.5]))
+    state_vector2 = StateVector(np.array([0.5]))
+    list_of_state_vectors = [state_vector1, state_vector2]
+    ensemble = StateVectors(list_of_state_vectors)
+    
+    # Test state without timestamp
+    state = EnsembleState(ensemble)
+    assert np.allclose(state.state_vector, StateVector([[1]]))
+    assert np.allclose(state.covar, CovarianceMatrix([[0.5]]))
 
-def test_composite_state_timestamp():
-    with pytest.raises(ValueError,
-                       match="All sub-states must share the same timestamp if defined"):
-        CompositeState([State([0], timestamp=1), State([0], timestamp=2)])
-    with pytest.raises(ValueError,
-                       match="Sub-state timestamps and default timestamp must be the same if "
-                             "defined"):
-        CompositeState([State([0], timestamp=1)], default_timestamp=2)
-    with pytest.raises(ValueError,
-                       match="Sub-state timestamps and default timestamp must be the same if "
-                             "defined"):
-        CompositeState([State([0], timestamp=1), State([0], timestamp=1)], default_timestamp=2)
+    # Test state with timestamp
+    timestamp = datetime.datetime(2021, 2, 25, 22, 29, 2)
+    state = EnsembleState(ensemble, timestamp=timestamp)
+    assert np.allclose(state.state_vector, StateVector([[1]]))
+    assert np.allclose(state.covar, CovarianceMatrix([[0.5]]))
+    assert state.timestamp == timestamp
 
-    for i in range(1, 4):
-        assert CompositeState(i * [State([0], timestamp=1)]).timestamp == 1
-        assert CompositeState(i * [State([0], timestamp=1)],
-                              default_timestamp=1).timestamp == 1
-        assert CompositeState(i * [State([0])]).timestamp is None
+    # 2D
+    state_vector1 = StateVector(np.array([1.5,0.75]))
+    state_vector2 = StateVector(np.array([0.5,1.25]))
+    ensemble = StateVectors([state_vector1, state_vector2])
 
+    state = EnsembleState(ensemble)
+    assert np.allclose(state.state_vector, StateVector([[1], [1]]))
+    assert np.allclose(state.covar, CovarianceMatrix([[0.5, -0.25], [-0.25, 0.125]]))
+    assert np.allclose(state.sqrt_covar @ state.sqrt_covar.T, state.covar)
+    
+def test_ensemblestate_gaussian_init():
+    """Test initialising with an existing gaussian state object"""
+    
+    #Initialize GaussianState
+    mean = StateVector([[25], [25], [25], [25]])
+    covar = CovarianceMatrix(np.eye(4))
+    timestamp = datetime.datetime(2021, 2, 26, 16, 35, 42)
+    gaussian_state = GaussianState(mean,covar,timestamp)
+    #Generate EnsembleState
+    num_vectors = 500
+    ensemble_state = EnsembleState.from_gaussian_state(gaussian_state, num_vectors)
 
-def test_composite_state():
-    # Test error on empty composite
-    with pytest.raises(ValueError, match="Cannot create an empty composite state"):
-        CompositeState([])
-
-    a = State([0, 1], timestamp=1)
-    b = State([2], timestamp=1)
-    c = State([3, 4], timestamp=1)
-    sub_states = [a, b, c]
-    state = CompositeState(sub_states)
-
-    # Test state vectors
-    for actual, expected in zip(state.state_vectors,
-                                [StateVector([0, 1]), StateVector([2]), StateVector([3, 4])]):
-        assert (actual == expected).all()
-
-    # Test state vector
-    assert (state.state_vector == StateVector([0, 1, 2, 3, 4])).all()
-
-    # Test contains and getitem
-    for index, sub_state in enumerate(sub_states):
-        assert sub_state in state
-        assert state[index] is sub_state
-    assert State([5, 6], timestamp=1) not in state
-    assert "a" not in state
-    state_slice = state[1:]
-    assert isinstance(state_slice, CompositeState)
-    assert state_slice.sub_states == sub_states[1:]
-
-    # Test iter
-    for exp_sub_state, actual_sub_state in zip(sub_states, state):
-        assert exp_sub_state is actual_sub_state
-
-    # Test len
-    assert len(state) == 3
+    
+    assert isinstance(ensemble_state.state_vector,StateVector)
+    assert isinstance(ensemble_state.ensemble,StateVectors)
+    assert isinstance(ensemble_state.covar,CovarianceMatrix)
+    assert isinstance(ensemble_state.timestamp,datetime.datetime)
+    assert ensemble_state.timestamp == timestamp
+    

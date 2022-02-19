@@ -3,9 +3,9 @@ from typing import Sequence
 
 from .array import CovarianceMatrix
 from .base import Type
-from .state import (State, GaussianState, ParticleState, SqrtGaussianState, InformationState,
-                    TaggedWeightedGaussianState, WeightedGaussianState, CategoricalState)
-from ..base import Property
+from .state import (State, GaussianState, ParticleState, EnsembleState, 
+                    SqrtGaussianState, InformationState, TaggedWeightedGaussianState,
+                    WeightedGaussianState, CategoricalState)
 from ..models.transition.base import TransitionModel
 from ..types.state import CreatableFromState, CompositeState
 
@@ -117,6 +117,18 @@ class ParticleMeasurementPrediction(MeasurementPrediction, ParticleState):
     This is a simple Particle measurement prediction object.
     """
 
+class EnsembleMeasurementPrediction(MeasurementPrediction, EnsembleState):
+    """EnsembleMeasurementPrediction type
+    
+    This is a simple Ensemble measurement prediction object.
+    """
+
+class EnsembleStatePrediction(Prediction, EnsembleState):
+    """EnsembleStatePrediction type
+
+    This is a simple Ensemble measurement prediction object.
+    """
+    
 
 class CategoricalStatePrediction(Prediction, CategoricalState):
     """Categorical state prediction type"""

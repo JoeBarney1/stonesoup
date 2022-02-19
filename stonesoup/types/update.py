@@ -2,7 +2,9 @@
 from typing import Sequence
 
 from .base import Type
-from .hypothesis import Hypothesis, CompositeHypothesis
+from .hypothesis import Hypothesis
+from .state import State, GaussianState, ParticleState, EnsembleState, \
+                    SqrtGaussianState, InformationState, CategoricalState
 from .mixture import GaussianMixture
 from .state import CreatableFromState, CompositeState
 from .state import State, GaussianState, ParticleState, SqrtGaussianState, \
@@ -59,6 +61,11 @@ class ParticleStateUpdate(Update, ParticleState):
     This is a simple Particle state update object.
     """
 
+class EnsembleStateUpdate(Update, EnsembleState):
+    """EnsembleStateUpdate type
+
+    This is a simple Ensemble state update object.
+    """
 
 class InformationStateUpdate(Update, InformationState):
     """ InformationUpdate type

@@ -6,7 +6,7 @@ from typing import MutableSequence, Sequence
 
 import numpy as np
 
-from .array import StateVector, CovarianceMatrix, PrecisionMatrix
+from .array import StateVector, StateVectors, CovarianceMatrix, PrecisionMatrix
 from .base import Type
 from .numeric import Probability
 from .particle import Particles
@@ -508,85 +508,120 @@ class CategoricalState(State):
 
     @property
     def category(self):
-        """Return the name of the most likely category."""
-        return self.categories[np.argmax(self.state_vector)]
+        """Return the name of the most likely category"""
+        return self.category_names[np.argmax(self.state_vector)]
+    
+class EnsembleState(Type):
+        """Ensemble State type
 
+        This is an Ensemble state object which describes the system state as a
+        ensemble of state vectors for use in Ensemble based filters.
+        
+        This approach is functionally identical to the Particle state type except 
+        it doesn't use any weighting for any of the "particles" or ensemble members.
+        All "particles" or state vectors in the ensemble are equally weighted."""
+        
+        ensemble: StateVectors = Property(doc='''An ensemble of state vectors which represent
+                                    the state''')
 
-class CompositeState(Type):
-    """Composite state type.
+        timestamp: datetime.datetime = Property(
+            default=None, doc="Timestamp of the state. Default None.")
 
-    A composition of ordered sub-states (:class:`State`) existing at the same timestamp,
-    representing an object with a state for (potentially) multiple, distinct state spaces.
-    """
+        @classmethod
+        def from_gaussian_state(self, gaussian_state, num_vectors, *args, **kwargs):
+            """
+            Returns an EnsembleState instance, from a given
+            GaussianState object.
 
-    sub_states: Sequence[State] = Property(
-        doc="Sequence of sub-states comprising the composite state. All sub-states must have "
-            "matching timestamp. Must not be empty.")
-    default_timestamp: datetime.datetime = Property(
-        default=None,
-        doc="Default timestamp if no sub-states exist to attain timestamp from. Defaults to "
-            "`None`, whereby sub-states will be required to have timestamps.")
+            Parameters
+            ----------
+            gaussian_state : :class:`~.GaussianState`
+                The GaussianState used to create the new EnsembleState.
+            num_vectors : :type:`~.int`
+                The number of desired column vectors present in the ensemble.            
 
-    def __init__(self, *args, **kwargs):
+            Returns
+            -------
+            :class:`~.EnsembleState`
+                Instance of EnsembleState.
+            """
+            
+            mean = gaussian_state.state_vector.reshape((gaussian_state.ndim,))
+            covar = gaussian_state.covar
+            timestamp = gaussian_state.timestamp
 
-        super().__init__(*args, **kwargs)
+            return EnsembleState(ensemble=self.generate_ensemble(mean,covar,num_vectors),
+                                 timestamp=timestamp,
+                                 *args, **kwargs)
+        
+        @classmethod
+        def generate_ensemble(self, mean, covar, num_vectors):
+            """
+            Returns a StateVectors wrapped ensemble of state vectors, from a given
+            mean and covariance matrix.
 
-        if len(self.sub_states) == 0:
-            raise ValueError("Cannot create an empty composite state")
+            Parameters
+            ----------
+            mean : :class:`~.numpy.ndarray`
+                The mean value of the distribution being sampled to generate ensemble.
+            covar : :class:`~.numpy.ndarray`
+                The covariance matrix of the distribution being sampled to generate ensemble.
+            num_vectors : :type:`~.int`
+                The number of desired column vectors present in the ensemble, or the 
+                number of samples.            
 
-        self._check_timestamp()  # validate timestamps of sub-states
+            Returns
+            -------
+            :class:`~.EnsembleState`
+                Instance of EnsembleState.
+            """
+            
+            #This check is necessary, because the StateVector wrapper does funny things with dimension.
+            rng = np.random.default_rng()
+            if mean.ndim != 1:
+                mean = mean.reshape(len(mean))
+            if mean.dtype == np.dtype('O'):
+                mean = np.array(mean,dtype=float)
+            try:
+                ensemble = StateVectors([StateVector((rng.multivariate_normal(mean, covar)))
+                                                 for n in range(num_vectors)])
+            #If covar is univariate, then use the univariate noise generation function.
+            except ValueError:
+                ensemble = StateVectors(
+                    [StateVector((rng.normal(mean, covar))) for n in range(num_vectors)])
+            
+            return ensemble
+        
 
-    @property
-    def timestamp(self):
-        return self.default_timestamp
+        @property
+        def ndim(self):
+            """Number of dimensions in state vectors"""
+            return np.shape(self.ensemble)[0]
+        
+        @property
+        def num_vectors(self):
+            """Number of columns in state ensemble"""
+            return np.shape(self.ensemble)[1]
+        
+        @property
+        def mean(self):
+            """The state mean, numerically equivalent to state vector"""
+            return np.average(self.ensemble,axis=1)
 
-    def _check_timestamp(self):
-        """Check all timestamps are equal. Replace empty sub-state timestamps with validated
-        timestamp."""
+        @property
+        def state_vector(self):
+            """State mean in StateVector wrapper."""
+            return StateVector(self.mean)
 
-        self._timestamp = None
+        @property
+        def covar(self):
+            """Sample covariance matrix for ensemble"""
+            return np.cov(self.ensemble)
+           
+        @property
+        def sqrt_covar(self):
+            """sqrt of sample covariance matrix for ensemble, useful for some EnKF algorithms"""
+            return (self.ensemble - np.tile(self.mean,self.num_vectors))/np.sqrt(self.num_vectors-1)
+            
+State.register(EnsembleState)
 
-        sub_timestamps = {sub_state.timestamp
-                          for sub_state in self.sub_states
-                          if sub_state.timestamp}
-
-        if len(sub_timestamps) > 1:
-            raise ValueError("All sub-states must share the same timestamp if defined")
-
-        if (sub_timestamps and self.default_timestamp
-                and not sub_timestamps == {self.default_timestamp}):
-            raise ValueError("Sub-state timestamps and default timestamp must be the same if "
-                             "defined")
-
-        if sub_timestamps:
-            self.default_timestamp = sub_timestamps.pop()
-
-        for sub_state in self.sub_states:
-            sub_state.timestamp = self.default_timestamp
-
-    @property
-    def state_vectors(self):
-        return [state.state_vector for state in self.sub_states]
-
-    @property
-    def state_vector(self):
-        """A combination of the component states' state vectors."""
-        return StateVector(np.concatenate(self.state_vectors))
-
-    def __contains__(self, item):
-
-        return self.sub_states.__contains__(item)
-
-    def __getitem__(self, index):
-        if isinstance(index, slice):
-            return self.__class__(self.sub_states.__getitem__(index))
-        return self.sub_states.__getitem__(index)
-
-    def __iter__(self):
-        return self.sub_states.__iter__()
-
-    def __len__(self):
-        return self.sub_states.__len__()
-
-
-State.register(CompositeState)  # noqa: E305
