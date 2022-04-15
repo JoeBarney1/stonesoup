@@ -86,33 +86,6 @@ class SwitchOneTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
         return self.transition_models[self.index]
 
 
-class SwitchOneTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
-    """Target simulator that produces a single target. This target switches
-    between multiple transition models based on a markov matrix
-    (:attr:`model_probs`)"""
-    transition_models: Sequence[TransitionModel] = Property(
-        doc="List of transition models to be used, ensure that they all have the same dimensions.")
-    model_probs: np.ndarray = Property(doc="A matrix of probabilities.\
-    The element in the ith row and the jth column is the probability of\
-     switching from the ith transition model in :attr:`transition_models`\
-     to the jth")
-    seed: Optional[int] = Property(default=None, doc="Seed for random number generation."
-                                                     " Default None")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.seed is not None:
-            self.random_state = np.random.RandomState(self.seed)
-        else:
-            self.random_state = np.random.mtrand._rand
-
-    @property
-    def transition_model(self):
-        self.index = self.random_state.choice(range(0, len(self.transition_models)),
-                                              p=self.model_probs[self.index])
-        return self.transition_models[self.index]
-
-
 class MultiTargetGroundTruthSimulator(SingleTargetGroundTruthSimulator):
     """Target simulator that produces multiple targets.
 

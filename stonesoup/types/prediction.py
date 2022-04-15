@@ -6,6 +6,9 @@ from .base import Type
 from .state import (State, GaussianState, ParticleState, EnsembleState, 
                     SqrtGaussianState, InformationState, TaggedWeightedGaussianState,
                     WeightedGaussianState, CategoricalState)
+from .state import (State, GaussianState, ParticleState, SqrtGaussianState, InformationState,
+                    TaggedWeightedGaussianState, WeightedGaussianState, CategoricalState)
+from ..base import Property
 from ..models.transition.base import TransitionModel
 from ..types.state import CreatableFromState, CompositeState
 
