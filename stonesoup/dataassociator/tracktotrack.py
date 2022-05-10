@@ -16,13 +16,14 @@ from .general import OneToOneAssociatorWithGates, RecentTrackMeasure, GenericMea
 
 
 class TrackToTrackCounting(TrackToTrackAssociator):
-    """Track to track associator based on the Counting Technique [1]_.  Sagild et al, 2021.
+    """Track to track associator based on the Counting Technique
 
     Compares two sets of :class:`~.tracks`, each formed of a sequence of
     :class:`~.State` objects and returns an :class:`~.Association` object for
-    each time at which a the two :class:`~.State` within the :class:`~.tracks`
+    each time at which the two :class:`~.State` within the :class:`~.tracks`
     are assessed to be associated.
 
+    Uses an algorithm called the Counting Technique [1]_.  Sagild et al, 2021.
     Associations are triggered by track states being within a threshold
     distance for a given number of timestamps. Associations are terminated when
     either the two :class:`~.tracks` end or the two :class:`~.State` are
@@ -34,7 +35,9 @@ class TrackToTrackCounting(TrackToTrackAssociator):
     If, at a specific time step, the :class:`~.State` of one of the
     :class:`~.tracks` is assessed as close to more than one track then an
     :class:`~.Association` object will be return for all possible association
-    combinations
+    combinations.
+
+    ----
 
     References
         ----------
@@ -61,14 +64,14 @@ class TrackToTrackCounting(TrackToTrackAssociator):
         default=EuclideanWeighted([0]),
         doc="Distance measure to use. Must use :class:`~.measures.EuclideanWeighted()` if "
             "`use_positional_only` set to True.  Default :class:`~.measures.EuclideanWeighted()` "
-            "(using equal weights unless use_positional_only is set to True)")
+            "(using equal weights unless :attr:`use_positional_only` is set to `True`)")
     mapping: list = Property(
         doc="List of items specifying the mapping of the position components "
             "of the state space")
     use_positional_only: bool = Property(
         default=True,
-        doc="If True, the differences in velocity/acceleration values for each state are ignored "
-            "in the calculation for the association threshold.  Default is True"
+        doc="If `True`, the differences in velocity/acceleration values for each state are "
+            "ignored in the calculation for the association threshold.  Default is `True`"
     )
     position_weighting: float = Property(
         default=0.6,
