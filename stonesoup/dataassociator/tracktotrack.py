@@ -79,6 +79,11 @@ class TrackToTrackCounting(TwoTrackToTrackAssociator):
             "position components compared to others (such as velocity).  "
             "Default is 0.6"
     )
+    one_to_one: bool = Property(
+        default=False,
+        doc="If True, the Hungarian Algorithm is applied to the results so that no track is "
+            "associated with more than one other at any given time step"
+    )
 
     def associate_tracks(self, tracks_set_1: Set[Track], tracks_set_2: Set[Track]):
         """Associate two sets of tracks together.
@@ -182,7 +187,10 @@ class TrackToTrackCounting(TwoTrackToTrackAssociator):
                         (track1, track2),
                         TimeRange(start_timestamp, end_timestamp)))
 
-        return AssociationSet(associations)
+        if self.one_to_one:
+            return AssociationSet(associations).association_deconflicter()
+        else:
+            return AssociationSet(associations)
 
 
 class TrackToTruth(TwoTrackToTrackAssociator):
