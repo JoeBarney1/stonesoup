@@ -19,7 +19,7 @@ except ImportError:
 
 from .types import detection
 from .types.state import StateMutableSequence
-from .models.base import LinearModel, NonLinearModel, Model
+from .models.base import LinearModel, Model
 
 from enum import Enum
 
