@@ -278,9 +278,10 @@ class Plotter:
             if same_colour:
                 tracks_kwargs['color'] = plt.getp(line[0], 'color')
 
-        # Assuming a single track or all plotted as the same colour then the following will work.
-        # Otherwise will just render the final track colour.
-        tracks_kwargs['color'] = plt.getp(line[0], 'color')
+        if tracks:  # If no tracks `line` won't be defined
+            # Assuming a single track or all plotted as the same colour then the following will
+            # work. Otherwise will just render the final track colour.
+            tracks_kwargs['color'] = plt.getp(line[0], 'color')
 
         # Generate legend items for track
         track_handle = Line2D([], [], linestyle=tracks_kwargs['linestyle'],
