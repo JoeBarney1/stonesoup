@@ -134,14 +134,8 @@ class Euclidean(Measure):
 
         """
         # Calculate Euclidean distance between two state
-        if hasattr(state1, 'mean'):
-            state_vector1 = state1.mean
-        else:
-            state_vector1 = state1.state_vector
-        if hasattr(state2, 'mean'):
-            state_vector2 = state2.mean
-        else:
-            state_vector2 = state2.state_vector
+        state_vector1 = getattr(state1, 'mean', state1.state_vector)
+        state_vector2 = getattr(state2, 'mean', state2.state_vector)
 
         if self.mapping is not None:
             return distance.euclidean(state_vector1[self.mapping, 0],
@@ -188,14 +182,8 @@ class EuclideanWeighted(Measure):
             :class:`~.State` objects
 
         """
-        if hasattr(state1, 'mean'):
-            state_vector1 = state1.mean
-        else:
-            state_vector1 = state1.state_vector
-        if hasattr(state2, 'mean'):
-            state_vector2 = state2.mean
-        else:
-            state_vector2 = state2.state_vector
+        state_vector1 = getattr(state1, 'mean', state1.state_vector)
+        state_vector2 = getattr(state2, 'mean', state2.state_vector)
 
         if self.mapping is not None:
             return distance.euclidean(state_vector1[self.mapping, 0],
@@ -237,14 +225,8 @@ class Mahalanobis(Measure):
             objects
 
         """
-        if hasattr(state1, 'mean'):
-            state_vector1 = state1.mean
-        else:
-            state_vector1 = state1.state_vector
-        if hasattr(state2, 'mean'):
-            state_vector2 = state2.mean
-        else:
-            state_vector2 = state2.state_vector
+        state_vector1 = getattr(state1, 'mean', state1.state_vector)
+        state_vector2 = getattr(state2, 'mean', state2.state_vector)
 
         if self.mapping is not None:
             u = state_vector1[self.mapping, 0]
