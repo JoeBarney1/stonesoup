@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 
 from stonesoup.types.detection import GaussianDetection
@@ -19,20 +20,14 @@ class Tracks2GaussianDetectionFeeder(DetectionFeeder):
     @BufferedGenerator.generator_method
     def data_gen(self):
         for time, tracks in self.reader:
-            detections = set()
+            detections = []
             for track in tracks:
                 dim = len(track.state.state_vector)
-                metadata = track.metadata.copy()
-                metadata['track_id'] = track.id
-                detections.add(
+                detections.append(
                     GaussianDetection.from_state(
                         track.state,
-                        state_vector=track.mean,
-                        covar=track.covar,
-                        measurement_model=LinearGaussian(
-                            dim, list(range(dim)), np.asarray(track.covar)),
-                        metadata=metadata,
+                        measurement_model=LinearGaussian(dim, range(dim), np.asarray(track.covar)),
                         target_type=GaussianDetection)
                 )
-
+            print('Detections:', detections)
             yield time, detections

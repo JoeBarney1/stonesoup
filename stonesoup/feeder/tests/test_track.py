@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import pytest
 import numpy as np
 
@@ -34,22 +35,16 @@ def test_Track2GaussianDetectionFeeder(tracks):
     assert len(detections) == len(tracks)
 
     # Check that the correct state was taken from each track
-    assert np.all([detection.timestamp == track.timestamp
-                   for track in tracks
-                   for detection in detections if detection.metadata['track_id'] == track.id])
-    assert np.all([detection.timestamp == time for detection in detections])
+    assert np.all([detections[i].timestamp == tracks[i][-1].timestamp for i in range(len(tracks))])
+    assert np.all([detections[i].timestamp == time for i in range(len(tracks))])
 
     # Check that the dimension of each detection is correct
-    assert np.all([len(detection.state_vector) == len(track.state_vector)
-                   for track in tracks
-                   for detection in detections if detection.metadata['track_id'] == track.id])
+    assert np.all([len(detections[i].state_vector) == len(tracks[i][-1].state_vector)
+                   for i in range(len(tracks))])
     assert np.all([len(detection.state_vector) == detection.measurement_model.ndim
                    for detection in detections])
 
     # Check that the detection has the correct mean and covariance
-    for track in tracks:
-        detection = next(iter(detection
-                              for detection in detections
-                              if detection.metadata['track_id'] == track.id))
-        assert np.all(detection.state_vector == track.state_vector)
-        assert np.all(detection.covar == track.covar)
+    for i in range(len(tracks)):
+        assert np.all(detections[i].state_vector == tracks[i][-1].state_vector)
+        assert np.all(detections[i].covar == tracks[i][-1].covar)
