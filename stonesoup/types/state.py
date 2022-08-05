@@ -1,4 +1,3 @@
-import copy
 import datetime
 import uuid
 from collections import abc

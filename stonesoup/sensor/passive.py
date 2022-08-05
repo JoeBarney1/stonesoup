@@ -1,4 +1,5 @@
-# -*- coding: utf-8 -*-
+from typing import Set, Union
+
 import numpy as np
 
 from typing import Set, Union
