@@ -109,6 +109,25 @@ def test_particle_3d():  # warning should arise if particle is attempted in 3d m
         plotter3.plot_tracks(track, [0, 1, 2], particle=True, uncertainty=False)
 
 
+def test_plot_sensors():
+    plotter3d = Plotter(Dimension.THREE)
+    sensor = RadarElevationBearingRange(
+        position_mapping=(0, 2, 4),
+        noise_covar=np.array([[0, 0, 0],
+                              [0, 0, 0]]),
+        ndim_state=6,
+        position=np.array([[10], [50], [0]])
+    )
+    plotter3d.plot_sensors(sensor, marker='o', color='red')
+    plt.close()
+    assert 'Sensors' in plotter3d.legend_dict
+
+
+def test_empty_tracks():
+    plotter.plot_tracks(set(), [0, 2])
+    plt.close()
+
+
 def test_figsize():
     plotter_figsize_default = Plotter()
     plotter_figsize_different = Plotter(figsize=(20, 15))
