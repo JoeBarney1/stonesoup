@@ -181,30 +181,39 @@ class Plotter(_Plotter):
             List of items specifying the mapping of the position components of the state space.
         \\*\\*kwargs: dict
             Additional arguments to be passed to plot function. Default is ``linestyle="--"``.
-        """
 
+        Returns
+        -------
+        : list of :class:`matplotlib.artist.Artist`
+            List of artists that have been added to the axis.
+        """
         truths_kwargs = dict(linestyle="--")
         truths_kwargs.update(kwargs)
         if not isinstance(truths, Collection) or isinstance(truths, StateMutableSequence):
             truths = {truths}  # Make a set of length 1
 
+        artists = []
         for truth in truths:
             if self.dimension is Dimension.TWO:  # plots the ground truths in xy
-                self.ax.plot([state.state_vector[mapping[0]] for state in truth],
-                             [state.state_vector[mapping[1]] for state in truth],
-                             **truths_kwargs)
+                artists.extend(
+                    self.ax.plot([state.state_vector[mapping[0]] for state in truth],
+                                 [state.state_vector[mapping[1]] for state in truth],
+                                 **truths_kwargs))
             elif self.dimension is Dimension.THREE:  # plots the ground truths in xyz
-                self.ax.plot3D([state.state_vector[mapping[0]] for state in truth],
-                               [state.state_vector[mapping[1]] for state in truth],
-                               [state.state_vector[mapping[2]] for state in truth],
-                               **truths_kwargs)
+                artists.extend(
+                    self.ax.plot3D([state.state_vector[mapping[0]] for state in truth],
+                                   [state.state_vector[mapping[1]] for state in truth],
+                                   [state.state_vector[mapping[2]] for state in truth],
+                                   **truths_kwargs))
             else:
                 raise NotImplementedError('Unsupported dimension type for truth plotting')
         # Generate legend items
         truths_handle = Line2D([], [], linestyle=truths_kwargs['linestyle'], color='black')
         self.legend_dict[truths_label] = truths_handle
         # Generate legend
-        self.ax.legend(handles=self.legend_dict.values(), labels=self.legend_dict.keys())
+        artists.append(self.ax.legend(handles=self.legend_dict.values(),
+                                      labels=self.legend_dict.keys()))
+        return artists
 
     def plot_measurements(self, measurements, mapping, measurement_model=None,
                           measurements_label="Measurements", **kwargs):
@@ -229,6 +238,11 @@ class Plotter(_Plotter):
         \\*\\*kwargs: dict
             Additional arguments to be passed to plot function for detections. Defaults are
             ``marker='o'`` and ``color='b'``.
+
+        Returns
+        -------
+        : list of :class:`matplotlib.artist.Artist`
+            List of artists that have been added to the axis.
         """
 
         measurement_kwargs = dict(marker='o', color='b')
@@ -262,11 +276,12 @@ class Plotter(_Plotter):
                 warnings.warn(f'Unknown type {type(state)}')
                 continue
 
+        artists = []
         if plot_detections:
             detection_array = np.array(list(plot_detections.values()))
             # *detection_array.T unpacks detection_array by columns
             # (same as passing in detection_array[:,0], detection_array[:,1], etc...)
-            self.ax.scatter(*detection_array.T, **measurement_kwargs)
+            artists.append(self.ax.scatter(*detection_array.T, **measurement_kwargs))
             measurements_handle = Line2D([], [], linestyle='', **measurement_kwargs)
 
             # Generate legend items for measurements
@@ -274,7 +289,7 @@ class Plotter(_Plotter):
 
         if plot_clutter:
             clutter_array = np.array(list(plot_clutter.values()))
-            self.ax.scatter(*clutter_array.T, color='y', marker='2')
+            artists.append(self.ax.scatter(*clutter_array.T, color='y', marker='2'))
             clutter_handle = Line2D([], [], linestyle='', marker='2', color='y')
             clutter_label = "Clutter"
 
@@ -282,7 +297,9 @@ class Plotter(_Plotter):
             self.legend_dict[clutter_label] = clutter_handle
 
         # Generate legend
-        self.ax.legend(handles=self.legend_dict.values(), labels=self.legend_dict.keys())
+        artists.append(self.ax.legend(handles=self.legend_dict.values(),
+                                      labels=self.legend_dict.keys()))
+        return artists
 
     def plot_tracks(self, tracks, mapping, uncertainty=False, particle=False, track_label="Tracks",
                     err_freq=1, **kwargs):
@@ -318,6 +335,11 @@ class Plotter(_Plotter):
         \\*\\*kwargs: dict
             Additional arguments to be passed to plot function. Defaults are ``linestyle="-"``,
             ``marker='s'`` for :class:`~.Update` and ``marker='o'`` for other states.
+
+        Returns
+        -------
+        : list of :class:`matplotlib.artist.Artist`
+            List of artists that have been added to the axis.
         """
 
         tracks_kwargs = dict(linestyle='-', marker="s", color=None)
@@ -326,6 +348,7 @@ class Plotter(_Plotter):
             tracks = {tracks}  # Make a set of length 1
 
         # Plot tracks
+        artists = []
         track_colors = {}
         for track in tracks:
             # Get indexes for Update and non-Update states for styling markers
@@ -346,11 +369,12 @@ class Plotter(_Plotter):
                 *data,
                 markevery=update_indexes,
                 **tracks_kwargs)
+            artists.extend(line)
             if not_update_indexes:
-                self.ax.plot(
+                artists.extend(self.ax.plot(
                     *data[:, not_update_indexes],
                     marker="o" if "marker" not in kwargs else kwargs['marker'],
-                    color=plt.getp(line[0], 'color'))
+                    color=plt.getp(line[0], 'color')))
             track_colors[track] = plt.getp(line[0], 'color')
             if same_colour:
                 tracks_kwargs['color'] = plt.getp(line[0], 'color')
@@ -384,6 +408,7 @@ class Plotter(_Plotter):
                                           angle=np.rad2deg(orient), alpha=0.2,
                                           color=track_colors[track])
                         self.ax.add_artist(ellipse)
+                        artists.append(ellipse)
 
                 # Generate legend items for uncertainty ellipses
                 ellipse_handle = Ellipse((0.5, 0.5), 0.5, 0.5, alpha=0.2,
@@ -391,9 +416,9 @@ class Plotter(_Plotter):
                 ellipse_label = "Uncertainty"
                 self.legend_dict[ellipse_label] = ellipse_handle
                 # Generate legend
-                self.ax.legend(handles=self.legend_dict.values(),
-                               labels=self.legend_dict.keys(),
-                               handler_map={Ellipse: _HandlerEllipse()})
+                artists.append(self.ax.legend(handles=self.legend_dict.values(),
+                                              labels=self.legend_dict.keys(),
+                                              handler_map={Ellipse: _HandlerEllipse()}))
             else:
                 # Plot 3D error bars on tracks
                 for track in tracks:
@@ -411,12 +436,15 @@ class Plotter(_Plotter):
                             y_err = w[1]
                             z_err = w[2]
 
-                            self.ax.plot3D([xl+x_err, xl-x_err], [yl, yl], [zl, zl],
-                                           marker="_", color=tracks_kwargs['color'])
-                            self.ax.plot3D([xl, xl], [yl+y_err, yl-y_err], [zl, zl],
-                                           marker="_", color=tracks_kwargs['color'])
-                            self.ax.plot3D([xl, xl], [yl, yl], [zl+z_err, zl-z_err],
-                                           marker="_", color=tracks_kwargs['color'])
+                            artists.extend(
+                                self.ax.plot3D([xl+x_err, xl-x_err], [yl, yl], [zl, zl],
+                                               marker="_", color=tracks_kwargs['color']))
+                            artists.extend(
+                                self.ax.plot3D([xl, xl], [yl+y_err, yl-y_err], [zl, zl],
+                                               marker="_", color=tracks_kwargs['color']))
+                            artists.extend(
+                                self.ax.plot3D([xl, xl], [yl, yl], [zl+z_err, zl-z_err],
+                                               marker="_", color=tracks_kwargs['color']))
                         check += 1
 
         if particle:
@@ -425,8 +453,8 @@ class Plotter(_Plotter):
                 for track in tracks:
                     for state in track:
                         data = state.state_vector[mapping[:2], :]
-                        self.ax.plot(data[0], data[1], linestyle='', marker=".",
-                                     markersize=1, alpha=0.5)
+                        artists.extend(self.ax.plot(data[0], data[1], linestyle='', marker=".",
+                                                    markersize=1, alpha=0.5))
 
                 # Generate legend items for particles
                 particle_handle = Line2D([], [], linestyle='', color="black", marker='.',
@@ -434,14 +462,98 @@ class Plotter(_Plotter):
                 particle_label = "Particles"
                 self.legend_dict[particle_label] = particle_handle
                 # Generate legend
-                self.ax.legend(handles=self.legend_dict.values(),
-                               labels=self.legend_dict.keys())  # particle error legend
+                artists.append(self.ax.legend(handles=self.legend_dict.values(),
+                                              labels=self.legend_dict.keys()))
             else:
                 raise NotImplementedError("""Particle plotting is not currently supported for
                                           3D visualization""")
 
         else:
-            self.ax.legend(handles=self.legend_dict.values(), labels=self.legend_dict.keys())
+            artists.append(self.ax.legend(handles=self.legend_dict.values(),
+                                          labels=self.legend_dict.keys()))
+
+        return artists
+
+    def plot_sensors(self, sensors, sensor_label="Sensors", **kwargs):
+        """Plots sensor(s)
+
+        Plots sensors.  Users can change the color and marker of detections using keyword
+        arguments. Default is a black 'x' marker.
+
+        Parameters
+        ----------
+        sensors : Collection of :class:`~.Sensor`
+            Sensors to plot
+        sensor_label: str
+            Label to apply to all tracks for legend.
+        \\*\\*kwargs: dict
+            Additional arguments to be passed to plot function for detections. Defaults are
+            ``marker='x'`` and ``color='black'``.
+
+        Returns
+        -------
+        : list of :class:`matplotlib.artist.Artist`
+            List of artists that have been added to the axis.
+        """
+
+        sensor_kwargs = dict(marker='x', color='black')
+        sensor_kwargs.update(kwargs)
+
+        if not isinstance(sensors, Collection):
+            sensors = {sensors}  # Make a set of length 1
+
+        artists = []
+        for sensor in sensors:
+            if self.dimension is Dimension.TWO:  # plots the sensors in xy
+                artists.append(self.ax.scatter(sensor.position[0],
+                                               sensor.position[1],
+                                               **sensor_kwargs))
+            elif self.dimension is Dimension.THREE:  # plots the sensors in xyz
+                artists.extend(self.ax.plot3D(sensor.position[0],
+                                              sensor.position[1],
+                                              sensor.position[2],
+                                              **sensor_kwargs))
+            else:
+                raise NotImplementedError('Unsupported dimension type for sensor plotting')
+        self.legend_dict[sensor_label] = Line2D([], [], linestyle='', **sensor_kwargs)
+        artists.append(self.ax.legend(handles=self.legend_dict.values(),
+                                      labels=self.legend_dict.keys()))
+        return artists
+
+    def set_equal_3daxis(self, axes=None):
+        """Plots minimum/maximum points with no linestyle to increase the plotting region to
+        simulate `.ax.axis('equal')` from matplotlib 2d plots which is not possible using 3d
+        projection.
+
+        Parameters
+        ----------
+        axes: list
+            List of dimension index specifying the equal axes, equal x and y = [0,1].
+            Default is x,y [0,1].
+        """
+        if not axes:
+            axes = [0, 1]
+        if self.dimension is Dimension.THREE:
+            min_xyz = [0, 0, 0]
+            max_xyz = [0, 0, 0]
+            for n in range(3):
+                for line in self.ax.lines:
+                    min_xyz[n] = np.min([min_xyz[n], *line.get_data_3d()[n]])
+                    max_xyz[n] = np.max([max_xyz[n], *line.get_data_3d()[n]])
+
+            extremes = np.max([x - y for x, y in zip(max_xyz, min_xyz)])
+            equal_axes = [0, 0, 0]
+            for i in axes:
+                equal_axes[i] = 1
+            lower = ([np.mean([x, y]) for x, y in zip(max_xyz, min_xyz)] - extremes/2) * equal_axes
+            upper = ([np.mean([x, y]) for x, y in zip(max_xyz, min_xyz)] + extremes/2) * equal_axes
+            ghosts = GroundTruthPath(states=[State(state_vector=lower),
+                                             State(state_vector=upper)])
+
+            self.ax.plot3D([state.state_vector[0] for state in ghosts],
+                           [state.state_vector[1] for state in ghosts],
+                           [state.state_vector[2] for state in ghosts],
+                           linestyle="")
 
     def plot_density(self, state_sequences: Iterable[StateMutableSequence],
                      index: Union[int, None] = -1,
