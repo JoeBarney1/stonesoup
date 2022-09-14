@@ -259,23 +259,6 @@ class Plotter(_Plotter):
         plot_detections = []
         plot_clutter = []
 
-        for state in measurements_set:
-
-            state_vec = convert_detection(state, measurement_model=measurement_model)
-            if state_vec is None:
-                continue
-
-            if isinstance(state, detection.Clutter):
-                # Plot clutter
-                plot_clutter.append((*state_vec[mapping], ))
-
-            elif isinstance(state, detection.Detection):
-                # Plot detections
-                plot_detections.append((*state_vec[mapping], ))
-            else:
-                warnings.warn(f'Unknown type {type(state)}')
-                continue
-
         artists = []
         if plot_detections:
             detection_array = np.array(list(plot_detections.values()))
@@ -374,7 +357,6 @@ class Plotter(_Plotter):
                 artists.extend(self.ax.plot(
                     *data[:, not_update_indexes],
                     marker="o" if "marker" not in kwargs else kwargs['marker'],
-                    linestyle='',
                     color=plt.getp(line[0], 'color')))
             track_colors[track] = plt.getp(line[0], 'color')
             if same_colour:
