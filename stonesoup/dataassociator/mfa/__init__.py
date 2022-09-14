@@ -1,53 +1,39 @@
-import numpy as np
+# -*- coding: utf-8 -*-
 
 from .. import DataAssociator
 from ...base import Property
-from ...hypothesiser.mfa import MFAHypothesiser
+from ...hypothesiser import Hypothesiser
 from ...types.multihypothesis import MultipleHypothesis
 from ._init import init_hyp_info, Hyp
 from ._step import MAX_ITERATION_COUNT, AlgorithmState, algorithm_step, prune_hypotheses
 
 
 class MFADataAssociator(DataAssociator):
-    """Data associator using multi-frame assignment algorithm over a sliding window.
+    """Data associator using multi-frame assignment algorithm over a sliding window."""
 
-    References
-    ----------
-    1. Xia, Y., Granström, K., Svensson, L., García-Fernández, Á.F., and Williams, J.L.,
-       2019. Multiscan Implementation of the Trajectory Poisson Multi-Bernoulli Mixture Filter.
-       J. Adv. Information Fusion, 14(2), pp. 213–235.
-
-    """
-
-    hypothesiser: MFAHypothesiser = Property(
+    hypothesiser: Hypothesiser = Property(
         doc='Generate a set of hypotheses for each prediction-detection pair')
     slide_window: int = Property(doc='Length of MFA slide window')
 
     def associate(self, tracks, detections, timestamp, **kwargs):
-        # No tracks, nothing to do
-        if not tracks:
-            return {}
         # Generate a set of hypotheses for each track on each detection
-        # and shuffle hypothesis data into format required by the MFA algorithm
-        tracks_list = []
-        # TODO: Avoid dependency on indexes
-        detections_tuple = tuple(detections)
-        hypotheses = []
-        hyps = []
-        for trackID, (track, multihypothesis) in enumerate(
-                self.generate_hypotheses(tracks, detections, timestamp,
-                                         detections_tuple=detections_tuple, **kwargs).items()):
-            tracks_list.append(track)
-            hypotheses.append(multihypothesis)
-            hyps.extend([
-                Hyp.create(
-                    trackID=trackID,
-                    cost=-np.log(individual_hypothesis.prediction.weight),
-                    measHistory=individual_hypothesis.prediction.tag,  # measurement indices
-                    slide_window=self.slide_window
-                )
-                for individual_hypothesis in multihypothesis
-            ])
+        tracks_list = list(tracks)
+        hypotheses = [
+            self.hypothesiser.hypothesise(track, detections, timestamp)
+            for track in tracks_list
+        ]
+
+        # Shuffle hypothesis data into format required by the MFA algorithm
+        hyps = [
+            Hyp.create(
+                trackID=trackID,
+                cost=-individual_hypothesis.prediction.weight.log_value,
+                measHistory=individual_hypothesis.prediction.tag,  # list of measurement indices
+                slide_window=self.slide_window
+            )
+            for trackID, (track, multihypothesis) in enumerate(zip(tracks, hypotheses))
+            for individual_hypothesis in multihypothesis
+        ]
         hyp_info = init_hyp_info(hyps, self.slide_window)
 
         # Run the MFA algorithm

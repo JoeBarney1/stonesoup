@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # © Copyright 2018-2021 University of Liverpool UK
 # © Copyright 2021 Roke Manor Research Ltd UK
 # Governed by MIT license - see LICENSE file or https://opensource.org/licenses/MIT

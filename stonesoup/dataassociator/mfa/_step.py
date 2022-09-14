@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # © Copyright 2018-2021 University of Liverpool UK
 # © Copyright 2021 Roke Manor Research Ltd UK
 # Governed by MIT license - see LICENSE file or https://opensource.org/licenses/MIT
@@ -14,14 +15,8 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 import numpy as np
+from ortools.linear_solver import pywraplp
 from scipy.optimize import linear_sum_assignment
-try:
-    from ortools.linear_solver import pywraplp
-except ImportError as error:  # pragma: no cover
-    raise ImportError(
-        "Usage of 'stonesoup.dataassociator.mfa' requires that the optional "
-        "package dependency 'ortools' is installed.") \
-        from error
 
 from ._init import Hyp, HypInfo, TimeStepIndices
 
@@ -141,7 +136,7 @@ def _getPrimalSolution(u_hat_mean, Amatrix, hypothesisCosts):
     # Run the solver
     solver.Minimize(solver.Sum([c * var for var, c in zip(vars, c_uncertain)]))
     status = solver.Solve()
-    if status not in (pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE):  # pragma: no cover
+    if status not in (pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE):
         raise RuntimeError("Infeasible primal problem")
 
     uprimal_uncertain = [bool(v.solution_value()) for v in vars]
