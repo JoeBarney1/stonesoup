@@ -3,7 +3,9 @@ import pytest
 
 from ...predictor import Predictor
 from ...types.prediction import (
-    GaussianMeasurementPrediction, GaussianStatePrediction)
+    GaussianMeasurementPrediction, GaussianStatePrediction, CategoricalStatePrediction,
+    CategoricalMeasurementPrediction)
+from ...types.update import Update
 from ...updater import Updater
 
 
@@ -35,7 +37,7 @@ def updater():
                                                  state_prediction.timestamp)
 
         def update(self, hypothesis, **kwargs):
-            pass
+            return Update.from_state(hypothesis.prediction, hypothesis=hypothesis)
 
     return TestGaussianUpdater()
 

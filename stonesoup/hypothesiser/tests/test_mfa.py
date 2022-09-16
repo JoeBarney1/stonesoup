@@ -24,15 +24,15 @@ def test_mfa(hypothesiser, updater):
     hypothesiser = MFAHypothesiser(hypothesiser)
 
     timestamp = datetime.datetime.now()
-    track = Track([GaussianMixture(
+    track = Track(GaussianMixture(
         [TaggedWeightedGaussianState(
             state_vector=[[0]],
             covar=[[1]],
             weight=Probability(1),
             tag=[],
-            timestamp=timestamp)])])
-    detection1 = Detection(np.array([[2]]), timestamp)
-    detection2 = Detection(np.array([[8]]), timestamp)
+            timestamp=timestamp)]))
+    detection1 = Detection(np.array([[2]]))
+    detection2 = Detection(np.array([[8]]))
     detections = {detection1, detection2}
     detections_tuple = (detection1, detection2)
 
@@ -115,15 +115,3 @@ def test_mfa(hypothesiser, updater):
 
     for hypothesis in multi_hypothesis:
         assert hypothesis.prediction.tag in ([0, 0], [1, 0])
-
-
-def test_mfa_bad_timestamp(hypothesiser):
-    hypothesiser = MFAHypothesiser(hypothesiser)
-
-    timestamp = datetime.datetime.now()
-    detection1 = Detection(np.array([[2]]), timestamp)
-    detection2 = Detection(np.array([[8]]), timestamp - datetime.timedelta(seconds=1))
-    detections = {detection1, detection2}
-
-    with pytest.raises(ValueError, match="All detections must have the same timestamp"):
-        hypothesiser.hypothesise({}, detections, timestamp, tuple(detections))
