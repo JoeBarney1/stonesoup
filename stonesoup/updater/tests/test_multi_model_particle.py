@@ -4,13 +4,12 @@ import datetime
 import numpy as np
 import pytest
 
-from ...resampler.particle import SystematicResampler
+from stonesoup.types.detection import Detection
 from ...models.measurement.linear import LinearGaussian
 from ...models.transition.linear import ConstantVelocity, ConstantAcceleration, KnownTurnRate
 from ...models.transition.linear import CombinedLinearGaussianTransitionModel
 from ...predictor.particle import RaoBlackwellisedMultiModelPredictor, MultiModelPredictor
 from ...updater.particle import RaoBlackwellisedParticleUpdater, MultiModelParticleUpdater
-from ...types.detection import Detection
 from ...types.hypothesis import SingleHypothesis
 from ...types.particle import RaoBlackwellisedParticle, MultiModelParticle
 from ...types.prediction import (
@@ -42,15 +41,7 @@ def transition_matrix():
             [0.40, 0.40, 0.2]]
 
 
-@pytest.fixture(params=[None, SystematicResampler])
-def resampler(request):
-    if request.param is None:
-        return None
-    else:
-        return request.param()
-
-
-def test_multi_model(dynamic_model_list, position_mappings, transition_matrix, resampler):
+def test_multi_model(dynamic_model_list, position_mappings, transition_matrix):
     # Initialise particles
     particle1 = MultiModelParticle(
         state_vector=[1, 1, -0.5, 1, 1, -0.5],
@@ -81,7 +72,7 @@ def test_multi_model(dynamic_model_list, position_mappings, transition_matrix, r
     assert isinstance(prediction, MultiModelParticleStatePrediction)
 
     measurement_model = LinearGaussian(6, [0, 3], np.diag([1, 1]))
-    updater = MultiModelParticleUpdater(measurement_model, predictor, resampler=resampler)
+    updater = MultiModelParticleUpdater(measurement_model, predictor)
 
     # Detection close to where known turn rate model would place particles
     detection = Detection([[0.5, 7.]], timestamp)
@@ -98,7 +89,7 @@ def test_multi_model(dynamic_model_list, position_mappings, transition_matrix, r
     assert isinstance(dynamic_model_list[np.argmax(model_weights)], KnownTurnRate)
 
 
-def test_rao_blackwellised(dynamic_model_list, position_mappings, transition_matrix, resampler):
+def test_rao_blackwellised(dynamic_model_list, position_mappings, transition_matrix):
     # Initialise particles
     particle1 = RaoBlackwellisedParticle(
         state_vector=[1, 1, -0.5, 1, 1, -0.5],
@@ -129,7 +120,7 @@ def test_rao_blackwellised(dynamic_model_list, position_mappings, transition_mat
     assert isinstance(prediction, RaoBlackwellisedParticleStatePrediction)
 
     measurement_model = LinearGaussian(6, [0, 3], np.diag([1, 1]))
-    updater = RaoBlackwellisedParticleUpdater(measurement_model, predictor, resampler=resampler)
+    updater = RaoBlackwellisedParticleUpdater(measurement_model, predictor)
 
     # Detection close to where known turn rate model would place particles
     detection = Detection([[0.5, 7.]], timestamp)

@@ -242,7 +242,7 @@ class MultiModelParticleUpdater(ParticleUpdater):
 
         Returns
         -------
-        : :class:`~.ParticleState`
+        : :class:`~.MultiModelParticleStateUpdate`
             The state posterior
         """
         if hypothesis.measurement.measurement_model is None:
@@ -257,7 +257,7 @@ class MultiModelParticleUpdater(ParticleUpdater):
             particle_list=None
         )
 
-        transition_matrix = np.asarray(self.predictor.transition_matrix)
+        transition_matrix = np.asanyarray(self.predictor.transition_matrix)
 
         update.weight = update.weight \
             * measurement_model.pdf(hypothesis.measurement, update, **kwargs) \
@@ -288,7 +288,7 @@ class RaoBlackwellisedParticleUpdater(MultiModelParticleUpdater):
 
         Returns
         -------
-        : :class:`~.ParticleState`
+        : :class:`~.RaoBlackwellisedParticleStateUpdate`
             The state posterior
         """
 

@@ -136,7 +136,7 @@ class ParticleMeasurementPrediction(MeasurementPrediction, ParticleState):
     """
 
 
-class MulitModelParticleStatePrediction(Prediction, MultiModelParticleState):
+class MultiModelParticleStatePrediction(Prediction, MultiModelParticleState):
     """MultiModelParticleStatePrediction type
 
     This is a simple multi-model Particle state prediction object.
