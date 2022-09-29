@@ -5,12 +5,12 @@ of data that is in `HDF5 <https://hdfgroup.org/>`_ format, using the `h5py
 <https://docs.h5py.org/>`_ library.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Collection, Sequence
 
 try:
     import h5py
-except ImportError as error:  # pragma: no cover
+except ImportError as error:
     raise ImportError(
         "HDF5 Readers require the dependency 'h5py' to be installed."
     ) from error
@@ -122,8 +122,7 @@ class _HDF5Reader(BinaryFileReader):
         if self.time_field_format is not None:
             time_field_value = datetime.strptime(raw_time_val, self.time_field_format)
         elif self.timestamp is True:
-            time_field_value = datetime.fromtimestamp(
-                raw_time_val, timezone.utc).replace(tzinfo=None)
+            time_field_value = datetime.utcfromtimestamp(raw_time_val)
         else:
             time_field_value = parse(raw_time_val, ignoretz=True)
 
