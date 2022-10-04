@@ -3,8 +3,7 @@ import numpy as np
 from typing import Set, Union
 
 from ..base import Property
-from ..models.measurement.nonlinear import CartesianToElevationBearing, \
-    CartesianToElevationBearingRange
+from ..models.measurement.nonlinear import CartesianToElevationBearing
 from ..sensor.sensor import SimpleSensor
 from ..types.array import CovarianceMatrix
 from ..types.groundtruth import GroundTruthState
