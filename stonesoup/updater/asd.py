@@ -1,9 +1,11 @@
+from collections import OrderedDict
 from functools import lru_cache
 
 import numpy as np
 
 from .kalman import KalmanUpdater
 from ..types.prediction import ASDGaussianMeasurementPrediction
+from ..types.state import State
 from ..types.update import ASDGaussianStateUpdate
 
 
@@ -22,7 +24,7 @@ class ASDKalmanUpdater(KalmanUpdater):
         vol. 47, no. 4, pp. 2766-2778, OCTOBER 2011, doi: 10.1109/TAES.2011.6034663.
     """
     @lru_cache()
-    def predict_measurement(self, predicted_state, measurement_model=None, measurement_noise=True,
+    def predict_measurement(self, predicted_state, measurement_model=None,
                             **kwargs):
         r"""Predict the measurement implied by the predicted state mean
 
@@ -33,8 +35,6 @@ class ASDKalmanUpdater(KalmanUpdater):
         measurement_model : :class:`~.MeasurementModel`
             The measurement model. If omitted, the model in the updater
             object is used
-        measurement_noise : bool
-            Whether to include measurement noise :math:`R` with innovation covariance
         **kwargs : various
             These are passed to :meth:`~.MeasurementModel.function` and
             :meth:`~.MeasurementModel.matrix`
@@ -48,23 +48,25 @@ class ASDKalmanUpdater(KalmanUpdater):
         measurement_model = self._check_measurement_model(measurement_model)
 
         t_index = predicted_state.timestamps.index(predicted_state.act_timestamp)
-        state_at_t = predicted_state[t_index]
+        t2t_plus = slice(t_index * predicted_state.ndim, (t_index+1) * predicted_state.ndim)
 
-        pred_meas = measurement_model.function(state_at_t, **kwargs)
+        pred_meas = measurement_model.function(
+            State(predicted_state.multi_state_vector[t2t_plus]), **kwargs)
 
-        hh = self._measurement_matrix(predicted_state=state_at_t,
+        hh = self._measurement_matrix(predicted_state=predicted_state,
                                       measurement_model=measurement_model,
                                       **kwargs)
-        innov_cov = hh@state_at_t.covar@hh.T
-        if measurement_noise:
-            innov_cov += measurement_model.covar()
 
-        t2t_plus = slice(t_index * predicted_state.ndim, (t_index+1) * predicted_state.ndim)
+        innov_cov = (
+            hh
+            @ predicted_state.multi_covar[t2t_plus, t2t_plus]
+            @ hh.T + measurement_model.covar())
+
         meas_cross_cov = predicted_state.multi_covar[:, t2t_plus] @ hh.T
 
         return ASDGaussianMeasurementPrediction(
             multi_state_vector=pred_meas, multi_covar=innov_cov,
-            timestamps=[predicted_state.act_timestamp],
+            timestamps=[predicted_state.timestamps[0]],
             cross_covar=meas_cross_cov)
 
     def update(self, hypothesis, force_symmetric_covariance=False, **kwargs):
@@ -95,7 +97,6 @@ class ASDKalmanUpdater(KalmanUpdater):
 
         # Get the predicted state out of the hypothesis
         predicted_state = hypothesis.prediction
-        correlation_matrices = predicted_state.correlation_matrices.copy()
 
         if hypothesis.measurement_prediction is None:
             # Get the measurement model out of the measurement if it's there.
@@ -126,10 +127,11 @@ class ASDKalmanUpdater(KalmanUpdater):
             posterior_covariance = \
                 (posterior_covariance + posterior_covariance.T) / 2
 
+        # save the new posterior, if it is no out of sequence measurement
+        pred_corr_matrices = predicted_state.correlation_matrices.setdefault(
+            predicted_state.act_timestamp, dict())
         t_index = predicted_state.timestamps.index(predicted_state.act_timestamp)
         t2t_plus = slice(t_index * predicted_state.ndim, (t_index+1) * predicted_state.ndim)
-        # save the new posterior, if it is no out of sequence measurement
-        correlation_matrices[t_index] = pred_corr_matrices = correlation_matrices[t_index].copy()
 
         # update covariance after calculating
         pred_corr_matrices['P'] = posterior_covariance[t2t_plus, t2t_plus]
@@ -140,6 +142,8 @@ class ASDKalmanUpdater(KalmanUpdater):
                 @ np.linalg.inv(pred_corr_matrices['P_pred']))
         except KeyError:
             pass
+        correlation_matrices = OrderedDict(sorted(
+            predicted_state.correlation_matrices.items(), reverse=True))
 
         return ASDGaussianStateUpdate(multi_state_vector=posterior_mean,
                                       multi_covar=posterior_covariance,
