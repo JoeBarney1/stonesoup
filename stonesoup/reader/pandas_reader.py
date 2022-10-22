@@ -1,20 +1,20 @@
+#!/usr/bin/env python
 import numpy as np
+import os
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from dateutil.parser import parse
-from math import modf
 from typing import Sequence, Collection
 
 try:
-    import pandas as pd
+    import pandas
 except ImportError as error:
     raise ImportError(
-        "Pandas Readers require dependency 'pandas' being installed. ") from error
+        "Usage of Pandas Readers readers requires the dependency 'pandas' being installed. ") from error
 
 from ..base import Property
 from ..buffered_generator import BufferedGenerator
 from ..reader.base import GroundTruthReader, DetectionReader, Reader
-from ..types.detection import Detection
 from ..types.groundtruth import GroundTruthPath, GroundTruthState
 
 
@@ -47,15 +47,14 @@ class _DataFrameReader(Reader):
             time_field_value = datetime.strptime(row[self.time_field], self.time_field_format)
         elif self.timestamp:
             fractional, timestamp = modf(float(row[self.time_field]))
-            time_field_value = datetime.fromtimestamp(
-                int(timestamp), timezone.utc).replace(tzinfo=None)
+            time_field_value = datetime.utcfromtimestamp(int(timestamp))
             time_field_value += timedelta(microseconds=fractional * 1E6)
         else:
             time_field_value = row[self.time_field]
-
+            
             if not isinstance(time_field_value, datetime):
                 time_field_value = parse(time_field_value, ignoretz=True)
-
+            
         return time_field_value
 
 
@@ -87,10 +86,11 @@ class DataFrameGroundTruthReader(GroundTruthReader, _DataFrameReader):
                 updated_paths = set()
             previous_time = time
 
-            state = GroundTruthState(np.array([[row[col_name]] for col_name
-                                              in self.state_vector_fields],
-                                              dtype=np.float64), timestamp=time,
-                                     metadata=self._get_metadata(row))
+            state = GroundTruthState(
+                np.array([[row[col_name]] for col_name in self.state_vector_fields],
+                        dtype=np.float_),
+                timestamp=time,
+                metadata=self._get_metadata(row))
 
             id_ = row[self.path_id_field]
             if id_ not in groundtruth_dict:
@@ -114,13 +114,13 @@ class DataFrameDetectionReader(DetectionReader, _DataFrameReader):
     ----------
     """
     dataframe: pd.DataFrame = Property(doc="DataFrame containing the ground truth data.")
-
+    
     @BufferedGenerator.generator_method
     def detections_gen(self):
         detections = set()
         previous_time = None
         for row in self.dataframe.to_dict(orient="records"):
-
+            
             time = self._get_time(row)
             if previous_time is not None and previous_time != time:
                 yield previous_time, detections
@@ -129,7 +129,7 @@ class DataFrameDetectionReader(DetectionReader, _DataFrameReader):
 
             detections.add(Detection(
                 np.array([[row[col_name]] for col_name in self.state_vector_fields],
-                         dtype=np.float64),
+                        dtype=np.float_),
                 timestamp=time,
                 metadata=self._get_metadata(row)))
 
