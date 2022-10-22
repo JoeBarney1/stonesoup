@@ -15,5 +15,5 @@ htmlcov/
 # pytest
 .pytest_cache/
 
-#Animation plotting example
-docs/examples/example_animation.gif
+# development on MacOS
+.DS_Store
