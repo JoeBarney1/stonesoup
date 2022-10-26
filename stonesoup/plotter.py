@@ -578,14 +578,19 @@ class _AnimationPlotterDataClass(Base):
 
 class AnimationPlotter(_Plotter):
 
-    def __init__(self, dimension=Dimension.TWO, **kwargs):
+    def __init__(self, dimension=Dimension.TWO, x_label: str = "$x$", y_label: str = "$y$",
+                 legend_kwargs: dict = {}, **kwargs):
+
         self.figure_kwargs = {"figsize": (10, 6)}
         self.figure_kwargs.update(kwargs)
         if dimension != Dimension.TWO:
             raise NotImplementedError
 
-        self.x_label: str = "$x$"
-        self.y_label: str = "$y$"
+        self.legend_kwargs = dict()
+        self.legend_kwargs.update(legend_kwargs)
+
+        self.x_label: str = x_label
+        self.y_label: str = y_label
 
         self.plotting_data: List[_AnimationPlotterDataClass] = []
 
@@ -613,6 +618,7 @@ class AnimationPlotter(_Plotter):
             x_label=self.x_label,
             y_label=self.y_label,
             figure_kwargs=self.figure_kwargs,
+            legend_kwargs=self.legend_kwargs,
             animation_input_kwargs=kwargs
         )
         return self.animation_output
@@ -772,6 +778,9 @@ class AnimationPlotter(_Plotter):
                                                                 mapping,
                                                                 measurement_model)
 
+        if measurements_label != "":
+            measurements_label = measurements_label + " "
+
         if plot_detections:
             detection_kwargs = dict(linestyle='', marker='o', color='b')
             detection_kwargs.update(kwargs)
@@ -779,7 +788,7 @@ class AnimationPlotter(_Plotter):
                 plotting_data=[State(state_vector=plotting_state_vector,
                                      timestamp=detection.timestamp)
                                for detection, plotting_state_vector in plot_detections.items()],
-                plotting_label=measurements_label + " detections",
+                plotting_label=measurements_label + "Detections",
                 plotting_keyword_arguments=detection_kwargs
             ))
 
@@ -790,7 +799,7 @@ class AnimationPlotter(_Plotter):
                 plotting_data=[State(state_vector=plotting_state_vector,
                                      timestamp=detection.timestamp)
                                for detection, plotting_state_vector in plot_clutter.items()],
-                plotting_label=measurements_label + " clutter",
+                plotting_label=measurements_label + "Clutter",
                 plotting_keyword_arguments=clutter_kwargs
             ))
 
@@ -805,6 +814,7 @@ class AnimationPlotter(_Plotter):
                       axis_padding: float = 0.1,
                       figure_kwargs: dict = {},
                       animation_input_kwargs: dict = {},
+                      legend_kwargs: dict = {},
                       x_label: str = "$x$",
                       y_label: str = "$y$"
                       ) -> animation.FuncAnimation:
@@ -825,6 +835,9 @@ class AnimationPlotter(_Plotter):
         animation_input_kwargs: dict
             Keyword arguments for FuncAnimation class. See matplotlib.animation.FuncAnimation for
             more details. Default values are: blit=False, repeat=False, interval=50
+        legend_kwargs: dict
+            Keyword arguments for the pyplot legend function. See matplotlib.pyplot.legend for more
+            details
         x_label: str
             Label for the x axis
         y_label: str
@@ -881,7 +894,8 @@ class AnimationPlotter(_Plotter):
 
         lines_with_legend = [line for line, label in zip(the_lines, legends_key)
                              if label is not None]
-        plt.legend(lines_with_legend, [label for label in legends_key if label is not None])
+        plt.legend(lines_with_legend, [label for label in legends_key if label is not None],
+                   **legend_kwargs)
 
         if plot_item_expiry is None:
             min_plot_time = min(state.timestamp
