@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Providing some basic astronomical readers for Stone Soup, allowing import of data that is in
-common astronomical formats.
+"""Astronomical readers for Stone Soup.
 
+This is a collection of readers for Stone Soup, allowing quick reading
+of data that is in common astronomical formats.
+
+Readers include:
+    FITS
+    TLE
 """
 from datetime import datetime
 import numpy as np
@@ -13,15 +18,20 @@ from .file import FileReader, TextFileReader
 
 
 class FITSReader(FileReader):
-    """A simple reader for FITS files. Returns a list of Header Data Units (HDUs) contained within
-    the file.
+    """A simple reader for FITS files. Returns a list of
+    Header Data Units (HDUs) contained within the file
 
     FITS file must be valid i.e. have at least one Header Data Unit (HDU)
 
+    Parameters
+    ----------
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         with fits.open(self.path) as hdu_list:
+            # self._hdu_list = hdu_list
+            # self._hdu_list = hdu_list.copy()
             self._data = []
             self._header = []
             for index, hdu in enumerate(hdu_list):
@@ -40,16 +50,15 @@ class FITSReader(FileReader):
 class TLEDictReader(Reader):
     """A reader designed to accept Two-Line Element (TLE) inputs as a dictionary. These contain
     a single TLE without a Line 0 which should conform strictly to the TLE format. The key for
-    Line 1 is "line_1" and that for Line 2 is "line_2". See the references [1]_, [2]_ for a full
+    Line 1 is "line_1" and that for Line 2 is "line_2". See the references _[1], _[2] for a full
     explanation of TLEs.
 
     References
     ----------
     .. [1] Kelso, T.S. 2019, CelesTrak: NORAD Two-Line Element Set Format,
-       [CelesTrak](https://www.celestrak.com/NORAD/documentation/tle-fmt.php)
-
+    https://www.celestrak.com/NORAD/documentation/tle-fmt.php
     .. [2] Kelso, T.S. 2019, Frequently Asked Questions: Two-Line Element Set Format,
-       [CelesTrak](https://celestrak.com/columns/v04n03/)
+    https://celestrak.com/columns/v04n03/
 
     """
     tle: dict = Property(doc="")
@@ -100,7 +109,7 @@ class TLEDictReader(Reader):
     @property
     def international_designator(self):
         """International designator incorporates the year of launch, launch number that year and
-        place of launch. How to interpret this string can be found at [2]_"""
+        place of launch. How to interpret this string can be found at _[2]"""
         return self.line1[9:17]
 
     @property
@@ -133,7 +142,7 @@ class TLEDictReader(Reader):
     def ballistic_coefficient(self):
         r"""Represents the first derivative of the mean motion , otherwise known as the ballistic
         coefficient. This is encoded in the TLE divided by two and in units of revolutions per
-        day :math:`^2`. Here it is returned in units of :math:`mathrm{rad s}^{-2}`. It is unused in
+        day:math:`^2`. Here it is returned in units of :math:`mathrm{rad s}^{-2}`. It is unused in
         SGP4.
         """
 
@@ -145,8 +154,8 @@ class TLEDictReader(Reader):
     @property
     def second_derivative_mean_motion(self):
         """This is the second derivative of the mean motion. Again, it's not used by SGP4. In TLEs
-        it's divided by six and given in units of revolutions per day :math:`^3`. Here it's
-        returned as :math:`mathrm{rad s}^{-3}`"""
+        it's divided by six and given in units of revolutions per day:math:`^3`. Here it's returned
+        as :math:`mathrm{rad s}^{-3}`"""
 
         mantissa = 0 - float(self.line1[45:50]) / 1e5 if self.line1[44] == '-' \
             else float(self.line1[45:50]) / 1e5
@@ -170,7 +179,7 @@ class TLEDictReader(Reader):
 
             B* = \frac{B \rho_0}{2}.
 
-        In TLEs, :math:`B*` has units of (earth radii) :math:^{-1}. This function returns
+        In TLEs, :math:`B*` has units of (earth radii):math:^{-1}. This function returns
         :math:`\mathrm{m}^{-1}`
         """
 
@@ -240,7 +249,7 @@ class TLEDictReader(Reader):
 
     @property
     def checksum_calculated(self):
-        """Return the TLE checksum calculated from the lines supplied"""
+        "Return the TLE checksum calculated from the lines supplied"
 
         return self.checksum(self.line1), self.checksum(self.line2)
 
