@@ -374,6 +374,7 @@ class Plotter(_Plotter):
                 artists.extend(self.ax.plot(
                     *data[:, not_update_indexes],
                     marker="o" if "marker" not in kwargs else kwargs['marker'],
+                    linestyle='',
                     color=plt.getp(line[0], 'color')))
             track_colors[track] = plt.getp(line[0], 'color')
             if same_colour:
