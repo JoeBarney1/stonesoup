@@ -12,9 +12,3 @@ Particle
 
 .. automodule:: stonesoup.sampler.particle
     :show-inheritance:
-
-Detection
----------
-
-.. automodule:: stonesoup.sampler.detection
-    :show-inheritance:
