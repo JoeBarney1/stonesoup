@@ -1,7 +1,6 @@
 import numpy as np
 
-from typing import Set, Union
-
+from stonesoup.types.detection import Detection
 from ..base import Property
 from ..models.measurement.nonlinear import CartesianToElevationBearing
 from ..sensor.sensor import SimpleSensor
@@ -41,4 +40,7 @@ class PassiveElevationBearing(SimpleSensor):
             rotation_offset=self.orientation)
 
     def is_detectable(self, state: GroundTruthState) -> bool:
+        return True
+
+    def is_clutter_detectable(self, state: Detection) -> bool:
         return True
