@@ -1,7 +1,4 @@
-import pytest
-
-pytest.importorskip('confluent_kafka')
-from ..kafka import KafkaWriter  # noqa: E402
+from stonesoup.writer.kafka import KafkaWriter
 
 
 def test_writer_default():

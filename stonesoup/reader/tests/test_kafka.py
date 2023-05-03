@@ -3,8 +3,7 @@ import datetime
 import pytest
 from dateutil.parser import parse
 
-pytest.importorskip('confluent_kafka')
-from ..kafka import KafkaDetectionReader, KafkaGroundTruthReader  # noqa: E402
+from stonesoup.reader.kafka import KafkaDetectionReader, KafkaGroundTruthReader
 
 
 @pytest.fixture(params=[KafkaDetectionReader, KafkaGroundTruthReader])
