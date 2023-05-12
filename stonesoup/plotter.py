@@ -1234,8 +1234,8 @@ class AnimatedPlotterly(_Plotter):
             plot_tracks, but will be a dictionary if coming from plot_measurements.
         """
 
-        all_x = []
-        all_y = []
+        all_x = list(self.fig.layout.xaxis.range)
+        all_y = list(self.fig.layout.xaxis.range)
         if type == "measurements":
 
             for key, item in data.items():
@@ -1268,10 +1268,8 @@ class AnimatedPlotterly(_Plotter):
         ymin = min(all_y)
 
         if self.equal_size:
-            xmax = max(xmax, ymax)
-            ymax = xmax
-            xmin = min(xmin, ymin)
-            ymin = xmin
+            xmax = ymax = max(xmax, ymax)
+            xmin = ymin = min(xmin, ymin)
 
         # need to check if it's actually necessary to resize or not
         if xmax > self.fig.layout.xaxis.range[1] or xmin < self.fig.layout.xaxis.range[0]:
@@ -1407,10 +1405,7 @@ class AnimatedPlotterly(_Plotter):
                 frame.traces = traces_
 
         if resize:
-            if data:
-                self._resize(data, type="ground_truth")
-            else:
-                raise RuntimeError("Cannot resize with no ground truth given.")
+            self._resize(data, type="ground_truth")
 
     def plot_measurements(self, measurements, mapping, measurement_model=None,
                           resize=True, measurements_label="Measurements", **kwargs):
@@ -1555,15 +1550,7 @@ class AnimatedPlotterly(_Plotter):
             frame.traces = traces_
 
         if resize:
-
-            # only resize if there is data available
-            if len(combined_data["Detection"]["x"]) or len(combined_data["Clutter"]["x"]):
-
-                # ensure the figure display is big enough
-                self._resize(combined_data, "measurements")
-
-            else:
-                raise RuntimeError("Cannot resize as no measurements provided.")
+            self._resize(combined_data, "measurements")
 
     def plot_tracks(self, tracks, mapping, uncertainty=False, resize=True,
                     particle=False, plot_history=False, ellipse_points=30,
@@ -1707,10 +1694,7 @@ class AnimatedPlotterly(_Plotter):
                 frame.traces = traces_
 
         if resize:
-            if data:
-                self._resize(data, "tracks")
-            else:
-                raise RuntimeError("Cannot resize - no tracks given.")
+            self._resize(data, "tracks")
 
         if uncertainty:  # plot ellipses
 
