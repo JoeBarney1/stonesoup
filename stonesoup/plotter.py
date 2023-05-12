@@ -1161,7 +1161,7 @@ class AnimatedPlotterly(_Plotter):
         self.fig.update_xaxes(range=[0, 10])
         self.fig.update_yaxes(range=[0, 10])
 
-        frame_duration = (sim_duration * 1000) / len(self.fig.frames)
+        frame_duration = sim_duration * 1000 / len(self.fig.frames)
 
         # if the gap between timesteps is greater than a day, it isn't necessary
         # to display hour and minute information, so remove this to give a cleaner display.
@@ -1253,7 +1253,7 @@ class AnimatedPlotterly(_Plotter):
                 all_x.extend(data[key]["x"])
                 all_y.extend(data[key]["y"])
 
-        elif type == "ground_truth" or type == "tracks":
+        elif type in ("ground_truth", "tracks"):
 
             for n, _ in enumerate(data):
                 all_x.extend(data[n]["x"])
