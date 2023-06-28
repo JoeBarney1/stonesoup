@@ -9,7 +9,7 @@ from ..non_state_measures import TrackMeasure
 from ..types.association import AssociationSet, TimeRangeAssociation, Association
 from ..types.groundtruth import GroundTruthPath
 from ..types.time import TimeRange
-from ..types.track import Track
+from ._assignment import multidimensional_deconfliction
 
 
 class TrackToTrackCounting(TwoTrackToTrackAssociator):
@@ -188,7 +188,7 @@ class TrackToTrackCounting(TwoTrackToTrackAssociator):
                         TimeRange(start_timestamp, end_timestamp)))
 
         if self.one_to_one:
-            return AssociationSet(associations).association_deconflicter()
+            return multidimensional_deconfliction(AssociationSet(associations))
         else:
             return AssociationSet(associations)
 
