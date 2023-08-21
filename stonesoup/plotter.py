@@ -974,6 +974,7 @@ def convert_detection(state: Detection, measurement_model: MeasurementModel = No
         rotational_matrix = np.array(((c, -s), (s, c)))
 
         points = np.array([[a * np.sin(i), b * np.cos(i)] for i in points])
+        points.append(points[0])
         points = rotational_matrix @ points.T
         return points + state.mean[mapping[:2], :]
 
