@@ -26,3 +26,8 @@ Actionable
 ----------
 .. automodule:: stonesoup.sensor.actionable
     :show-inheritance:
+
+Gas
+---
+.. automodule:: stonesoup.sensor.gas
+    :show-inheritance:
