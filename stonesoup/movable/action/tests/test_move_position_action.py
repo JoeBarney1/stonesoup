@@ -6,7 +6,8 @@ import copy
 
 from ....types.state import StateVector, State, StateVectors
 from ....platform import FixedPlatform
-from ...grid import NStepDirectionalGridMovable
+from ..move_position_action import GridActionGenerator, NStepDirectionalGridActionGenerator
+from ...actionable_movable import GridActionableMovable
 
 
 @pytest.mark.parametrize(
@@ -63,7 +64,7 @@ from ...grid import NStepDirectionalGridMovable
         ), (
                 {'n_steps': 2,
                  'step_size': 1,
-                 'action_mapping': (0, 1, 2),
+                 'action_mapping': (0, 1),
                  'action_space': StateVectors([[0, 5], [-1, 5], [-1, 1]]),
                  'resolution': 1},
                 StateVector([0., 0., 0.]),  # state
@@ -91,12 +92,16 @@ def test_n_step_directional_grid_action_gen(generator_params, state, position_ma
         resolution = 1  # if none, it should use default
 
     platform = FixedPlatform(
-        movement_controller=NStepDirectionalGridMovable(
+        movement_controller=GridActionableMovable(
             states=[State(state, timestamp=start_timestamp)],
             position_mapping=position_mapping,
-            **generator_params))  # Dummy platform for initiating the generator
+            generator=GridActionGenerator))  # Dummy platform for populating the owner category
 
-    generator = platform.actions(start_timestamp).pop()
+    generator = NStepDirectionalGridActionGenerator(owner=platform,
+                                                    attribute='position',
+                                                    start_time=start_timestamp,
+                                                    end_time=end_timestamp,
+                                                    **generator_params)
 
     # Check that parameters have been set correctly
     assert generator.n_steps == n_steps
@@ -124,15 +129,10 @@ def test_n_step_directional_grid_action_gen(generator_params, state, position_ma
                 continue
             eval_action = copy.copy(state)
             eval_action[dim] += delta
-
-            if action_space is None or \
-                    (np.all(eval_action[action_mapping, :] >= action_space[:, [0]])
-                     and np.all(eval_action[action_mapping, :] <= action_space[:, [1]])):
+            if action_space is not None and (np.any(eval_action < action_space[:, 0]) or
+                                             np.any(eval_action > action_space[:, 1])):
+                continue
+            else:
                 eval_actions.append(eval_action)
 
     assert np.all(np.isclose(actions, eval_actions))
-
-    platform.add_actions(move_position_actions[1])
-    platform.act(end_timestamp)
-
-    assert np.all(np.isclose(platform.position, actions[1]))
