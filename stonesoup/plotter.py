@@ -2132,7 +2132,8 @@ class AnimatedPlotterly(_Plotter):
         self.plotting_function_called = True
 
     def plot_measurements(self, measurements, mapping, measurement_model=None,
-                          resize=True, measurements_label="Measurements", **kwargs):
+                          resize=True, measurements_label="Measurements", convert_measurements=True,
+                          **kwargs):
         """Plots measurements
 
         Plots detections and clutter, generating a legend automatically. Detections are plotted as
@@ -2155,6 +2156,9 @@ class AnimatedPlotterly(_Plotter):
             If True, will resize figure to ensure measurements are in view
         measurements_label : str
             Label for the measurements.  Default is "Measurements".
+        convert_measurements : bool
+            Should the measurements be converted from measurement space to state space before
+            being plotted. Default is True
         \\*\\*kwargs: dict
             Additional arguments to be passed to scatter function for detections. Defaults are
             ``marker=dict(color="#636EFA")``.
@@ -2169,7 +2173,8 @@ class AnimatedPlotterly(_Plotter):
             measurements_set = measurements
         plot_detections, plot_clutter = self._conv_measurements(measurements_set,
                                                                 mapping,
-                                                                measurement_model)
+                                                                measurement_model,
+                                                                convert_measurements)
         plot_combined = {'Detection': plot_detections,
                          'Clutter': plot_clutter}  # for later reference
 
