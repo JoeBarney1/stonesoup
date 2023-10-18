@@ -1,6 +1,4 @@
 import copy
-import math
-
 import numpy as np
 import scipy
 
@@ -10,7 +8,7 @@ from ..base import Property
 from ..types.prediction import Prediction, EnsembleStatePrediction
 from ..types.state import State
 from ..types.update import Update
-from ..types.array import CovarianceMatrix, StateVectors, StateVector
+from ..types.array import CovarianceMatrix, StateVectors
 
 
 class BayesianRecursiveUpdater(ExtendedKalmanUpdater):
@@ -19,13 +17,12 @@ class BayesianRecursiveUpdater(ExtendedKalmanUpdater):
     """
     number_steps: int = Property(doc="Number of recursive steps",
                                  default=1)
+    use_joseph_cov: bool = Property(doc="Bool dictating the method of covariance calculation. If "
+                                        "use_joseph_cov is True then the Joseph form of the "
+                                        "covariance equation is used.",
+                                    default=False)
 
-    @classmethod
-    def _get_meas_cov_scale_factor(cls, n=1, step_no=None):
-        return n
-
-    def _innovation_covariance(self, m_cross_cov, meas_mat, meas_mod, measurement_noise,
-                               scale_factor=1, **kwargs):
+    def _innovation_covariance(self, m_cross_cov, meas_mat, meas_mod):
         """Compute the innovation covariance
 
         Parameters
@@ -36,10 +33,6 @@ class BayesianRecursiveUpdater(ExtendedKalmanUpdater):
             Measurement matrix
         meas_mod : :class:~.MeasurementModel`
             Measurement model
-        measurement_noise : bool
-            Include measurement noise or not
-        scale_factor : float
-            Scaling factor between 0 and 1. Default 1 (no scaling)
 
         Returns
         -------
@@ -47,12 +40,9 @@ class BayesianRecursiveUpdater(ExtendedKalmanUpdater):
             The innovation covariance
 
         """
-        innov_covar = meas_mat@m_cross_cov
-        if measurement_noise:
-            innov_covar += scale_factor*meas_mod.covar(**kwargs)
-        return innov_covar
+        return meas_mat@m_cross_cov + self.number_steps*meas_mod.covar()
 
-    def _posterior_covariance(self, hypothesis, scale_factor=1):
+    def _posterior_covariance(self, hypothesis):
         """
         Return the posterior covariance for a given hypothesis
 
@@ -80,23 +70,21 @@ class BayesianRecursiveUpdater(ExtendedKalmanUpdater):
             kalman_gain = hypothesis.measurement_prediction.cross_covar @ \
                 np.linalg.inv(hypothesis.measurement_prediction.covar)
 
-            measurement_model = self._check_measurement_model(
-                hypothesis.measurement.measurement_model)
-
             # Calculate measurement matrix/jacobian matrix
-            meas_matrix = self._measurement_matrix(hypothesis.prediction,
-                                                   measurement_model)
+            meas_matrix = self._measurement_matrix(hypothesis.prediction)
 
             # Calculate Prior covariance
             prior_covar = hypothesis.prediction.covar
 
             # Calculate measurement covariance
-            meas_covar = measurement_model.covar()
+            meas_covar = hypothesis.measurement.measurement_model.covar()
 
             # Compute posterior covariance matrix
             I_KH = id_matrix - kalman_gain @ meas_matrix
             post_cov = I_KH @ prior_covar @ I_KH.T \
-                + kalman_gain @ (scale_factor * meas_covar) @ kalman_gain.T
+                + kalman_gain @ (self.number_steps * meas_covar) @ kalman_gain.T
+
+            return post_cov.view(CovarianceMatrix), kalman_gain
 
         else:
             kalman_gain = hypothesis.measurement_prediction.cross_covar @ \
@@ -105,7 +93,7 @@ class BayesianRecursiveUpdater(ExtendedKalmanUpdater):
             post_cov = hypothesis.prediction.covar - kalman_gain @ \
                 hypothesis.measurement_prediction.covar @ kalman_gain.T
 
-        return post_cov.view(CovarianceMatrix), kalman_gain
+            return post_cov.view(CovarianceMatrix), kalman_gain
 
     def update(self, hypothesis, **kwargs):
         r"""The Kalman update method. Given a hypothesised association between
@@ -149,15 +137,13 @@ class BayesianRecursiveUpdater(ExtendedKalmanUpdater):
                              "updated state")
 
         nhypothesis = copy.copy(hypothesis)
-        for i in range(1, self.number_steps + 1):
-
-            sf = self._get_meas_cov_scale_factor(self.number_steps, i)
+        for _ in range(self.number_steps):
 
             nhypothesis.measurement_prediction = self.predict_measurement(
-                nhypothesis.prediction, measurement_model=measurement_model, scale_factor=sf)
+                nhypothesis.prediction, measurement_model=measurement_model)
             # Kalman gain and posterior covariance
-            posterior_covariance, kalman_gain = self._posterior_covariance(nhypothesis,
-                                                                           scale_factor=sf)
+            posterior_covariance, kalman_gain = \
+                self._posterior_covariance(nhypothesis)
 
             # Posterior mean
             posterior_mean = self._posterior_mean(nhypothesis.prediction, kalman_gain,
@@ -216,17 +202,11 @@ class RecursiveEnsembleUpdater(ExtendedKalmanUpdater, EnsembleUpdater):
 
         for _ in range(self.number_steps):
 
-            # Clear measurement prediction so that it is automatically recalculated
-            nhypothesis.measurement_prediction = None
-
             # Generate an ensemble of measurements based on measurement
             measurement_ensemble = nhypothesis.prediction.generate_ensemble(
                 mean=hypothesis.measurement.state_vector,
                 covar=self.measurement_model.covar(),
                 num_vectors=num_vectors)
-
-            # Recalculate measurement prediction
-            nhypothesis = self._check_measurement_prediction(nhypothesis)
 
             # Calculate Kalman Gain according to Dr. Jan Mandel's EnKF formalism.
             innovation_ensemble = nhypothesis.prediction.state_vector - nhypothesis.prediction.mean
@@ -369,197 +349,3 @@ class RecursiveLinearisedEnsembleUpdater(ExtendedKalmanUpdater, EnsembleUpdater)
                                  X,
                                  timestamp=hypothesis.measurement.timestamp,
                                  hypothesis=hypothesis)
-
-
-class VariableStepBayesianRecursiveUpdater(BayesianRecursiveUpdater):
-    """
-    Extension of the BayesianRecursiveUpdater. The BayesianRecursiveUpdater uses equal
-    measurement noise for each recursive step. The VariableStepBayesianUpdater over-inflates
-    measurement noise in the earlier steps, requiring the use of a smaller number of steps.
-
-    References
-    ----------
-
-    1. K. Michaelson, A. A. Popov and R. Zanetti,
-    "Bayesian Recursive Update for Ensemble Kalman Filters"
-    """
-    number_steps: int = Property(doc="Number of recursive steps",
-                                 default=1)
-
-    @classmethod
-    def _get_meas_cov_scale_factor(cls, n=1, step_no=None):
-        return 1 / (step_no / ((n * (n + 1)) / 2))
-
-
-class ErrorControllerBayesianRecursiveUpdater(BayesianRecursiveUpdater):
-    """
-    Extension of the variable-step Bayesian recursive update method, which introduces
-    error-controlling parameters. This method allows the step size to adjust according to the
-    error value from the previous step. Implementation based on algorithm 3 of [1]. Default
-    values for parameters atol, rtol, f, fmin and fmax are copied from values stated in examples
-    in [1]
-
-    References
-    ----------
-
-    1. K. Michaelson, A. A. Popov and R. Zanetti,
-    "Bayesian Recursive Update for Ensemble Kalman Filters"
-
-    """
-    atol: float = Property(default=1.e-3,
-                           doc="Absolute tolerance value")
-    rtol: float = Property(default=1.e-3,
-                           doc="Relative tolerance value")
-    f: float = Property(doc="Nominal value for step size scale factor")
-    fmin: float = Property(doc="Minimum value for step size scale factor")
-    fmax: float = Property(doc="Maximum value for step size scale factor")
-
-    def update(self, hypothesis, **kwargs):
-        """
-        Update method of the ErrorControllerBayesianRecursiveUpdater. This method allows the
-        step size to adjust according to the error value from the previous step.
-
-        Parameters
-        ----------
-        hypothesis : :class:`~.SingleHypothesis`
-            the prediction-measurement association hypothesis. This hypothesis
-            may carry a predicted measurement, or a predicted state. In the
-            latter case a predicted measurement will be calculated.
-
-        Returns
-        -------
-        : :class:`~.GaussianStateUpdate`
-            The posterior state Gaussian with mean :math:`\\mathbf{x}_{k|k}` and
-            covariance :math:`P_{x|x}`
-
-        """
-        if not self.number_steps > 0:
-            raise ValueError("Updater cannot run 0 times (or less). This would not provide an "
-                             "updated state")
-
-        # # 1-2) X0 = prior state estimate
-        X_0 = hypothesis.prediction.state_vector
-        P_0 = hypothesis.prediction.covar
-
-        # Get the measurement model out of the measurement if it's there.
-        # If not, use the one native to the updater (which might still be
-        # none)
-        measurement_model = hypothesis.measurement.measurement_model
-        measurement_model = self._check_measurement_model(measurement_model)
-
-        # If there is no measurement prediction in the hypothesis then do the
-        # measurement prediction (and attach it back to the hypothesis).
-        if hypothesis.measurement_prediction is None:
-            # Attach the measurement prediction to the hypothesis
-            hypothesis.measurement_prediction = self.predict_measurement(
-                hypothesis.prediction, measurement_model=measurement_model, **kwargs)
-
-        # 3) define initial tc value
-        tc = 0
-
-        # 4) define initial ds value
-        ds = 1/self.number_steps
-
-        # 5) start iteration count
-        i = 1
-
-        # Make two deep copies of the hypothesis
-        nhypothesis = copy.deepcopy(hypothesis)
-        nhypothesis_prime = copy.deepcopy(hypothesis)
-
-        # initial values for iteration i-1
-        X_iminus1 = X_0
-        P_iminus1 = P_0
-
-        while tc < 1:
-
-            if tc + ds > 1:
-                # 9) update ds value
-                ds = 1 - tc
-
-            # Update predicted state
-            nhypothesis.prediction = Prediction.from_state(nhypothesis_prime.prediction,
-                                                           state_vector=X_iminus1,
-                                                           covar=P_iminus1)
-            nhypothesis.measurement_prediction = None
-
-            # 12-13) Jacobian, innov_cov calculations using prior state. Note different innov
-            # cov method
-            nhypothesis.measurement_prediction = self.predict_measurement(
-                nhypothesis.prediction, measurement_model=measurement_model, scale_factor=1/ds)
-
-            # 14, 17) Posterior cov and Kalman gain calculation
-            P_i, K = self._posterior_covariance(nhypothesis, scale_factor=1/ds)
-
-            # 16) posterior state_vector calculation
-            X_i = self._posterior_mean(nhypothesis.prediction, K,
-                                       nhypothesis.measurement,
-                                       nhypothesis.measurement_prediction)
-
-            # 15) deltaX calculation
-            deltaX_i = X_i - X_iminus1
-
-            # Set nhypothesis_prime.prediction to be the posterior state
-            nhypothesis_prime.prediction = Prediction.from_state(nhypothesis.prediction,
-                                                                 state_vector=X_i,
-                                                                 covar=P_i)
-
-            # 19-20) Jacobian, innov_cov calculations using posterior state. Note different innov
-            # cov method
-            nhypothesis_prime.measurement_prediction = self.predict_measurement(
-                nhypothesis_prime.prediction, measurement_model=measurement_model,
-                scale_factor=1/ds)
-
-            # 21) P' and K' calculation
-            P_prime, K_prime = self._posterior_covariance(nhypothesis_prime, scale_factor=1 / ds)
-
-            # 22) deltaX_prime calculation
-            deltaX_i_prime = self._posterior_mean(nhypothesis_prime.prediction, K_prime,
-                                                  nhypothesis_prime.measurement,
-                                                  nhypothesis_prime.measurement_prediction) - \
-                nhypothesis_prime.prediction.state_vector
-
-            # 23) posterior_state_prime calculation
-            X_i_prime = X_iminus1 + 0.5*(deltaX_i + deltaX_i_prime)
-
-            # 24) sc calculation
-            sc = self.atol + \
-                StateVector(np.max(np.hstack((np.abs(X_i), np.abs(X_i_prime))), axis=1)) * \
-                self.rtol
-
-            # 25) error calculation
-            error = np.sqrt(np.mean((np.multiply(1/sc, X_i - X_i_prime)) ** 2))
-
-            if error > 1:
-                # 28) update ds
-                ds = ds * min(0.9, max(self.fmin, self.f * math.sqrt(1/error)))
-
-                # 29) reject update and go to top of loop
-                continue
-
-            # 32) update tc (tc = tc + ds)
-            tc = tc + ds
-
-            # 33) posterior_state_vector <- posterior_state_vector_tilda
-            X_iminus1 = X_i
-
-            # 34) posterior_cov <- posterior_cov_tilda
-            P_iminus1 = P_i
-
-            # 35) update iteration count
-            i += 1
-
-            # 36) update ds
-            ds = ds * min(self.fmax, max(self.fmin, self.f * math.sqrt(1/error)))
-
-        # 39) final_posterior_state_vector <- posterior_state_vector at i-1
-        X = X_iminus1
-        # 40) final_posterior_cov <- posterior_cov
-        P = P_i
-
-        if self.force_symmetric_covariance:
-            P = (P + P.T)/2
-        return Update.from_state(
-            hypothesis.prediction,
-            X, P,
-            timestamp=hypothesis.measurement.timestamp, hypothesis=hypothesis)
