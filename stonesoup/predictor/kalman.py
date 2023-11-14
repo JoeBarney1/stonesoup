@@ -360,7 +360,7 @@ class UnscentedKalmanPredictor(KalmanPredictor):
 
         # and return a Gaussian state based on these parameters
         return Prediction.from_state(prior, x_pred, p_pred, timestamp=timestamp,
-                                     transition_model=self.transition_model)
+                                     transition_model=self.transition_model, prior=prior)
 
 
 class SqrtKalmanPredictor(ExtendedKalmanPredictor):
