@@ -4,18 +4,14 @@ import warnings
 from . import Updater
 from ..base import Property
 from ..measures import Measure, KLDivergence
-from ..models.measurement import MeasurementModel
-from ..models.transition import TransitionModel
 from ..predictor import Predictor
+
 from .kalman import ExtendedKalmanUpdater
-from ..predictor.kalman import ExtendedKalmanPredictor
 from ..smoother import Smoother
-from ..smoother.kalman import ExtendedKalmanSmoother
-from ..types.prediction import Prediction
 from ..types.track import Track
 
 
-class DynamicallyIteratedUpdater(Updater):
+class DynamicallyIteratedUpdater(ExtendedKalmanUpdater):
     """
     Wrapper around a :class:`~.Predictor`, :class:`~.Updater` and :class:`~.Smoother`. This
     updater takes a :class:`~.Prediction`, and updates as usual by calling its updater property.
@@ -32,7 +28,7 @@ class DynamicallyIteratedUpdater(Updater):
     1. Anton Kullberg, Isaac Skog, Gustaf Hendeby,
     "Iterated Filters for Nonlinear Transition Models"
     """
-    measurement_model = None
+
     predictor: Predictor = Property(doc="Predictor to use for iterating over the predict step. "
                                         "Probably should be the same predictor used for the "
                                         "initial predict step")
@@ -50,15 +46,7 @@ class DynamicallyIteratedUpdater(Updater):
         doc="Number of iterations before while loop is exited and a non-convergence warning is "
             "returned")
 
-    def predict_measurement(self, *args, **kwargs):
-        return self.updater.predict_measurement(*args, **kwargs)
-
     def update(self, hypothesis, **kwargs):
-
-        # Get last update step for smoothing
-        prior_state = hypothesis.prediction.prior
-        while isinstance(prior_state, Prediction) and getattr(prior_state, 'prior', None):
-            prior_state = prior_state.prior
 
         # 1) Compute X^0_{k|k-1}, P^0_{k|k-1} via eqtn 2 (predict step)
         # Step 1 is completed by predict step, provided in hypothesis.prediction
@@ -67,11 +55,11 @@ class DynamicallyIteratedUpdater(Updater):
         posterior_state = self.updater.update(hypothesis, **kwargs)
 
         # 3) Compute X^0_{k-1|k}, P^0_{k-1|k} via eqtn 4 (smooth)
-        track_to_smooth = Track(states=[prior_state, posterior_state])
+        track_to_smooth = Track(states=[hypothesis.prediction.prior, posterior_state])
         # Feed posterior and prior update into the smoother
         smoothed_track = self.smoother.smooth(track_to_smooth)
         # Extract smoothed prior state
-        smoothed_state = smoothed_track[0]
+        prior_state = smoothed_track[0]
 
         nhypothesis = copy.deepcopy(hypothesis)
         iterations = 0
@@ -99,19 +87,17 @@ class DynamicallyIteratedUpdater(Updater):
 
             # (1) Predict from prior_state
             pred_state = self.predictor.predict(prior_state,
-                                                timestamp=hypothesis.prediction.timestamp,
-                                                linearisation_point=smoothed_state)
+                                                timestamp=hypothesis.prediction.timestamp)
             nhypothesis.prediction = pred_state
 
             # (2) Update using hypothesis made from new prediction and old measurement
             nhypothesis.measurement_prediction = None
-            new_posterior = self.updater.update(nhypothesis, linearisation_point=old_posterior)
+            new_posterior = self.updater.update(nhypothesis)
 
-            # (3) Smooth again and update the smoothed state
-            track_to_smooth = Track(states=[prior_state, new_posterior])
-            smoothed_track = self.smoother.smooth(
-                track_to_smooth, linearisation_point=smoothed_state)
-            smoothed_state = smoothed_track[0]
+            # (3) Smooth again and update the prior state
+            track_to_smooth = Track(states=[nhypothesis.prediction.prior, new_posterior])
+            smoothed_track = self.smoother.smooth(track_to_smooth)
+            prior_state = smoothed_track[0]
 
             # (4) Update iteration count
             iterations += 1
@@ -120,20 +106,3 @@ class DynamicallyIteratedUpdater(Updater):
         new_posterior.hypothesis = hypothesis
 
         return new_posterior
-
-
-class DynamicallyIteratedEKFUpdater(DynamicallyIteratedUpdater):
-    predictor = None
-    updater = None
-    smoother = None
-    measurement_model: MeasurementModel = Property(doc="measurement model")
-    transition_model: TransitionModel = Property(doc="The transition model to be used.")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.updater = ExtendedKalmanUpdater(self.measurement_model)
-        self.predictor = ExtendedKalmanPredictor(self.transition_model)
-        self.smoother = ExtendedKalmanSmoother(self.transition_model)
-
-
-ExtendedKalmanUpdater.register(DynamicallyIteratedEKFUpdater)

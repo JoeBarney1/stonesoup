@@ -3,7 +3,8 @@ import numpy as np
 import datetime
 
 from stonesoup.models.measurement.nonlinear import CartesianToBearingRange
-from stonesoup.models.transition.nonlinear import ConstantTurn
+from stonesoup.models.transition.linear import CombinedLinearGaussianTransitionModel, \
+    ConstantVelocity
 from stonesoup.predictor.kalman import ExtendedKalmanPredictor
 from stonesoup.smoother.kalman import ExtendedKalmanSmoother
 from stonesoup.types.angle import Bearing
@@ -20,15 +21,15 @@ def test_diekf():
 
     time1 = datetime.datetime.now()
     time2 = time1 + datetime.timedelta(seconds=1)
-    time3 = time2 + datetime.timedelta(seconds=1)
 
-    transition_model = ConstantTurn([0.05, 0.05], np.radians(2))
+    transition_model = CombinedLinearGaussianTransitionModel([ConstantVelocity(0.05),
+                                                              ConstantVelocity(0.05)])
 
     sensor_x = 50  # Placing the sensor off-centre
     sensor_y = 0
 
     measurement_model = CartesianToBearingRange(
-        ndim_state=5,
+        ndim_state=4,
         mapping=(0, 2),
         noise_covar=np.diag([np.radians(0.2), 1]),  # Covariance matrix. 0.2 degree variance in
         # bearing and 1 metre in range
@@ -36,21 +37,16 @@ def test_diekf():
         # sensor in cartesian.
     )
 
-    prior = GaussianState(
-        [[0.], [1.], [0.], [1.], [0.]],
-        np.diag([1.5, 0.5, 1.5, 0.5, np.radians(0.5)]),
-        timestamp=time1)
+    prior = GaussianState([[0], [1], [0], [1]], np.diag([1.5, 0.5, 1.5, 0.5]), timestamp=time1)
 
-    prediction = GaussianStatePrediction(
-        state_vector=StateVector([[1.], [1.], [1.], [1.], [0.]]),
-        covar=CovarianceMatrix([[1.5, 0., 0., 0., 0.],
-                                [0., 0.5, 0., 0., 0.],
-                                [0., 0., 1.5, 0., 0.],
-                                [0., 0., 0., 0.5, 0.],
-                                [0., 0., 0., 0., np.radians(0.5)]]),
-        transition_model=transition_model,
-        timestamp=time2,
-        prior=prior)
+    prediction = GaussianStatePrediction(state_vector=StateVector([[0.], [1.], [0.], [1.]]),
+                                         covar=CovarianceMatrix([[1.5, 0., 0., 0.],
+                                                                 [0., 0.5, 0., 0.],
+                                                                 [0., 0., 1.5, 0.],
+                                                                 [0., 0., 0., 0.5]]),
+                                         transition_model=transition_model,
+                                         timestamp=time2,
+                                         prior=prior)
 
     measurement = Detection(state_vector=StateVector([[Bearing(-3.1217136817127424)],
                                                       [47.7876225398533]]),
@@ -63,7 +59,8 @@ def test_diekf():
     sub_predictor = ExtendedKalmanPredictor(transition_model)
     smoother = ExtendedKalmanSmoother(transition_model)
 
-    updater = DynamicallyIteratedUpdater(predictor=sub_predictor,
+    updater = DynamicallyIteratedUpdater(measurement_model=measurement_model,
+                                         predictor=sub_predictor,
                                          updater=sub_updater,
                                          smoother=smoother)
 
@@ -77,39 +74,17 @@ def test_diekf():
     assert updated_state.hypothesis.measurement == measurement
 
     # Check state vector is correct
-    assert np.allclose(
-        updated_state.state_vector,
-        StateVector([[1.812], [1.211], [0.603], [0.897], [0.]]),
-        atol=1e-3)
+    assert np.allclose(updated_state.state_vector, StateVector([[1.80932438],
+                                                                [1.21069189],
+                                                                [0.60060323],
+                                                                [0.89602481]]))
 
     # Check covariance matrix is correct
-    assert np.allclose(
-        updated_state.covar,
-        CovarianceMatrix(
-            [[0.669, 0.174, 0.012, 0.003, 0.],
-             [0.174, 0.467, 0.003, -0.008, -0.009],
-             [0.012, 0.003, 1.615,  0.420, 0.],
-             [0.003, -0.008, 0.420, 0.531, 0.009],
-             [0., -0.009, 0., 0.009, 0.044]]),
-        atol=1.e-3)
-
-    prediction = sub_predictor.predict(updated_state, time3)
-    measurement = Detection(state_vector=StateVector([[Bearing(3.133)], [47.777]]),
-                            timestamp=time3,
-                            measurement_model=measurement_model)
-    hypothesis = SingleHypothesis(prediction=prediction, measurement=measurement)
-    updated_state = updater.update(hypothesis=hypothesis)
-
-    assert np.allclose(
-        updated_state.state_vector,
-        StateVector([[2.550], [0.999], [1.215], [0.811], [0.005]]),
-        atol=1e-3)
-    assert np.allclose(
-        updated_state.covar,
-        CovarianceMatrix(
-            [[0.603, 0.275, 0.027, -0.003, -0.010],
-             [0.275, 0.370, -0.013, -0.043, -0.037],
-             [0.027, -0.013, 2.182, 0.730, 0.022],
-             [-0.003, -0.043, 0.730, 0.548, 0.049],
-             [-0.010, -0.037, 0.022, 0.049, 0.078]]),
-        atol=1e-3)
+    assert np.allclose(updated_state.covar, CovarianceMatrix([[6.68906899e-01, 1.74136920e-01,
+                                                               1.95258451e-02, 5.08317455e-03],
+                                                              [1.74136920e-01, 4.58659611e-01,
+                                                               5.08317455e-03, 1.32330577e-03],
+                                                              [1.95258451e-02, 5.08317455e-03,
+                                                               1.62526160e+00, 4.23105294e-01],
+                                                              [5.08317455e-03, 1.32330577e-03,
+                                                               4.23105294e-01, 5.23473692e-01]]))
