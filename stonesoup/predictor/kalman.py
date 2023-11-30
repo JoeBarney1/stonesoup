@@ -177,8 +177,7 @@ class KalmanPredictor(Predictor):
                                           **kwargs)
 
         # Prediction of the covariance
-        p_pred = self._predicted_covariance(prior, predict_over_interval,
-                                            control_input=control_input)
+        p_pred = self._predicted_covariance(prior, predict_over_interval, **kwargs)
 
         # And return the state in the correct form
         return Prediction.from_state(prior, x_pred, p_pred, timestamp=timestamp,
@@ -203,7 +202,7 @@ class ExtendedKalmanPredictor(KalmanPredictor):
         doc="The control model to be used. Default `None` where the predictor "
             "will create a zero-effect linear :class:`~.ControlModel`.")
 
-    def _transition_matrix(self, prior, **kwargs):
+    def _transition_matrix(self, prior, linearisation_point=None, **kwargs):
         r"""Returns the transition matrix, a matrix if the model is linear, or
         approximated as Jacobian otherwise.
         Parameters
@@ -223,7 +222,9 @@ class ExtendedKalmanPredictor(KalmanPredictor):
         if isinstance(self.transition_model, LinearModel):
             return self.transition_model.matrix(**kwargs)
         else:
-            return self.transition_model.jacobian(prior, **kwargs)
+            if linearisation_point is None:
+                linearisation_point = prior
+            return self.transition_model.jacobian(linearisation_point, **kwargs)
 
     def _transition_function(self, prior, **kwargs):
         r"""This is the application of :math:`f_k(\mathbf{x}_{k-1})`, the
