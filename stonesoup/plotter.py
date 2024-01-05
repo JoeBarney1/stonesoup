@@ -1962,6 +1962,8 @@ class AnimationPlotter(_Plotter):
             Label for the x axis
         y_label: str
             Label for the y axis
+        plot_title: str
+            Title for the plot
 
         Returns
         -------
@@ -2051,6 +2053,8 @@ class AnimationPlotter(_Plotter):
             lowest (earliest) time for an item to be plotted
         end_times : List[datetime]
             highest (latest) time for an item to be plotted
+        title: str
+            Title for the plot
 
         Returns
         -------
