@@ -997,10 +997,13 @@ class Plotterly(_Plotter):
         if self.dimension != 2:
             raise TypeError("Only 2D plotting currently supported")
 
-    if isinstance(meas_model, LinearModel):
-        model_matrix = meas_model.matrix()
-        inv_model_matrix = np.linalg.pinv(model_matrix)
-        state_vec = inv_model_matrix @ state.state_vector
+        from plotly import colors
+        layout_kwargs = dict(
+            xaxis_title="x",
+            yaxis_title="y",
+            colorway=colors.qualitative.Plotly,  # Needed to match colours later.
+        )
+        layout_kwargs.update(kwargs)
 
     elif isinstance(meas_model, NonLinearModel):
         try:
