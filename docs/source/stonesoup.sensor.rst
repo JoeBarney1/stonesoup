@@ -22,9 +22,9 @@ Passive
 .. automodule:: stonesoup.sensor.passive
     :show-inheritance:
 
-Actionable
-----------
-.. automodule:: stonesoup.sensor.actionable
+Categorical
+-----------
+.. automodule:: stonesoup.sensor.categorical
     :show-inheritance:
 
 Gas
