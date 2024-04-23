@@ -1,14 +1,17 @@
 import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
+from enum import IntEnum
 from itertools import chain
 from typing import Collection, Iterable, Union, List, Optional, Tuple, Dict
+
 import numpy as np
 from matplotlib import animation as animation
 from matplotlib import pyplot as plt
 from matplotlib.legend_handler import HandlerPatch
 from matplotlib.lines import Line2D
 from matplotlib.patches import Ellipse
+from mergedeep import merge
 from scipy.integrate import quad
 from scipy.optimize import brentq
 from scipy.stats import kde
@@ -21,22 +24,14 @@ try:
 except ImportError:
     go = None
 
-from stonesoup.base import Base, Property
-from stonesoup.types.detection import Detection
-from stonesoup.types.state import State, StateVector
-
+from .base import Base, Property
+from .models.base import LinearModel, Model
 from .types import detection
-from .types.groundtruth import GroundTruthPath
 from .types.array import StateVector
+from .types.groundtruth import GroundTruthPath
 from .types.metric import SingleTimeMetric
 from .types.state import State, StateMutableSequence
 from .types.update import Update
-
-from .base import Base, Property
-
-from .models.base import LinearModel, Model
-
-from enum import IntEnum
 
 
 class Dimension(IntEnum):
@@ -289,9 +284,11 @@ class Plotter(_Plotter):
             self.legend_dict[measurements_label] = measurements_handle
 
         if plot_clutter:
+            clutter_kwargs = kwargs.copy()
+            clutter_kwargs.update(dict(marker='2'))
             clutter_array = np.array(list(plot_clutter.values()))
-            artists.append(self.ax.scatter(*clutter_array.T, color='y', marker='2'))
-            clutter_handle = Line2D([], [], linestyle='', marker='2', color='y')
+            artists.append(self.ax.scatter(*clutter_array.T, **clutter_kwargs))
+            clutter_handle = Line2D([], [], linestyle='', **clutter_kwargs)
             clutter_label = "Clutter"
 
             # Generate legend items for clutter
@@ -1003,7 +1000,7 @@ class Plotterly(_Plotter):
         if self.dimension == 3:
             layout_kwargs.update(dict(scene_aspectmode='data'))  # auto shapes fig to fit data well
 
-        layout_kwargs.update(kwargs)
+        merge(layout_kwargs, kwargs)
 
     elif isinstance(meas_model, NonLinearModel):
         try:
@@ -1061,7 +1058,7 @@ class Plotterly(_Plotter):
         if self.dimension == 3:  # make ground truth line thicker so easier to see in 3d plot
             truths_kwargs.update(dict(line=dict(width=8, dash="longdashdot")))
 
-        truths_kwargs.update(kwargs)
+        merge(truths_kwargs, kwargs)
         add_legend = truths_kwargs['legendgroup'] not in {trace.legendgroup
                                                           for trace in self.fig.data}
 
@@ -1149,7 +1146,7 @@ class Plotterly(_Plotter):
             if self.dimension == 3:  # make markers smaller in 3d plot
                 measurement_kwargs.update(dict(marker=dict(size=4, color='#636EFA')))
 
-            measurement_kwargs.update(kwargs)
+            merge(measurement_kwargs, kwargs)
             if measurement_kwargs['legendgroup'] not in {trace.legendgroup
                                                          for trace in self.fig.data}:
                 measurement_kwargs['showlegend'] = True
@@ -1182,7 +1179,7 @@ class Plotterly(_Plotter):
 
         if plot_clutter:
             name = measurements_label + "<br>(Clutter)"
-            measurement_kwargs = dict(
+            clutter_kwargs = dict(
                 mode='markers', marker=dict(symbol="star-triangle-up", color='#FECB52'),
                 name=name, legendgroup=name, legendrank=210)
 
@@ -1190,12 +1187,12 @@ class Plotterly(_Plotter):
                 measurement_kwargs.update(dict(marker=dict(size=4, symbol="diamond",
                                                            color='#FECB52')))
 
-            measurement_kwargs.update(kwargs)
-            if measurement_kwargs['legendgroup'] not in {trace.legendgroup
-                                                         for trace in self.fig.data}:
-                measurement_kwargs['showlegend'] = True
+            merge(clutter_kwargs, kwargs)
+            if clutter_kwargs['legendgroup'] not in {trace.legendgroup
+                                                     for trace in self.fig.data}:
+                clutter_kwargs['showlegend'] = True
             else:
-                measurement_kwargs['showlegend'] = False
+                clutter_kwargs['showlegend'] = False
             clutter_array = np.asarray(list(plot_clutter.values()), dtype=np.float64)
 
             if self.dimension == 1:
@@ -1203,14 +1200,14 @@ class Plotterly(_Plotter):
                     x=[state.timestamp for state in plot_clutter.keys()],
                     y=clutter_array[:, 0],
                     text=[self._format_state_text(state) for state in plot_clutter.keys()],
-                    **measurement_kwargs,
+                    **clutter_kwargs,
                 )
             elif self.dimension == 2:
                 self.fig.add_scatter(
                     x=clutter_array[:, 0],
                     y=clutter_array[:, 1],
                     text=[self._format_state_text(state) for state in plot_clutter.keys()],
-                    **measurement_kwargs,
+                    **clutter_kwargs,
                 )
             elif self.dimension == 3:
                 self.fig.add_scatter3d(
@@ -1218,7 +1215,7 @@ class Plotterly(_Plotter):
                     y=clutter_array[:, 1],
                     z=clutter_array[:, 2],
                     text=[self._format_state_text(state) for state in plot_clutter.keys()],
-                    **measurement_kwargs,
+                    **clutter_kwargs,
                 )
 
     def get_next_color(self):
@@ -1290,7 +1287,7 @@ class Plotterly(_Plotter):
 
         if self.dimension == 3:  # change visuals to work well in 3d
             track_kwargs.update(dict(line=dict(width=7)), marker=dict(size=4))
-        track_kwargs.update(kwargs)
+        merge(track_kwargs, kwargs)
         add_legend = track_kwargs['legendgroup'] not in {trace.legendgroup
                                                          for trace in self.fig.data}
 
@@ -1491,7 +1488,7 @@ class Plotterly(_Plotter):
 
         sensor_kwargs = dict(mode='markers', marker=dict(symbol='x', color='black'),
                              legendgroup=sensor_label, legendrank=50)
-        sensor_kwargs.update(kwargs)
+        merge(sensor_kwargs, kwargs)
 
         sensor_kwargs['name'] = sensor_label
         if sensor_kwargs['legendgroup'] not in {trace.legendgroup
@@ -1580,7 +1577,7 @@ class PolarPlotterly(_Plotter):
         plotting_kwargs = dict(
             mode="markers", legendgroup=label, legendrank=200,
             name=label, thetaunit="radians")
-        plotting_kwargs.update(kwargs)
+        merge(plotting_kwargs, kwargs)
         add_legend = plotting_kwargs['legendgroup'] not in {trace.legendgroup
                                                             for trace in self.fig.data}
 
@@ -1627,7 +1624,7 @@ class PolarPlotterly(_Plotter):
             ``line=dict(dash="dash")``.
         """
         truths_kwargs = dict(mode="lines", line=dict(dash="dash"), legendrank=100)
-        truths_kwargs.update(kwargs)
+        merge(truths_kwargs, kwargs)
         angle_mapping = mapping[0]
         if len(mapping) > 1:
             range_mapping = mapping[1]
@@ -1687,7 +1684,7 @@ class PolarPlotterly(_Plotter):
         if plot_detections:
             name = measurements_label + "<br>(Detections)"
             measurement_kwargs = dict(mode='markers', marker=dict(color='#636EFA'), legendrank=200)
-            measurement_kwargs.update(kwargs)
+            merge(measurement_kwargs, kwargs)
             plotting_data = [State(state_vector=plotting_state_vector,
                                    timestamp=det.timestamp)
                              for det, plotting_state_vector in plot_detections.items()]
@@ -1698,16 +1695,16 @@ class PolarPlotterly(_Plotter):
 
         if plot_clutter:
             name = measurements_label + "<br>(Clutter)"
-            measurement_kwargs = dict(mode='markers', legendrank=210,
-                                      marker=dict(symbol="star-triangle-up", color='#FECB52'))
-            measurement_kwargs.update(kwargs)
+            clutter_kwargs = dict(mode='markers', legendrank=210,
+                                  marker=dict(symbol="star-triangle-up", color='#FECB52'))
+            merge(clutter_kwargs, kwargs)
             plotting_data = [State(state_vector=plotting_state_vector,
                                    timestamp=det.timestamp)
                              for det, plotting_state_vector in plot_clutter.items()]
 
             self.plot_state_sequence(state_sequences=[plotting_data], angle_mapping=angle_mapping,
                                      range_mapping=range_mapping, label=name,
-                                     **measurement_kwargs)
+                                     **clutter_kwargs)
 
     def plot_tracks(self, tracks, mapping, uncertainty=False, particle=False, track_label="Tracks",
                     **kwargs):
@@ -1741,7 +1738,7 @@ class PolarPlotterly(_Plotter):
             raise NotImplementedError
 
         track_kwargs = dict(mode='markers+lines', legendrank=300)
-        track_kwargs.update(kwargs)
+        merge(track_kwargs, kwargs)
         angle_mapping = mapping[0]
         if len(mapping) > 1:
             range_mapping = mapping[1]
@@ -2467,7 +2464,7 @@ class AnimatedPlotterly(_Plotter):
         truth_kwargs = dict(x=[], y=[], mode="lines", hoverinfo='none', legendgroup=truths_label,
                             line=dict(dash="dash", color=self.colorway[0]), legendrank=100,
                             name=truths_label, showlegend=True)
-        truth_kwargs.update(kwargs)
+        merge(truth_kwargs, kwargs)
         # legend dummy trace
         self.fig.add_trace(go.Scatter(truth_kwargs))
 
@@ -2476,9 +2473,8 @@ class AnimatedPlotterly(_Plotter):
 
         for n, _ in enumerate(truths):
             # change the colour of each truth and include n in its name
-            truth_kwargs.update({
-                "line": dict(dash="dash", color=self.colorway[n % len(self.colorway)])})
-            truth_kwargs.update(kwargs)
+            merge(truth_kwargs, dict(line=dict(color=self.colorway[n % len(self.colorway)])))
+            merge(truth_kwargs, kwargs)
             self.fig.add_trace(go.Scatter(truth_kwargs))  # add to traces
 
         for frame in self.fig.frames:
@@ -2620,7 +2616,7 @@ class AnimatedPlotterly(_Plotter):
                                   legendgroup='Detections (Measurements)',
                                   legendrank=200, showlegend=True,
                                   marker=dict(color="#636EFA"), hoverinfo='none')
-        measurement_kwargs.update(kwargs)
+        merge(measurement_kwargs, kwargs)
 
         self.fig.add_trace(go.Scatter(measurement_kwargs))  # trace for legend
 
@@ -2629,11 +2625,12 @@ class AnimatedPlotterly(_Plotter):
 
         # change necessary kwargs to initialise clutter trace
         name = measurements_label + "<br>(Clutter)"
-        measurement_kwargs.update({"legendgroup": 'Clutter', "legendrank": 300,
-                                   "marker": dict(symbol="star-triangle-up", color='#FECB52'),
-                                   "name": name, 'showlegend': True})
+        clutter_kwargs = {"legendgroup": 'Clutter', "legendrank": 300,
+                          "marker": dict(symbol="star-triangle-up", color='#FECB52'),
+                          "name": name, 'showlegend': True}
+        merge(clutter_kwargs, kwargs)
 
-        self.fig.add_trace(go.Scatter(measurement_kwargs))  # trace for plotting clutter
+        self.fig.add_trace(go.Scatter(clutter_kwargs))  # trace for plotting clutter
 
         # add data to frames
         for frame in self.fig.frames:
@@ -2975,7 +2972,7 @@ class AnimatedPlotterly(_Plotter):
             sensor_kwargs = dict(mode='markers', marker=dict(symbol='x', color='black'),
                                  legendgroup=sensor_label, legendrank=50,
                                  name=sensor_label, showlegend=True)
-            sensor_kwargs.update(kwargs)
+            merge(sensor_kwargs, kwargs)
 
             self.fig.add_trace(go.Scatter(sensor_kwargs))  # initialises trace
 
