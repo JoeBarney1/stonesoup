@@ -323,4 +323,3 @@ plotter.fig
 #        Multi-target out-of-sequence data association: Tracking using
 #        graphical models, Information Fusion.
 
-# sphinx_gallery_thumbnail_path = '_static/sphinx_gallery/OOSM_Kalman_Thumb.png'

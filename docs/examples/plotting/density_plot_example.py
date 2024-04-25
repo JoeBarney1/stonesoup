@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding: utf-8
 
 """
 Density Plot Example
@@ -12,7 +13,7 @@ analyse large data sets.
 # %%
 # Set the imports and set the start time
 from datetime import datetime, timedelta
-from matplotlib import animation
+from matplotlib import pyplot as plt, animation
 
 from stonesoup.types.groundtruth import GroundTruthPath, GroundTruthState
 from stonesoup.models.transition.linear import CombinedLinearGaussianTransitionModel, \
@@ -76,9 +77,6 @@ plotter.plot_density(truths, index=None)
 # The function allows you to pick an index of the state sequence (ground truth in this example) to
 # plot. In this example we're only interested in the final state of the sequences. An index of '-1'
 # is the last state in the sequence. The resultant plot is much more spread out.
-
-# sphinx_gallery_thumbnail_number = 4
-
 plotter = Plotter()
 plotter.plot_density(truths, index=-1)
 
