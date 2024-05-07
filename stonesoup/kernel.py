@@ -1,10 +1,8 @@
 from abc import abstractmethod
 
 import numpy as np
-
+from stonesoup.types.array import StateVectors
 from .base import Base, Property
-from .types.array import StateVectors
-from .types.state import State
 
 
 class Kernel(Base):
@@ -13,8 +11,11 @@ class Kernel(Base):
     A Kernel provides a means to translate state space or measurement space into kernel space.
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     @abstractmethod
-    def __call__(self, state1, state2=None):
+    def __call__(self, state1, state2):
         r"""
         Compute the kernel state of a pair of :class:`~.State` objects
 
@@ -25,33 +26,18 @@ class Kernel(Base):
 
         Returns
         -------
-        StateVectors
+        float
             kernel state of a pair of input :class:`~.State` objects
 
         """
         raise NotImplementedError
 
-    @staticmethod
-    def _get_state_vectors(state1, state2):
-        if isinstance(state1, State):
-            state_vector1 = state1.state_vector
-        else:
-            state_vector1 = state1
-        if state2 is None:
-            state_vector2 = state_vector1
-        else:
-            if isinstance(state2, State):
-                state_vector2 = state2.state_vector
-            else:
-                state_vector2 = state2
-        return state_vector1, state_vector2
-
 
 class QuadraticKernel(Kernel):
     r"""Quadratic Kernel type
 
-    This kernel returns the quadratic kernel state vector from a pair of
-    :class:`~.KernelParticleState` state vectors.
+    This kernel returns the quadratic kernel state from a pair of
+    :class:`~.KernelParticleState` objects.
 
     The Quadratic kernel of state vectors :math:`\mathbf{x}` and
     :math:`\mathbf{x}'` is defined as:
@@ -77,10 +63,12 @@ class QuadraticKernel(Kernel):
         Returns
         -------
         StateVectors
-            Transformed state vector in kernel space.
+            Transformed state in kernel space.
         """
-        state_vector1, state_vector2 = self._get_state_vectors(state1, state2)
-        return (state_vector1.T@state_vector2/self.ialpha + self.c) ** 2
+        if state2 is None:
+            state2 = state1
+        return (state1.state_vector.T @ state2.state_vector /
+                self.ialpha + self.c) ** 2
 
 
 class QuarticKernel(Kernel):
@@ -115,15 +103,17 @@ class QuarticKernel(Kernel):
         StateVectors
             Transformed state in kernel space.
         """
-        state_vector1, state_vector2 = self._get_state_vectors(state1, state2)
-        return (state_vector1.T@state_vector2/self.ialpha + self.c) ** 4
+        if state2 is None:
+            state2 = state1
+        return (state1.state_vector.T @ state2.state_vector /
+                self.ialpha + self.c) ** 4
 
 
 class GaussianKernel(Kernel):
     r"""Gaussian Kernel
 
-    This kernel returns the Gaussian kernel state vector from a pair of
-    :class:`~.KernelParticleState` state vectors.
+    This kernel returns the Gaussian kernel state from a pair of
+    :class:`~.KernelParticleState` objects.
 
     The Gaussian kernel of state vectors :math:`\mathbf{x}` and
     :math:`\mathbf{x}'` is defined as:
@@ -137,6 +127,9 @@ class GaussianKernel(Kernel):
         doc=r"Denoted as :math:`\sigma^2` in the equation above. Determines the width of the "
             r"Gaussian kernel. Range is [1e0, 1e2].")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def __call__(self, state1, state2=None):
         r"""Calculate the Gaussian Kernel transformation for a pair of state vectors
 
@@ -148,12 +141,14 @@ class GaussianKernel(Kernel):
         Returns
         -------
         StateVectors
-            Transformed state vector in kernel space.
+            Transformed state in kernel space.
         """
-        state_vector1, state_vector2 = self._get_state_vectors(state1, state2)
-        diff_tilde_x = (state_vector1.T[:, :, None] - state_vector2.T[:, None, :]) ** 2
+        if state2 is None:
+            state2 = state1
+        diff_tilde_x = (state1.state_vector.T[:, :, None] - state2.state_vector.T[:, None, :]) ** 2
         diff_tilde_x_sum = np.sum(diff_tilde_x, axis=0)
 
-        k_tilde_x = np.exp(-diff_tilde_x_sum/(2*self.variance)) / np.sqrt(2*np.pi*self.variance)
+        k_tilde_x = np.exp(-diff_tilde_x_sum / (2 * self.variance)) / (
+            np.sqrt(2 * np.pi * self.variance))
 
         return StateVectors(k_tilde_x)
