@@ -5,6 +5,7 @@ from scipy.stats import multivariate_normal
 
 from . import Updater
 from ..kernel import QuadraticKernel, Kernel
+from ..models.base import LinearModel
 from ..types.array import StateVectors
 from ..types.prediction import MeasurementPrediction
 from ..types.update import Update
@@ -12,25 +13,51 @@ from ..base import Property
 
 
 class AdaptiveKernelKalmanUpdater(Updater):
-    """The adaptive kernel Kalman updater uses the predictions from the predictor to generate the
-     measurement particles and update the posterior kernel weight vector and covariance matrix.
-     Additionally, the updater generates new proposal particles at every step to refine the state
-     estimate.
+    """Adaptive kernel Kalman updater class
     """
     kernel: Kernel = Property(
         default=None,
-        doc="Default is None. If None, the default :class:`QuadraticKernel` is used.")
+        doc="Kernel")
     lambda_updater: float = Property(
         default=1e-3,
         doc="Used to incorporate prior knowledge of the distribution. If the "
             "true distribution is Gaussian, the value of 2 is optimal. "
-            "Default is 1e-3")
+            "Default is 2")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         if self.kernel is None:
             self.kernel = QuadraticKernel()
+
+    def _measurement_matrix(self, predicted_state, measurement_model=None,
+                            **kwargs):
+        r"""Return the (via :meth:`NonLinearModel.jacobian`) measurement matrix
+
+        Parameters
+        ----------
+        predicted_state : :class:`~.State`
+            The predicted state :math:`\mathbf{x}_{k|k-1}`
+        measurement_model : :class:`~.MeasurementModel`
+            The measurement model. If omitted, the model in the updater object
+            is used
+        **kwargs : various
+            Passed to :meth:`~.MeasurementModel.matrix` if linear
+            or :meth:`~.MeasurementModel.jacobian` if not
+
+        Returns
+        -------
+        : :class:`numpy.ndarray`
+            The measurement matrix, :math:`H_k`
+        """
+
+        measurement_model = self._check_measurement_model(measurement_model)
+
+        if isinstance(measurement_model, LinearModel):
+            return measurement_model.matrix(**kwargs)
+        else:
+            return measurement_model.jacobian(predicted_state,
+                                              **kwargs)
 
     @lru_cache()
     def predict_measurement(self, state_prediction, measurement_model=None,
@@ -80,22 +107,21 @@ class AdaptiveKernelKalmanUpdater(Updater):
 
             # Attach the measurement prediction to the hypothesis
             hypothesis.measurement_prediction = self.predict_measurement(
-                predicted_state, measurement_model=measurement_model,
-                measurement_noise=False, **kwargs)
+                predicted_state, measurement_model=measurement_model, **kwargs)
         G_yy = self.kernel(hypothesis.measurement_prediction)
         g_y = self.kernel(hypothesis.measurement_prediction, hypothesis.measurement)
 
-        Q_AKKF = \
-            predicted_state.kernel_covar \
-            @ np.linalg.pinv(G_yy @ predicted_state.kernel_covar
-                             + self.lambda_updater * np.identity(len(predicted_state)))
-        weights = predicted_state.weight[:, np.newaxis]
-        updated_weights = (weights + Q_AKKF@(g_y - G_yy@weights)).ravel()
+        Q_AKKF = predicted_state.kernel_covar @ np.linalg.pinv(
+            G_yy @ predicted_state.kernel_covar + self.lambda_updater * np.identity(
+                len(predicted_state)))
+
+        updated_weights = np.atleast_2d(predicted_state.weight).T + Q_AKKF @ (
+                    g_y - np.atleast_2d(G_yy @ predicted_state.weight).T)
         updated_covariance = \
             predicted_state.kernel_covar - Q_AKKF @ G_yy @ predicted_state.kernel_covar
 
         # Proposal Calculation
-        pred_mean = predicted_state.state_vector @ updated_weights
+        pred_mean = predicted_state.state_vector @ np.squeeze(updated_weights)
         pred_covar = np.diag(np.diag(
             predicted_state.state_vector @ updated_covariance @ predicted_state.state_vector.T))
 
