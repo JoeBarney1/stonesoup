@@ -1,13 +1,13 @@
 from abc import abstractmethod
 from datetime import timedelta
 import copy
-from typing import Sequence, Iterable, Union, List, Optional, Callable
+from typing import Sequence, Iterable, Union, List, Optional
 
 from scipy.linalg import block_diag
 import numpy as np
 
-from ..base_driver import Latents
-from ..base import Model, GaussianModel, LinearModel, TimeVariantModel, LevyModel
+from .base_driver import Latents, GaussianDriver, ConditionalGaussianDriver
+from ..base import Model, GaussianModel, LinearModel
 from ...base import Property
 from ...types.array import StateVector, StateVectors, CovarianceMatrix, CovarianceMatrices
 from ...types.state import State
@@ -135,37 +135,159 @@ class CombinedGaussianTransitionModel(TransitionModel, GaussianModel):
         return block_diag(*covar_list)
 
 
-class CombinedLevyTransitionModel(TransitionModel, LevyModel):
-    r"""Combine multiple models into a single model by stacking them.
-
-    The assumption is that all models are Gaussian.
-    Time Variant, and Time Invariant models can be combined together.
-    If any of the models are time variant the keyword argument "time_interval"
-    must be supplied to all methods
-    """
-    model_list: Sequence[GaussianModel] = Property(doc="List of Transition Models.")
+class DrivenTransitionModel(TransitionModel):
+    g_driver: GaussianDriver = Property(default=None, doc="Gaussian noise process.")
+    cg_driver: ConditionalGaussianDriver = Property(default=None, doc="Conditional Gaussian noise process.")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        assert(len(self.model_list) != 0)
+        # To prevent checks throwing errors due to self.g_driver returning a list instead
+        # In addition, checks for combined model are dedundant as they are performed when each dimension is initialized individually.
+        if hasattr(self, "model_list"): return 
+        if self.g_driver and self.ndim_state != self.g_driver.ndim_state:
+            raise AttributeError("No. of state dimensions of model and Gaussian driving noise process must match.")
+        if self.cg_driver and self.ndim_state != self.cg_driver.ndim_state:
+            raise AttributeError("No. of state dimensions of model and conditionally Gaussian driving noise process must match.")
 
-    def _integrand(self, dt: float, jtimes: np.ndarray):
-        return NotImplementedError
+    @abstractmethod
+    def ft(self, dt: float, jtimes: np.ndarray, **kwargs) -> np.ndarray:
+        """
+        Returns function handle implementing f_t() = exp(At) @ h
+        """
+        pass
+
+    @abstractmethod
+    def e_ft(self, dt: float, **kwargs) -> np.ndarray:
+        """
+        Returns function handle implementing E[f_t()]
+        """
+        pass
+
+    # @abstractmethod
+    # def ft2(self, dt: float, jtimes2: np.ndarray, **kwargs) -> np.ndarray:
+    #     """
+    #     Returns function handle implementing f_t() = exp(At) @ h @ h.T @ exp(At).T
+    #     """
+    #     pass
+
+    # @abstractmethod
+    # def e_ft2(self, dt: float, **kwargs) -> np.ndarray:
+    #     """
+    #     Returns function handle implementing E[f_t() @ f_t().T]
+    #     """
+    #     pass
+
+    @abstractmethod
+    def e_gt(self, dt: float, **kwargs) -> np.ndarray:
+        """
+        Returns function handle implementing E[g_t()]
+        """
+        pass
+
+    # @abstractmethod
+    # def e_gt2(self, dt: float, **kwargs) -> np.ndarray:
+    #     """
+    #     Returns function handle implementing E[g_t() @ g_t().T]
+    #     """
+    #     pass
+    
+    def sample_latents(self, time_interval: timedelta, num_samples: int) -> Latents:
+        dt = time_interval.total_seconds()
+        latents = Latents(num_samples=num_samples)
+        if self.cg_driver:
+            jsizes, jtimes = self.cg_driver.sample_latents(dt=dt, num_samples=num_samples)
+            latents.add(driver=self.cg_driver, jsizes=jsizes, jtimes=jtimes)
+        return latents
+    
+    def mean(self, latents: Latents, time_interval: timedelta, **kwargs) -> StateVector | StateVectors:
+        dt = time_interval.total_seconds()
+        mean = 0
+        if self.g_driver:
+            mean += self.g_driver.mean(e_gt_func=self.e_gt, dt=dt)
+        if self.cg_driver:
+            tmp = self.cg_driver.mean(latents=latents, ft_func=self.ft, e_ft_func=self.e_ft, dt=dt)
+            assert(len(mean) == len(tmp + 1) or len(mean) == len(tmp))
+            if isinstance(tmp, StateVectors):
+                mean = mean[None, ...]
+            mean += tmp
+        return mean
+    
+    def covar(self, latents: Latents, time_interval: timedelta, **kwargs) -> CovarianceMatrix | CovarianceMatrices:
+        # dt = time_interval.total_seconds()
+        # covar = 0
+        # if self.g_driver:
+        #     covar += self.g_driver.covar(e_gt2_func=self.e_gt2, dt=dt)
+        # if self.cg_driver:
+        #     tmp = self.cg_driver.covar(latents=latents, ft2_func=self.ft2, e_ft2_func=self.e_ft2, dt=dt)
+        #     if isinstance(tmp, CovarianceMatrices):
+        #         covar = covar[None, ...]
+        #     covar += tmp
+        # return covar
+        dt = time_interval.total_seconds()
+        covar = 0
+        if self.g_driver:
+            covar += self.g_driver.covar(e_gt_func=self.e_gt, dt=dt)
+        if self.cg_driver:
+            tmp = self.cg_driver.covar(latents=latents, ft_func=self.ft, e_ft_func=self.e_ft, dt=dt)
+            if isinstance(tmp, CovarianceMatrices):
+                covar = covar[None, ...]
+            covar += tmp
+        return covar
+
+    def rvs(
+        self, time_interval: timedelta, num_samples: int = 1, latents: Optional[Latents]=None, **kwargs
+    ) -> StateVector | StateVectors:
+        """Linear combination of Gaussian noise samples"""
+        dt = time_interval.total_seconds()
+        noise = 0
+        if self.g_driver:
+            mean = self.g_driver.mean(e_gt_func=self.e_gt, dt=dt)
+            # covar = self.g_driver.covar(e_gt2_func=self.e_gt2, dt=dt)
+            covar = self.g_driver.covar(e_gt_func=self.e_gt, dt=dt)
+            noise += self.g_driver.rvs(mean=mean, covar=covar, num_samples=num_samples, **kwargs)
+
+        if self.cg_driver:
+            if not latents:
+                latents = self.sample_latents(time_interval=time_interval, num_samples=1)
+            mean = self.cg_driver.mean(latents=latents, ft_func=self.ft, e_ft_func=self.e_ft, dt=dt)
+            # covar = self.cg_driver.covar(latents=latents, ft2_func=self.ft2, e_ft2_func=self.e_ft2, dt=dt)
+            covar = self.cg_driver.covar(latents=latents, ft_func=self.ft, e_ft_func=self.e_ft, dt=dt)
+            noise += self.cg_driver.rvs(mean=mean, covar=covar, num_samples=num_samples, **kwargs)
+
+        return noise
+
+    def pdf(self, *args, **kwargs) -> Union[Probability, np.ndarray]:
+        raise NotImplementedError
+
+    def logpdf(self, *args, **kwargs) -> Union[float, np.ndarray]:
+        raise NotImplementedError
+
+
+class LinearDrivenTransitionModel(DrivenTransitionModel, LinearModel):
+    @property
+    def ndim_state(self, **kwargs):
+        """ndim_state getter method
+
+        Returns
+        -------
+        : :class:`int`
+            The number of model state dimensions.
+        """
+        # Time delta does not affect matrix dimensions.
+        return self.matrix(time_interval=timedelta(seconds=1), **kwargs).shape[0]
+
+
+class CombinedDrivenTransitionModel(DrivenTransitionModel):
+    model_list: Sequence[DrivenTransitionModel] = Property(doc="List of Transition Models.")
 
     @property
-    def driver(self) -> List[Iterable]:
-        return [model.driver for model in self.model_list]
-
-    @property
-    def mu_W(self):
-        mu = [m.mu_W if m.mu_W is not None else m.driver.mu_W for m in self.model_list]
-        return np.atleast_2d(mu).T
+    def g_driver(self) -> List[Iterable]:
+        return [model.g_driver for model in self.model_list]
     
     @property
-    def sigma_W2(self):
-        sigma2 = [m.sigma_W2 if m.sigma_W2 is not None else m.driver.sigma_W2 for m in self.model_list]
-        return np.diag(sigma2)
-    
+    def cg_driver(self) -> List[Iterable]:
+        return [model.cg_driver for model in self.model_list]
+       
     @property
     def ndim_state(self):
         """ndim_state getter method
@@ -177,47 +299,15 @@ class CombinedLevyTransitionModel(TransitionModel, LevyModel):
         """
         return sum(model.ndim_state for model in self.model_list)
 
-
-    def mean(self, **kwargs) -> StateVector | StateVectors:
-        """Returns the transition model noise mean matrix.
-
-        Returns
-        -------
-        : :class:`stonesoup.types.state.StateVector` of shape\
-        (:py:attr:`~ndim_state`, 1)
-            The process noise mean.
-        """
-        mean_list = [model.mean(**kwargs) for _, model in enumerate(self.model_list)]
-        if len(mean_list[0].shape) == 2:
-            return np.vstack(mean_list).view(StateVector)
-        else:
-            return np.concatenate(mean_list, axis=1).view(StateVectors)
-        
+    def sample_latents(self, time_interval: timedelta, num_samples: int) -> Latents:
+        dt = time_interval.total_seconds()
+        latents = Latents(num_samples=num_samples)
+        for m in self.model_list:
+            if m.cg_driver and not latents.exists(m.cg_driver):
+                jsizes, jtimes = m.cg_driver.sample_latents(dt=dt, num_samples=num_samples)
+                latents.add(driver=m.cg_driver, jsizes=jsizes, jtimes=jtimes)
+        return latents
     
-    def covar(self, **kwargs) -> CovarianceMatrix | CovarianceMatrices:
-        """Returns the transition model noise covariance matrix.
-
-        Returns
-        -------
-        : :class:`stonesoup.types.state.CovarianceMatrix` of shape\
-        (:py:attr:`~ndim_state`, :py:attr:`~ndim_state`)
-            The process noise covariance.
-        """
-
-        covar_list = [model.covar(**kwargs) for _, model in enumerate(self.model_list)]
-        if len(covar_list[0].shape) == 2:
-            return block_diag(*covar_list).view(CovarianceMatrix)
-        else:
-            N = covar_list[0].shape[0]
-            ret = []
-            for n in range(N):
-                tmp = []
-                for tensor in covar_list: # D
-                    tmp.append(tensor[n])
-                ret.append(block_diag(*tmp))
-            return np.array(ret).view(CovarianceMatrices)
-
-
     def function(self, state, time_interval: timedelta, noise=False, **kwargs) -> StateVector:
         """Applies each transition model in :py:attr:`~model_list` in turn to the state's
         corresponding state vector components.
@@ -264,12 +354,69 @@ class CombinedLevyTransitionModel(TransitionModel, LevyModel):
             noise = 0
         return state_vector + noise
 
-    def sample_latents(self, time_interval: timedelta, num_samples: int, random_state: Optional[np.random.RandomState]=None) -> Latents:
-        dt = time_interval.total_seconds()
-        latents = Latents(num_samples=num_samples)
-        for m in self.model_list:
-            if m.driver and not latents.exists(m.driver):
-                jsizes, jtimes = m.driver.sample_latents(dt=dt, num_samples=num_samples, random_state=random_state)
-                latents.add(driver=m.driver, jsizes=jsizes, jtimes=jtimes)
-        return latents
+    def ft(self, **kwargs) -> np.ndarray:
+        tmp = [model.ft(**kwargs) for model in self.model_list]
+        return np.hstack(tmp)
 
+    def e_ft(self, **kwargs) -> np.ndarray:
+        tmp = [model.e_ft(**kwargs) for model in self.model_list]
+        return np.vstack(tmp)
+
+    def ft2(self, **kwargs) -> np.ndarray:
+        tmp = [model.ft2(**kwargs) for model in self.model_list]
+        combined = []
+        for i in range(tmp[0].shape[0]):  # Loop through first axis
+            matrices = []
+            for j in range(len(tmp)):
+                matrices.append(tmp[j][i, ...])
+            combined.append(block_diag(*matrices))
+        return combined
+
+    def e_ft2(self, **kwargs) -> np.ndarray:
+        tmp = [model.e_ft2(**kwargs) for model in self.model_list]
+        return block_diag(*tmp)
+
+    def e_gt(self, **kwargs) -> np.ndarray:
+        tmp = [model.e_gt(**kwargs) for model in self.model_list]
+        return np.vstack(tmp)
+
+    def e_gt2(self, **kwargs) -> np.ndarray:
+        tmp = [model.e_gt2(**kwargs) for model in self.model_list]
+        return block_diag(*tmp)
+
+    def covar(self, **kwargs):
+        covar_list = [model.covar(**kwargs) for _, model in enumerate(self.model_list)]
+        return block_diag(*covar_list)
+
+    def mean(self, **kwargs) -> StateVector:
+        mean_list = [model.mean(**kwargs) for _, model in enumerate(self.model_list)]
+        return np.vstack(mean_list)
+
+    def jacobian(self, state, **kwargs) -> np.ndarray:
+        temp_state = copy.copy(state)
+        ndim_count = 0
+        J_list = []
+        for model in self.model_list:
+            temp_state.state_vector = state.state_vector[
+                ndim_count : model.ndim_state + ndim_count, :
+            ]
+            J_list.append(model.jacobian(temp_state, **kwargs))
+
+            ndim_count += model.ndim_state
+        out = block_diag(*J_list)
+
+        return out
+
+
+class CombinedLinearDrivenTransitionModel(CombinedDrivenTransitionModel, LinearModel):
+    def matrix(self, **kwargs):
+        """Model matrix :math:`F`
+
+        Returns
+        -------
+        : :class:`numpy.ndarray` of shape\
+        (:py:attr:`~ndim_state`, :py:attr:`~ndim_state`)
+        """
+
+        transition_matrices = [model.matrix(**kwargs) for model in self.model_list]
+        return block_diag(*transition_matrices)
