@@ -6,11 +6,7 @@ from ...types.association import Association
 from ...types.groundtruth import GroundTruthPath, GroundTruthState
 from ...types.state import State
 from ...types.track import Track
-from ..tracktotrack import (
-    TrackIDbased,
-    TrackToTrackCounting,
-    TrackToTruth,
-)
+from ..tracktotrack import TrackIDbased, TrackToTrackCounting, TrackToTruth
 
 
 @pytest.fixture
@@ -239,3 +235,8 @@ def test_trackidbased():
     association_setC = associator.associate_tracks(tracksC, truths)
     assocC = list(association_setC.associations)[0]
     assert isinstance(assocC, Association)
+
+
+def test_clear_mot_associations():
+    # TODO: write tests
+    pass
