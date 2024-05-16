@@ -1,12 +1,19 @@
 import datetime
+from typing import List
 
 import pytest
 
+from ...measures.state import Euclidean
 from ...types.association import Association
 from ...types.groundtruth import GroundTruthPath, GroundTruthState
 from ...types.state import State
 from ...types.track import Track
-from ..tracktotrack import TrackIDbased, TrackToTrackCounting, TrackToTruth
+from ..tracktotrack import (
+    ClearMotAssociator,
+    TrackIDbased,
+    TrackToTrackCounting,
+    TrackToTruth,
+)
 
 
 @pytest.fixture
@@ -237,6 +244,21 @@ def test_trackidbased():
     assert isinstance(assocC, Association)
 
 
-def test_clear_mot_associations():
-    # TODO: write tests
-    pass
+def test_clear_mot(tracks: List[Track]):
+
+    associator = ClearMotAssociator(time_interval=datetime.timedelta(
+        seconds=1), measure=Euclidean(mapping=[0, 1]), association_threshold=3.0)
+
+    track = tracks[0]
+    truth_track = tracks[1]
+
+    association_set = associator.associate_tracks({track}, {truth_track})
+
+    assoc = list(association_set.associations)[0]
+    assoc_track = assoc.objects[0]
+    assoc_truth = assoc.objects[1]
+    assert assoc_track.id == track.id
+    assert assoc_truth.id == truth_track.id
+
+    assert assoc.time_range.start == datetime.datetime(2019, 1, 1, 14, 0, 1)
+    assert assoc.time_range.end == datetime.datetime(2019, 1, 1, 14, 0, 9)
