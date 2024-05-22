@@ -67,14 +67,16 @@ Monte Carlo Tree Search for Autonomous Source Term Estimation
 # Setup
 # ^^^^^
 # First, some general packages used throughout the example are imported and
-# random number generation is seeded for repeatability.
+# random number generation is seeded for repeatabiltiy.
 #
 
 # General imports and environment setup
 import numpy as np
 from datetime import datetime, timedelta
+import random
 
 np.random.seed(1991)
+random.seed(1991)
 
 # %%
 # Generate ground truth
@@ -189,7 +191,7 @@ sensor_platformB = FixedPlatform(
 # 
 # Now the :class:`~.ParticlePredictor` and :class:`~.ParticleUpdater` are
 # constructed. The particle predictor will be created with a :class:`~.RandomWalk`
-# motion model with 0 magnitude, meaning that the predictor will not change
+# motion model with 0 magnitude, meaning that the perdictor will not change
 # the estimated source term.
 # 
 # The :class:`~.ParticleUpdater` is created with an effective sample size
@@ -240,9 +242,7 @@ updater = ParticleUpdater(measurement_model,
 # with increasing future depth, :attr:`rollout_depth` controls the
 # rollout horizon and :attr:`best_child_policy` determines how to select
 # the best child at the end of the MCTS process. Choices include maximum
-# action value (``'max_cumulative_reward'``), average action value per
-# visit (``'max_average_reward'``) and maximum number of visits
-# (``'max_visits'``).
+# action value, average action value per visit and maximum number of visits.
 
 
 from stonesoup.sensormanager.reward import ExpectedKLDivergence
@@ -252,15 +252,13 @@ from stonesoup.sensormanager.tree_search import MCTSRolloutSensorManager
 reward_updater = ParticleUpdater(measurement_model=None)
 
 # Myopic benchmark approach
-reward_funcA = ExpectedKLDivergence(updater=reward_updater, measurement_noise=True)
+reward_funcA = ExpectedKLDivergence(updater=reward_updater)
 sensormanagerA = BruteForceSensorManager(sensors={gas_sensorA}, 
                                          platforms={sensor_platformA}, 
                                          reward_function=reward_funcA)
 
 # MCTS with rollout approach
-reward_funcB = ExpectedKLDivergence(updater=reward_updater,
-                                    measurement_noise=True,
-                                    return_tracks=True)
+reward_funcB = ExpectedKLDivergence(updater=reward_updater, return_tracks=True)
 sensormanagerB = MCTSRolloutSensorManager(sensors={gas_sensorB}, 
                                           platforms={sensor_platformB}, 
                                           reward_function=reward_funcB, 
@@ -268,7 +266,7 @@ sensormanagerB = MCTSRolloutSensorManager(sensors={gas_sensorB},
                                           exploration_factor=0.05,
                                           discount_factor=0.9, 
                                           rollout_depth=5,
-                                          best_child_policy='max_cumulative_reward')
+                                          best_child_policy=0)
 
 # %%
 # Create prior distribution
@@ -547,7 +545,7 @@ animation.FuncAnimation(plotterB.fig, anim_funcB, interval=250, frames=len(track
 # the MCTS algorithm was able to converge to a better source term
 # estimate and did so in less iterations than the myopic benchmark. Considering
 # non-myopic actions in this scenario allows for more robust handling of
-# unreliable measurements, a common problem in STE that is caused by low
+# unreliable measurements, a common problem is STE that is caused by low
 # quality sensors or turbulent environment conditions.
 
 # %%
