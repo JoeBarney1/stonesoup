@@ -1,4 +1,5 @@
 import datetime
+from typing import List
 
 import pytest
 
@@ -54,7 +55,7 @@ def tracks():
         + [State(state_vector=[[i + 1000], [i + 1000]],
                  timestamp=start_time + datetime.timedelta(seconds=i))
            for i in range(7, 10)]))
-
+    
     # 7th crosses the 1st at the middle
     tracks.append(Track(id="Track-7", states=[
         State(state_vector=[[i], [10-i]],
@@ -63,9 +64,8 @@ def tracks():
 
     # 8th first equals the 1st and later follows the 7th
     tracks.append(Track(id="Track-8", states=[State(state_vector=[[i], [i]],
-                                                    timestamp=start_time +
-                                                    datetime.timedelta(seconds=i))
-                                              for i in range(0, 5)]
+                                      timestamp=start_time + datetime.timedelta(seconds=i))
+                                for i in range(0, 5)]
                         + [State(state_vector=[[i], [10-i]],
                                  timestamp=start_time + datetime.timedelta(seconds=i))
                            for i in range(5, 10)]))
@@ -73,7 +73,7 @@ def tracks():
     return tracks
 
 
-def test_clear_mot(tracks: list[Track]):
+def test_clear_mot(tracks: List[Track]):
 
     associator = ClearMotAssociator(measure=Euclidean(mapping=[0, 1]), association_threshold=3.0)
 
@@ -92,7 +92,7 @@ def test_clear_mot(tracks: list[Track]):
     assert assoc.time_range.end == datetime.datetime(2019, 1, 1, 14, 0, 6)
 
 
-def test_clear_mot_two_truths_crossing(tracks: list[Track]):
+def test_clear_mot_two_truths_crossing(tracks: List[Track]):
 
     associator = ClearMotAssociator(measure=Euclidean(mapping=[0, 1]), association_threshold=2.0)
 
@@ -122,7 +122,7 @@ def test_clear_mot_two_truths_crossing(tracks: list[Track]):
     assert assocB.time_range.end == datetime.datetime(2019, 1, 1, 14, 0, 9)
 
 
-def test_clear_mot_measure_dimensions(tracks: list[Track]):
+def test_clear_mot_measure_dimensions(tracks: List[Track]):
 
     track = tracks[0]
     truth_track = tracks[4]
@@ -134,11 +134,11 @@ def test_clear_mot_measure_dimensions(tracks: list[Track]):
     assert not len(association_set), \
         "Track-1 and Track-5 should not be associated when looking at all" +\
         " dimensions of the state vector."
-
+    
     associator = ClearMotAssociator(measure=Euclidean(mapping=[0]), association_threshold=3.0)
-
+    
     association_set = associator.associate_tracks({track}, {truth_track})
-
+    
     assoc = list(association_set.associations)[0]
     assoc_track = assoc.objects[0]
     assoc_truth = assoc.objects[1]
