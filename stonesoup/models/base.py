@@ -343,3 +343,4 @@ class GaussianModel(Model):
     @abstractmethod
     def covar(self, **kwargs) -> CovarianceMatrix:
         """Model covariance"""
+
