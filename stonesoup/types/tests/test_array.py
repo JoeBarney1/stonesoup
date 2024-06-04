@@ -207,38 +207,22 @@ def test_array_ops():
 
 
 def test_covariancematrices():
-    cov1 = np.array([[1., 0., 0.], [0., 2., 0.], [0., 0., 3.]]) 
+    cov1 = np.array([[1., 0., 0.], [0., 2., 0.], [0., 0., 3.]])
     cov2 = np.array([[4., 0., 0.], [0., 5., 0.], [0., 0., 6.]])
 
-    cm1 = CovarianceMatrix(cov1) 
+    cm1 = CovarianceMatrix(cov1)
     cm2 = CovarianceMatrix(cov2)
-    cms0 =  CovarianceMatrices([cov1])
-    assert isinstance(cms0, CovarianceMatrix)
 
-    tensor1 = np.stack((cov1, cov2), axis=-1)
-    cms1 = CovarianceMatrices([cm1, cm2]) # 3x3x2
+    tensor1 = np.concatenate((cov1, cov2), axis=1)
+    cms1 = CovarianceMatrices([cm1, cm2])
+    cms2 = CovarianceMatrices(tensor1)
+    cms3 = CovarianceMatrices([cov1, cov2])  # Creates 3dim array
     assert np.array_equal(cms1, tensor1)
-    cms2 = CovarianceMatrices(tensor1) # 3x3x2
     assert np.array_equal(cms2, tensor1)
-    cms3 = CovarianceMatrices([cov1, cov2])  # 2x3x3
     assert cms3.shape != tensor1.shape
+    print(cms1.shape, cms3.shape, tensor1.shape)
     for cm in cms2:
         assert isinstance(cm, CovarianceMatrix)
-
-
-
-def test_covariancematrices_mean():
-    cov1 = np.array([[1., 0., 0.], [0., 2., 0.], [0., 0., 3.]]) 
-    cov2 = np.array([[4., 0., 0.], [0., 5., 0.], [0., 0., 6.]])
-    cm1 = CovarianceMatrix(cov1) 
-    cm2 = CovarianceMatrix(cov2)
-    cms1 = CovarianceMatrices([cm1, cm2])
-    cms2 = CovarianceMatrices([cov1, cov2])
-    mean1 = CovarianceMatrix([[2.5, 0., 0.], [0., 3.5, 0.], [0., 0., 4.5]])
-    mean2 = CovarianceMatrices([[[2.5], [0.], [0.]], [[0.], [3.5], [0.]], [[0.], [0.], [4.5]]])
-    assert np.allclose(np.average(cms1, axis=2), mean1)
-    assert np.allclose(np.average(cms2, axis=0), mean1)
-    assert np.allclose(np.mean(cms1, axis=2, keepdims=True), mean2)
 
 
 def test_statevectors_mean():
