@@ -1,7 +1,6 @@
 from datetime import timedelta
-from typing import Union, Optional, Tuple, Callable, Dict, NamedTuple, Generator
+from typing import Union, Optional, Tuple, Callable, Dict, NamedTuple
 from collections import namedtuple
-from scipy.stats import multivariate_normal
 from abc import abstractmethod
 from ..base import Base, Property
 from ..types.array import StateVector, StateVectors, CovarianceMatrix, CovarianceMatrices
@@ -78,22 +77,22 @@ class LevyDriver(Driver):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.random_state = np.random.default_rng(self.seed)
+        self._rng = np.random.default_rng(seed=self.seed)
+        self.mu_W = np.atleast_2d(self.mu_W)
+        self.sigma_W2 = np.atleast_2d(self.sigma_W2)
 
     def rvs(
         self,
         mean: StateVector,
         covar: CovarianceMatrix,
-        random_state: Generator,
         num_samples: int = 1,
+        random_state=None,
         **kwargs
     ) -> Union[StateVector, StateVectors]:
         """
         returns driving noise term
         """
-        if random_state is None:
-            random_state = self.random_state
-        noise = random_state.multivariate_normal(
+        noise = self._rng.multivariate_normal(
             mean.flatten(), covar, size=num_samples
         )
         noise = noise.T
@@ -150,24 +149,22 @@ class LevyDriver(Driver):
             raise AttributeError("invalid noise case")
         return self._first_moment(truncation=truncation) * r_mean  # (m, 1)
 
-    def _accept_reject(self, jsizes: np.ndarray, random_state: Generator) -> np.ndarray:
+    def _accept_reject(self, jsizes: np.ndarray) -> np.ndarray:
         probabilities = self._thinning_probabilities(jsizes)
-        u = random_state.uniform(low=0.0, high=1.0, size=probabilities.shape)
+        u = self._rng.uniform(low=0.0, high=1.0, size=probabilities.shape)
         jsizes = np.where(u <= probabilities, jsizes, 0)
         return jsizes
 
-    def sample_latents(self, dt: float, num_samples: int, random_state: Optional[Generator] = None) -> Tuple[np.ndarray, np.ndarray]:
-        if random_state is None:
-            random_state = self.random_state
+    def sample_latents(self, dt: float, num_samples: int) -> Tuple[np.ndarray, np.ndarray]:
         # Sample latents pairs
-        epochs = random_state.exponential(scale=1 / dt, size=(int(self.c * dt), num_samples))
+        epochs = self._rng.exponential(scale=1 / dt, size=(int(self.c * dt), num_samples))
         epochs = epochs.cumsum(axis=0)
 
         # Accept reject sampling
         jsizes = self._hfunc(epochs=epochs)
-        jsizes = self._accept_reject(jsizes=jsizes, random_state=random_state)
+        jsizes = self._accept_reject(jsizes=jsizes)
         # Generate jump times
-        jtimes = random_state.uniform(low=0.0, high=dt, size=jsizes.shape)
+        jtimes = self._rng.uniform(low=0.0, high=dt, size=jsizes.shape)
         return jsizes, jtimes
 
     def mean(
@@ -180,7 +177,8 @@ class LevyDriver(Driver):
         **kwargs
     ) -> StateVector | StateVectors:
         """Computes a num_samples of mean vectors"""
-        mu_W = np.atleast_2d(self.mu_W) if mu_W is None else np.atleast_2d(mu_W)
+        if mu_W is None:
+            mu_W = self.mu_W
 
         jtimes = latents.times(driver=self)  # (n_jumps, n_samples)
         jsizes = latents.sizes(driver=self)  # (n_jumps, n_samples)
@@ -211,8 +209,11 @@ class LevyDriver(Driver):
         **kwargs
     ) -> CovarianceMatrix | CovarianceMatrices:
         """Computes covariance matrix / matrices"""
-        mu_W = np.atleast_2d(self.mu_W) if mu_W is None else np.atleast_2d(mu_W)
-        sigma_W2 = np.atleast_2d(self.sigma_W2) if sigma_W2 is None else np.atleast_2d(sigma_W2)     
+        if mu_W is None:
+            mu_W = self.mu_W
+            
+        if sigma_W2 is None:
+            sigma_W2 = self.sigma_W2
 
         jsizes = self._jump_power(latents.sizes(driver=self))  # (n_jumps, n_samples)
         jtimes = latents.times(driver=self)
