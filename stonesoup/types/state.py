@@ -797,7 +797,9 @@ class MultiModelParticleState(ParticleState):
 
     def __getitem__(self, item):
         if self.parent is not None:
-            parent = self.parent[item]
+            parent = copy.copy(self.parent)
+            parent.parent = None  # Don't slice parent parent
+            parent = parent[item]
         else:
             parent = None
 
@@ -890,7 +892,9 @@ class RaoBlackwellisedParticleState(ParticleState):
 
     def __getitem__(self, item):
         if self.parent is not None:
-            parent = self.parent[item]
+            parent = copy.copy(self.parent)
+            parent.parent = None  # Don't slice parent parent
+            parent = parent[item]
         else:
             parent = None
 
@@ -945,7 +949,9 @@ class BernoulliParticleState(ParticleState):
 
     def __getitem__(self, item):
         if self.parent is not None:
-            parent = self.parent[item]
+            parent = copy.copy(self.parent)
+            parent.parent = None  # Don't slice parent parent
+            parent = parent[item]
         else:
             parent = None
 
