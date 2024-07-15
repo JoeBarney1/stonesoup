@@ -185,34 +185,42 @@ class GOSPAMetric(MetricGenerator):
         next_truth = next(truth_iter, None)
         next_meas = next(meas_iter, None)
 
+        all_meas_points = np.array(measured_states)
+        all_meas_ids = np.array(measured_state_ids)
+        all_meas_timestamps = np.fromiter((state.timestamp for state in measured_states), dtype='datetime64[us]')
+
+        all_truth_points = np.array(truth_states)
+        all_truth_ids = np.array(truth_state_ids)
+        all_truth_timestamps = np.fromiter((state.timestamp for state in truth_states), dtype='datetime64[us]')
+
         switching_metric = _SwitchingLoss(self.switching_penalty, self.p)
         gospa_metrics = []
+        import time
+        for timestamp in timestamps:
+            begin = time.time()
+            begin_ = time.time()
+            meas_mask = all_meas_timestamps == timestamp
+            end_ = time.time()
+            print(f'mask took {(end_ - begin_) * 1e3:.2f}ms')
+            # np.array doesn't work for ParticleState
+            begin_ = time.time()
+            meas_points = all_meas_points[meas_mask]
+            meas_ids = all_meas_ids[meas_mask]
+            end_ = time.time()
+            print(f'first took {(end_ - begin_) * 1e3:.2f}ms')
 
-        while next_truth is not None or next_meas is not None:
-            timestamp = min(group[0] for group in [next_truth, next_meas] if group is not None)
+            begin_ = time.time()
+            truth_mask = all_truth_timestamps == timestamp
+            end_ = time.time()
+            print(f'truth mask took {(end_ - begin_) * 1e3:.2f}ms')
 
-            truth_idxs = []
+            begin_ = time.time()
+            truth_points = all_truth_points[truth_mask]
+            truth_ids = all_truth_ids[truth_mask]
+            end_ = time.time()
+            print(f'second took {(end_ - begin_) * 1e3:.2f}ms')
 
-            if next_truth is not None and timestamp == next_truth[0]:
-                truth_idxs = np.fromiter(next_truth[1], dtype=int)
-                next_truth = next(truth_iter, None)
-
-            meas_idxs = []
-
-            if next_meas is not None and timestamp == next_meas[0]:
-                meas_idxs = np.fromiter(next_meas[1], dtype=int)
-                next_meas = next(meas_iter, None)
-
-            meas_points = all_meas_points[meas_idxs]
-            meas_ids = all_meas_ids[meas_idxs]
-
-            truth_points = all_truth_points[truth_idxs]
-            truth_ids = all_truth_ids[truth_idxs]
-
-            metric, truth_to_measured_assignment = self.compute_gospa_metric(
-                meas_points,
-                truth_points
-            )
+            metric, truth_to_measured_assignment = self.compute_gospa_metric(meas_points, truth_points)
             truth_mapping = {
                 truth_id: meas_ids[meas_id] if meas_id != -1 else None
                 for truth_id, meas_id in zip(truth_ids, truth_to_measured_assignment)}
@@ -223,6 +231,8 @@ class GOSPAMetric(MetricGenerator):
                                                 metric.value['switching']**self.alpha,
                                                 1.0/self.alpha)
             gospa_metrics.append(metric)
+            end = time.time()
+            print(f'iter took {(end - begin) * 1e3:.2f}ms')
 
         # If only one timestamp is present then return a SingleTimeMetric
         if len(gospa_metrics) == 1:
