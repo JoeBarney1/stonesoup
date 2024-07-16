@@ -189,17 +189,17 @@ class GOSPAMetric(MetricGenerator):
         gospa_metrics = []
 
         while next_truth is not None or next_meas is not None:
-            timestamp = min(next_truth[0], next_meas[0])
+            timestamp = min(group[0] for group in [next_truth, next_meas] if group is not None)
 
             truth_idxs = []
 
-            if timestamp == next_truth[0]:
+            if next_truth is not None and timestamp == next_truth[0]:
                 truth_idxs = np.fromiter(next_truth[1], dtype=int)
                 next_truth = next(truth_iter, None)
 
             meas_idxs = []
 
-            if timestamp == next_meas[0]:
+            if next_meas is not None and timestamp == next_meas[0]:
                 meas_idxs = np.fromiter(next_meas[1], dtype=int)
                 next_meas = next(meas_iter, None)
 
