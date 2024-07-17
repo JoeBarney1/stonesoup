@@ -113,8 +113,8 @@ Kernel methods: the adaptive kernel Kalman filter
 #   :width: 800
 #   :alt: Illustration of Kernel Mean Embedding from data space to kernel feature space
 #
-# This figure represents the KME of the conditional distribution :math:`p(X|\mathbf{Y})` is
-# embedded as a point in kernel feature space as
+# Figure 1: This figure represents the KME of the conditional distribution :math:`p(X|\mathbf{Y})`
+# is embedded as a point in kernel feature space as
 # :math:`\mu_{X|y} = \int_{\mathcal{X}}\phi_x(x) d P(x|y)`.
 # Given the training data sampled from :math:`P(X, Y)`, the empirical KME of :math:`P(X|y)` is
 # approximated as a linear operation in RKHS, i.e.,
@@ -226,7 +226,7 @@ Kernel methods: the adaptive kernel Kalman filter
 #     \mathbb{E}\left(X_{k}\right) &= X_{k}\mathbf{w}^{+}_{k}\\
 #     \mathrm{Cov}\left(X_{k}\right) &= X_{k}S^{+}_{k} X_{k}^{\rm{T}}.
 #
-# .. image:: ../../_static/AKKf_flow_diagram.png
+# .. image:: ../../_static/AKKF_flow_diagram.png
 #   :width: 800
 #   :alt: Flow diagram of the AKKF
 #
