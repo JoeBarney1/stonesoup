@@ -300,9 +300,9 @@ class Plotter(_Plotter):
 
             # Generate legend items for measurements
             if plot_clutter:
-                name = label + "\n(Detections)"
+                name = measurements_label + "<br>(Detections)"
             else:
-                name = label
+                name = measurements_label
             self.legend_dict[name] = measurements_handle
 
         if plot_clutter:
@@ -313,7 +313,7 @@ class Plotter(_Plotter):
             clutter_handle = Line2D([], [], linestyle='', **clutter_kwargs)
 
             # Generate legend items for clutter
-            name = label + "\n(Clutter)"
+            name = measurements_label + "<br>(Clutter)"
             self.legend_dict[name] = clutter_handle
 
         # Generate legend
@@ -1193,9 +1193,9 @@ class Plotterly(_Plotter):
 
         if plot_detections:
             if plot_clutter:
-                name = label + "<br>(Detections)"
+                name = measurements_label + "<br>(Detections)"
             else:
-                name = label
+                name = measurements_label
             measurement_kwargs = dict(
                 mode='markers', marker=dict(color='#636EFA'),
                 name=name, legendgroup=name, legendrank=200)
@@ -1918,9 +1918,9 @@ class PolarPlotterly(_Plotter):
 
         if plot_detections:
             if plot_clutter:
-                name = label + "<br>(Detections)"
+                name = measurements_label + "<br>(Detections)"
             else:
-                name = label
+                name = measurements_label
             measurement_kwargs = dict(mode='markers', marker=dict(color='#636EFA'), legendrank=200)
             merge(measurement_kwargs, kwargs)
             plotting_data = [State(state_vector=plotting_state_vector,
@@ -2190,7 +2190,7 @@ class AnimationPlotter(_Plotter):
             ))
 
     def plot_measurements(self, measurements, mapping, measurement_model=None,
-                          label="Measurements", convert_measurements=True, **kwargs):
+                          measurements_label="Measurements", convert_measurements=True, **kwargs):
         """Plots measurements
 
         Plots detections and clutter, generating a legend automatically. Detections are plotted as
@@ -2209,7 +2209,7 @@ class AnimationPlotter(_Plotter):
         measurement_model : :class:`~.Model`, optional
             User-defined measurement model to be used in finding measurement state inverses if
             they cannot be found from the measurements themselves.
-        label: str
+        measurements_label: str
             Label for measurements. Default is "Detections".
         convert_measurements: bool
             Should the measurements be converted from measurement space to state space before
@@ -2243,9 +2243,9 @@ class AnimationPlotter(_Plotter):
 
         if plot_detections:
             if plot_clutter:
-                name = label + "\n(Detections)"
+                name = measurements_label + "<br>(Detections)"
             else:
-                name = label
+                name = measurements_label
             detection_kwargs = dict(linestyle='', marker='o', color='b')
             detection_kwargs.update(kwargs)
             self.plotting_data.append(_AnimationPlotterDataClass(
@@ -2263,7 +2263,7 @@ class AnimationPlotter(_Plotter):
                 plotting_data=[State(state_vector=plotting_state_vector,
                                      timestamp=detection.timestamp)
                                for detection, plotting_state_vector in plot_clutter.items()],
-                plotting_label=label + "\n(Clutter)",
+                plotting_label=measurements_label + "<br>(Clutter)",
                 plotting_keyword_arguments=clutter_kwargs
             ))
 
@@ -2894,28 +2894,12 @@ class AnimatedPlotterly(_Plotter):
         # get number of traces currently in fig
         trace_base = len(self.fig.data)
 
-        if plot_detections:
-            # initialise detections
-            if plot_clutter:
-                name = label + "<br>(Detections)"
-            else:
-                name = label
-            measurement_kwargs = dict(x=[], y=[], mode='markers',
-                                      name=name,
-                                      legendgroup=name,
-                                      legendrank=200, showlegend=True,
-                                      marker=dict(color="#636EFA"), hoverinfo='none')
-            merge(measurement_kwargs, kwargs)
-
-            self.fig.add_trace(go.Scatter(measurement_kwargs))  # trace for legend
-
-            measurement_kwargs.update({"showlegend": False})
-            self.fig.add_trace(go.Scatter(measurement_kwargs))  # trace for plotting
-
+        # initialise detections
         if plot_clutter:
-            # change necessary kwargs to initialise clutter trace
-            name = label + "<br>(Clutter)"
-            clutter_kwargs = dict(x=[], y=[], mode='markers',
+            name = measurements_label + "<br>(Detections)"
+        else:
+            name = measurements_label
+        measurement_kwargs = dict(x=[], y=[], mode='markers',
                                   name=name,
                                   legendgroup=name,
                                   legendrank=300, showlegend=True,
