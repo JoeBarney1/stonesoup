@@ -1,6 +1,7 @@
 from typing import Union
 
 import numpy as np
+from enum import Enum
 from scipy.stats import multivariate_normal as mvn
 
 from stonesoup.base import Property
@@ -27,21 +28,14 @@ class PriorAsProposal(Proposal):
     def rvs(self, prior: State, measurement=None, time_interval=None,
             **kwargs) -> Union[StateVector, StateVectors]:
         """Generate samples from the proposal.
-
         Parameters
         ----------
         state: :class:`~.State`
             The state to generate samples from.
-        measurement: :class:`~.Detection`
-            the measurement that will preferably used to get time interval
-            if provided(the default is `None`)
-        time_interval: :class:`datetime.time_delta`
-            time interval of the prediction is needed to propagate the states
-
         Returns
         -------
-        : :class:`~.ParticlePrediction`
-            State with samples drawn from the updated proposal
+        : :class:`~.ParticlePrediction` with samples drawn from the updated proposal
+
         """
 
         if measurement is not None:
@@ -61,8 +55,9 @@ class PriorAsProposal(Proposal):
                                      prior=prior)
 
 
+
 class KFasProposal(Proposal):
-    """This proposal uses the Kalman filter prediction and update steps to
+    """This proposal uses the kalman filter prediction and update steps to
     generate new set of particles and weights
     """
     predictor: Predictor = Property(
@@ -73,15 +68,13 @@ class KFasProposal(Proposal):
     def rvs(self, prior: State, measurement: Detection = None, time_interval=None,
             **kwargs):
         """Generate samples from the proposal.
-
-        Use the Kalman filter predictor and updater to create a new distribution
-
+            Use the kalman filter predictor and updater to create a new distribution
         Parameters
         ----------
         state: :class:`~.State`
             The state to generate samples from.
         measurement: :class:`~.Detection`
-            the measurement that is used in the update step of the Kalman prediction,
+            the measurement that is used in the update step of the kalman prediction,
             (the default is `None`)
         time_interval: :class:`datetime.time_delta`
             time interval of the prediction is needed to propagate the states
@@ -89,8 +82,10 @@ class KFasProposal(Proposal):
         Returns
         -------
         : :class:`~.ParticlePrediction`
-            State with samples drawn from the updated proposal
         """
+
+        # get the number of particles
+        number_particles = prior.state_vector.shape[1]
 
         if measurement is not None:
             timestamp = measurement.timestamp
@@ -110,7 +105,7 @@ class KFasProposal(Proposal):
         if isinstance(self.predictor, SqrtKalmanPredictor):
             prior_cls = SqrtGaussianState
 
-        # Null covariance for the particles
+        # Null covariance
         null_covar = np.zeros_like(prior.covar)
 
         predictions = [
@@ -131,8 +126,9 @@ class KFasProposal(Proposal):
                             for state in updates])
 
         # Compute the log of q(x_k|x_{k-1}, y_k)
-        post_log_weights = np.array([mvn.logpdf(sample - update.state_vector.reshape(-1),
-                                                cov=update.covar)
+        post_log_weights = np.array([mvn.logpdf(sample,
+                                                np.array(update.mean).reshape(-1),
+                                                update.covar)
                                      for sample, update in zip(samples, updates)])
 
         pred_state = Prediction.from_state(prior,
