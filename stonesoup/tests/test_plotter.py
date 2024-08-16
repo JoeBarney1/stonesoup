@@ -1,4 +1,3 @@
-import warnings
 from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
@@ -49,17 +48,20 @@ for state in truth:
 
     true_measurements.append(measurement_set)
 
+prob_clutter = 0.8
 clutter_measurements = []
 for state in truth:
     clutter_measurement_set = set()
-    random_state = state.from_state(
-        state=state,
-        state_vector=np.random.uniform(-20, 20, size=state.state_vector.size)
-    )
-    measurement = measurement_model.function(random_state, noise=True)
-    clutter_measurement_set.add(Clutter(state_vector=measurement,
-                                        timestamp=state.timestamp,
-                                        measurement_model=measurement_model))
+    # Generate clutter detections
+    if np.random.rand() <= prob_clutter:
+        random_state = state.from_state(
+            state=state,
+            state_vector=np.random.uniform(-20, 20, size=state.state_vector.size)
+        )
+        measurement = measurement_model.function(random_state, noise=True)
+        clutter_measurement_set.add(Clutter(state_vector=measurement,
+                                            timestamp=state.timestamp,
+                                            measurement_model=measurement_model))
 
     clutter_measurements.append(clutter_measurement_set)
 
@@ -102,35 +104,6 @@ sensor3d = RadarElevationBearingRange(
 )
 
 
-@pytest.fixture(autouse=True)
-def close_figs():
-    existing_figs = set(plt.get_fignums())
-    yield None
-    for fignum in set(plt.get_fignums()) - existing_figs:
-        plt.close(fignum)
-
-
-@pytest.fixture(scope="module")
-def plotter_class(request):
-
-    plotter_class = request.param
-    assert plotter_class in {Plotter, Plotterly, AnimationPlotter,
-                             PolarPlotterly, AnimatedPlotterly}
-
-    def _generate_animated_plotterly(*args, **kwargs):
-        return AnimatedPlotterly(*args, timesteps=timesteps, **kwargs)
-
-    def _generate_plotter(*args, **kwargs):
-        return plotter_class(*args, **kwargs)
-
-    if plotter_class in {Plotter, Plotterly, AnimationPlotter, PolarPlotterly}:
-        yield _generate_plotter
-    elif plotter_class is AnimatedPlotterly:
-        yield _generate_animated_plotterly
-    else:
-        raise ValueError("Invalid Plotter type.")
-
-
 # Test functions
 def test_dimension_inlist():  # ensure dimension type is in predefined enum list
     with pytest.raises(AttributeError):
@@ -150,9 +123,14 @@ def test_plot_sensors():
     assert 'Sensors' in plotter3d.legend_dict
 
 
+def create_animated_plotterly():
+    """Generates a AnimatedPlotterly object. Used for parameterized testing."""
+    return AnimatedPlotterly(timesteps)
+
+
 @pytest.mark.parametrize(
     "plotter_class",
-    [Plotter, Plotterly, AnimationPlotter, PolarPlotterly, AnimatedPlotterly], indirect=True)
+    [Plotter, Plotterly, AnimationPlotter, PolarPlotterly, create_animated_plotterly])
 def test_empty_tracks(plotter_class):
     plotter = plotter_class()
     plotter.plot_tracks(set(), [0, 2])
@@ -404,7 +382,7 @@ def test_show_plot(labels):
 
 @pytest.mark.parametrize(
     "plotter_class",
-    [Plotter, Plotterly, AnimationPlotter, PolarPlotterly, AnimatedPlotterly], indirect=True)
+    [Plotter, Plotterly, AnimationPlotter, PolarPlotterly, create_animated_plotterly])
 @pytest.mark.parametrize(
     "_measurements",
     [true_measurements, clutter_measurements, all_measurements,
@@ -417,7 +395,7 @@ def test_plotters_plot_measurements_2d(plotter_class, _measurements):
 
 @pytest.mark.parametrize(
     "plotter_class",
-    [Plotter, Plotterly, AnimationPlotter, PolarPlotterly, AnimatedPlotterly], indirect=True)
+    [Plotter, Plotterly, AnimationPlotter, PolarPlotterly, create_animated_plotterly])
 def test_plotters_plot_tracks(plotter_class):
     plotter = plotter_class()
     plotter.plot_tracks(track, [0, 2])
@@ -429,8 +407,7 @@ def test_plotters_plot_tracks(plotter_class):
      Plotterly,
      pytest.param(AnimationPlotter, marks=pytest.mark.xfail(raises=NotImplementedError)),
      pytest.param(PolarPlotterly, marks=pytest.mark.xfail(raises=NotImplementedError)),
-     AnimatedPlotterly],
-    indirect=True
+     create_animated_plotterly]
 )
 def test_plotters_plot_track_uncertainty(plotter_class):
     plotter = plotter_class()
@@ -450,7 +427,7 @@ def test_plotters_plot_track_particle(plotter_class):
 
 @pytest.mark.parametrize(
     "plotter_class",
-    [Plotter, Plotterly, AnimationPlotter, PolarPlotterly, AnimatedPlotterly], indirect=True)
+    [Plotter, Plotterly, AnimationPlotter, PolarPlotterly, create_animated_plotterly])
 def test_plotters_plot_truths(plotter_class):
     plotter = plotter_class()
     plotter.plot_ground_truths(truth, [0, 2])
@@ -462,7 +439,7 @@ def test_plotters_plot_truths(plotter_class):
      Plotterly,
      pytest.param(AnimationPlotter, marks=pytest.mark.xfail(raises=NotImplementedError)),
      pytest.param(PolarPlotterly, marks=pytest.mark.xfail(raises=NotImplementedError)),
-     AnimatedPlotterly], indirect=True
+     create_animated_plotterly]
 )
 def test_plotters_plot_sensors(plotter_class):
     plotter = plotter_class()
@@ -470,7 +447,7 @@ def test_plotters_plot_sensors(plotter_class):
 
 
 @pytest.mark.parametrize("plotter_class",
-                         [Plotterly, PolarPlotterly, AnimatedPlotterly], indirect=True)
+                         [Plotterly, PolarPlotterly, create_animated_plotterly])
 @pytest.mark.parametrize("_measurements, expected_labels",
                          [(true_measurements, {'Measurements'}),
                           (clutter_measurements, {'Measurements<br>(Clutter)'}),
@@ -495,3 +472,7 @@ def test_plotter_plot_measurements_label(_measurements, expected_labels):
     plotter.plot_measurements(_measurements, [0, 2])
     actual_labels = set(plotter.legend_dict.keys())
     assert actual_labels == expected_labels
+
+
+def test_close_all_figures():
+    plt.close('all')
