@@ -1,8 +1,7 @@
 import copy
 import datetime
 import warnings
-from collections.abc import Iterable, Callable
-from typing import Union
+from typing import Union, List, Iterable, Callable
 
 import numpy as np
 
@@ -17,7 +16,6 @@ except ImportError:
         from more_itertools import pairwise
     except ImportError:
         from itertools import tee
-
         def pairwise(iterable: Iterable):
             a, b = tee(iterable)
             next(b, None)
@@ -71,7 +69,7 @@ def interpolate_state_mutable_sequence(sms: StateMutableSequence,
     ----------
     sms: StateMutableSequence
         A :class:`~.StateMutableSequence` that should be interpolated
-    times: Union[datetime.datetime, list[datetime.datetime]]
+    times: Union[datetime.datetime, List[datetime.datetime]]
         a time, or a list of times for ``sms`` to be interpolated to.
 
     Returns
