@@ -1,6 +1,6 @@
 from collections.abc import Sequence, Iterable
 from itertools import chain
-from typing import Dict, Iterable, Sequence, Union
+from typing import Union
 
 from ..base import Property
 from ..dataassociator import Associator
@@ -78,7 +78,7 @@ class MultiManager(MetricManager):
             Metrics generated
         """
 
-        metrics: Dict[Dict] = {}
+        metrics: dict[dict] = {}
 
         generators = self.generators if isinstance(self.generators, list) else [self.generators]
 

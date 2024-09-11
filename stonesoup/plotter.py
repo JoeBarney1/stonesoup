@@ -2079,7 +2079,7 @@ class AnimationPlotter(_Plotter):
 
         self.animation_output.save(filename, **kwargs)
 
-    def plot_ground_truths(self, truths, mapping: List[int], label: str = "Ground Truth",
+    def plot_ground_truths(self, truths, mapping: list[int], label: str = "Ground Truth",
                            **kwargs):
         """Plots ground truth(s)
 
@@ -2113,7 +2113,7 @@ class AnimationPlotter(_Plotter):
         truths_kwargs.update(kwargs)
         self.plot_state_mutable_sequence(truths, mapping, label, **truths_kwargs)
 
-    def plot_tracks(self, tracks, mapping: List[int], uncertainty=False, particle=False,
+    def plot_tracks(self, tracks, mapping: list[int], uncertainty=False, particle=False,
                     label="Tracks", **kwargs):
         """Plots track(s)
 

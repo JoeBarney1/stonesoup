@@ -1,5 +1,4 @@
 from operator import attrgetter
-from typing import Set
 
 from ordered_set import OrderedSet
 
