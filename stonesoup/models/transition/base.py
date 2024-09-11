@@ -1,18 +1,13 @@
-from abc import abstractmethod
-from datetime import timedelta
 import copy
-from typing import Sequence, Iterable, Union, List, Optional, Callable
+from abc import abstractmethod
+from collections.abc import Sequence
 
+import numpy as np
 from scipy.linalg import block_diag
-from stonesoup.base import Property
-from stonesoup.models.base import GaussianModel, Latents, LevyModel, Model
-from stonesoup.models.base_driver import ConditionallyGaussianDriver
-from stonesoup.types.array import (
-    CovarianceMatrices,
-    CovarianceMatrix,
-    StateVector,
-    StateVectors,
-)
+
+from ..base import Model, GaussianModel
+from ...base import Property
+from ...types.array import StateVector, StateVectors
 
 
 class TransitionModel(Model):
