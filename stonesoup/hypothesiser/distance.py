@@ -72,12 +72,8 @@ class DistanceHypothesiser(Hypothesiser):
         for detection in detections:
 
             # Re-evaluate prediction
-            if self.predict_with_measurements:
-                prediction = self.predictor.predict(
-                    track, timestamp=detection.timestamp, measurement=detection, **kwargs)
-            else:
-                prediction = self.predictor.predict(
-                    track, timestamp=detection.timestamp, **kwargs)
+            prediction = self.predictor.predict(
+                track, timestamp=detection.timestamp, measurement=detection, **kwargs)
 
             # Compute measurement prediction and distance measure
             measurement_prediction = self.updater.predict_measurement(
