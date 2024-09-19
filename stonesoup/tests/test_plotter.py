@@ -1,3 +1,4 @@
+import warnings
 from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
@@ -48,20 +49,17 @@ for state in truth:
 
     true_measurements.append(measurement_set)
 
-prob_clutter = 0.8
 clutter_measurements = []
 for state in truth:
     clutter_measurement_set = set()
-    # Generate clutter detections
-    if np.random.rand() <= prob_clutter:
-        random_state = state.from_state(
-            state=state,
-            state_vector=np.random.uniform(-20, 20, size=state.state_vector.size)
-        )
-        measurement = measurement_model.function(random_state, noise=True)
-        clutter_measurement_set.add(Clutter(state_vector=measurement,
-                                            timestamp=state.timestamp,
-                                            measurement_model=measurement_model))
+    random_state = state.from_state(
+        state=state,
+        state_vector=np.random.uniform(-20, 20, size=state.state_vector.size)
+    )
+    measurement = measurement_model.function(random_state, noise=True)
+    clutter_measurement_set.add(Clutter(state_vector=measurement,
+                                        timestamp=state.timestamp,
+                                        measurement_model=measurement_model))
 
     clutter_measurements.append(clutter_measurement_set)
 
