@@ -2,9 +2,9 @@ import weakref
 from typing import Sequence
 
 from stonesoup.types.numeric import Probability
-from ..base import Property
-from .array import StateVector
-from .base import Type
+from stonesoup.base import Property
+from stonesoup.types.array import StateVector
+from stonesoup.types.base import Type
 
 
 class Particle(Type):
@@ -16,20 +16,18 @@ class Particle(Type):
     state_vector: StateVector = Property(doc="State vector")
     weight: float = Property(doc='Weight of particle')
     parent: 'Particle' = Property(default=None, doc='Parent particle')
-    history: list[Probability[float]] = Property(default_factory=list, doc='History of previous weights')
+    history: list = Property(default=list, doc='History of previous weights')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Initialize history directly as an instance attribute
-        self.history = [] if 'history' not in kwargs else kwargs['history']
+        self.history = []
         
         if self.parent and self.parent.parent:
             self.parent.parent = weakref.ref(self.parent.parent)
         if self.state_vector is not None and not isinstance(self.state_vector, StateVector):
             self.state_vector = StateVector(self.state_vector)
         
-        
-
     @property
     def ndim(self):
         return self.state_vector.shape[0]
@@ -53,7 +51,7 @@ class Particle(Type):
     #         """
     #         if self.weight is not None:
     #             self.history.append(self.weight)  # Store the current weight in history before updating
-
+print(dir(Particle))
 class MultiModelParticle(Particle):
     """
     Particle type
