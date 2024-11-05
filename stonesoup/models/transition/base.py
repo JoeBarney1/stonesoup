@@ -1,10 +1,9 @@
-from abc import abstractmethod
-from datetime import timedelta
 import copy
-from typing import Sequence, Iterable, Union, List, Optional, Callable
+from abc import abstractmethod
+from collections.abc import Sequence
 
-from scipy.linalg import block_diag
 import numpy as np
+from scipy.linalg import block_diag
 
 from .base_driver import Latents, GaussianDriver, ConditionalGaussianDriver
 from ..base import Model, GaussianModel, LinearModel, TimeVariantModel
