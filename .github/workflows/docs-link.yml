@@ -10,10 +10,12 @@ jobs:
     if: "${{ github.event.context == 'ci/circleci: docs' }}"
     permissions:
       statuses: write
+    permissions:
+      statuses: write
     name: Run CircleCI artifacts redirector
     steps:
       - name: GitHub Action step
-        uses: larsoner/circleci-artifacts-redirector-action@v1
+        uses: scientific-python/circleci-artifacts-redirector-action@v1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           api-token: ${{ secrets.CIRCLECI_DOCS_LINK }}
