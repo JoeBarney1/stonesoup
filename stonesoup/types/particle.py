@@ -14,9 +14,15 @@ class Particle(Type):
     state_vector: StateVector = Property(doc="State vector")
     weight: float = Property(doc='Weight of particle')
     parent: 'Particle' = Property(default=None, doc='Parent particle')
+    history: Sequence[float] = Property(default=None, doc='History of previous weights, means, and covariances')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)       
+         
+        # Initialize history as an empty list if it's not provided
+        if self.history is None:
+            self.history = Sequence()
+
         if self.parent and self.parent.parent:
             self.parent.parent = weakref.ref(self.parent.parent)
         if self.state_vector is not None and not isinstance(self.state_vector, StateVector):
@@ -53,3 +59,16 @@ class RaoBlackwellisedParticle(Particle):
     model_probabilities: Sequence[float] = Property(
         doc="The dynamic probabilities of changing models")
     parent: 'RaoBlackwellisedParticle' = Property(default=None, doc='Parent particle')
+
+class SmoothedParticle(Particle):
+    """
+    Smoothed Particle type
+
+    A particle type with a history of previous weights
+    """
+    history: Sequence[float] = Property(default=list, doc='History of previous weights, means and covariances')
+
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    #     if self.history is None:
+    #         self.history = []
