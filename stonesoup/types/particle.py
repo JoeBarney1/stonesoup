@@ -1,10 +1,8 @@
 import weakref
 from typing import Sequence
-
-from stonesoup.types.numeric import Probability
-from stonesoup.base import Property
-from stonesoup.types.array import StateVector
-from stonesoup.types.base import Type
+from ..base import Property
+from .array import StateVector
+from .base import Type
 
 
 class Particle(Type):
@@ -16,13 +14,9 @@ class Particle(Type):
     state_vector: StateVector = Property(doc="State vector")
     weight: float = Property(doc='Weight of particle')
     parent: 'Particle' = Property(default=None, doc='Parent particle')
-    history: list = Property(default=list, doc='History of previous weights')
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Initialize history directly as an instance attribute
-        self.history = []
-        
+        super().__init__(*args, **kwargs)       
         if self.parent and self.parent.parent:
             self.parent.parent = weakref.ref(self.parent.parent)
         if self.state_vector is not None and not isinstance(self.state_vector, StateVector):
@@ -38,20 +32,7 @@ class Particle(Type):
             return self._property_parent()
         else:
             return self._property_parent
-        
-    #define a function to update the history of a particle given new weights
-    # def update_history(self):
-    #         """
-    #         Update the weight of the particle and add the previous weight to the history.
-            
-    #         Parameters
-    #         ----------
-    #         new_weight : Probability
-    #             The new weight to assign to the particle.
-    #         """
-    #         if self.weight is not None:
-    #             self.history.append(self.weight)  # Store the current weight in history before updating
-print(dir(Particle))
+    
 class MultiModelParticle(Particle):
     """
     Particle type
@@ -72,3 +53,16 @@ class RaoBlackwellisedParticle(Particle):
     model_probabilities: Sequence[float] = Property(
         doc="The dynamic probabilities of changing models")
     parent: 'RaoBlackwellisedParticle' = Property(default=None, doc='Parent particle')
+
+class SmoothedParticle(Particle):
+    """
+    Smoothed Particle type
+
+    A particle type with a history of previous weights
+    """
+    history: list = Property(default=list, doc='History of previous weights, means and covariances')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.history is None:
+            self.history = []
