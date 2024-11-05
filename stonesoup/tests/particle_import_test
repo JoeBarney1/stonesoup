@@ -1,0 +1,2 @@
+from stonesoup.types.particle import Particle, SmoothedParticle
+print(dir(SmoothedParticle))
