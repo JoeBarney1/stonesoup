@@ -60,7 +60,7 @@ class SmoothedParticle(Particle):
 
     A particle type with a history of previous weights
     """
-    history: list = Property(default=list, doc='History of previous weights, means and covariances')
+    history: Sequence[float] = Property(default=list, doc='History of previous weights, means and covariances')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
