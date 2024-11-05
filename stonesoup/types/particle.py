@@ -53,16 +53,3 @@ class RaoBlackwellisedParticle(Particle):
     model_probabilities: Sequence[float] = Property(
         doc="The dynamic probabilities of changing models")
     parent: 'RaoBlackwellisedParticle' = Property(default=None, doc='Parent particle')
-
-class SmoothedParticle(Particle):
-    """
-    Smoothed Particle type
-
-    A particle type with a history of previous weights
-    """
-    history: Sequence[float] = Property(default=list, doc='History of previous weights, means and covariances')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.history is None:
-            self.history = []
