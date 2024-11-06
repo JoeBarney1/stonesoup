@@ -1,6 +1,6 @@
 import copy
 from functools import lru_cache
-from typing import Callable
+from typing import Callable, Sequence
 import warnings
 
 import numpy as np
@@ -732,15 +732,6 @@ class MarginalisedParticleUpdater(ParticleUpdater):
         new_weight -= logsumexp(new_weight) 
         
         posterior.log_weight = new_weight
-        
-        #Before resampling (and losing the new_weights)
-        #Add the new, posterior weights to the history property of each particle in the posterior
-        #Currently the best way to consider each 'particle' is the index of the particles, 
-        # need to discuss if this is acceptable/what the mathematically correct way is.
-        
-        # for particle in posterior:
-        #     if particle.weight is not None:
-        #         particle.history.append(particle.weight)
 
         # Resample
         resample_flag = True
@@ -749,13 +740,13 @@ class MarginalisedParticleUpdater(ParticleUpdater):
             if resampled_state == posterior:
                 resample_flag = False
             posterior = resampled_state
-        # print(posterior.log_weight)
+
         if self.regulariser is not None and resample_flag:
             prior = hypothesis.prediction.parent
             posterior = self.regulariser.regularise(prior, posterior)
         return  posterior
     
-    def update_with_history(self, hypothesis, **kwargs):
+    def update_with_history(self, hypothesis, history=None, **kwargs):
         predicted_state = hypothesis.prediction
 
         if hypothesis.measurement.measurement_model is None:
@@ -763,19 +754,17 @@ class MarginalisedParticleUpdater(ParticleUpdater):
         else:
             measurement_model = hypothesis.measurement.measurement_model
 
-
         if hypothesis.measurement_prediction is None:
             # Attach the measurement prediction to the hypothesis
             hypothesis.measurement_prediction = self.predict_measurement(
                 predicted_state, measurement_model=measurement_model, **kwargs)
 
-
         posterior_covariance, kalman_gain = self._posterior_covariance(hypothesis)
 
         # Posterior mean
         posterior_mean = self._posterior_mean(predicted_state, kalman_gain,
-                                              hypothesis.measurement,
-                                              hypothesis.measurement_prediction)
+                                            hypothesis.measurement,
+                                            hypothesis.measurement_prediction)
 
         posterior = Update.from_state(
             state_vector=posterior_mean,
@@ -785,23 +774,24 @@ class MarginalisedParticleUpdater(ParticleUpdater):
             timestamp=hypothesis.prediction.timestamp
         )
 
+        # Update weights
         new_weight = posterior.log_weight + measurement_model.logpdf(
             hypothesis.measurement, posterior, **kwargs)
-
-
-        # Normalise the weights
-        new_weight -= logsumexp(new_weight) 
-        
+        new_weight -= logsumexp(new_weight)  # Normalize the weights
         posterior.log_weight = new_weight
-        
-        #Before resampling (and losing the new_weights)
-        #Add the new, posterior weights to the history property of each particle in the posterior
-        #Currently the best way to consider each 'particle' is the index of the particles, 
-        # need to discuss if this is acceptable/what the mathematically correct way is.
-        
-        # for particle in posterior:
-        #     if particle.weight is not None:
-        #         particle.history.append(particle.weight)
+
+        # Initialize history dictionary if input is given
+        if history == 'begin_history':
+            history = {
+                "particle_log_weights": [],
+                "particle_means": [],
+                "particle_covariances": []
+            }
+        if history is not None:
+            # Append the current values to the history
+            history["particle_log_weights"].append(posterior.log_weight)
+            history["particle_means"].append([posterior.state_vector])
+            history["particle_covariances"].append([posterior.covariance])
 
         # Resample
         resample_flag = True
@@ -810,11 +800,16 @@ class MarginalisedParticleUpdater(ParticleUpdater):
             if resampled_state == posterior:
                 resample_flag = False
             posterior = resampled_state
-        # print(posterior.log_weight)
+
         if self.regulariser is not None and resample_flag:
             prior = hypothesis.prediction.parent
             posterior = self.regulariser.regularise(prior, posterior)
-        return  posterior
+
+        if history is not None:
+            # Return the posterior and updated history
+            return posterior, history
+        else:
+            return posterior
 
     @lru_cache()
     def predict_measurement(self, predicted_state, measurement_model=None,
