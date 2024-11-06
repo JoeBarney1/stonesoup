@@ -1,50 +1,76 @@
-import copy
-from cv2 import invert
+from abc import abstractmethod
+
+import pytest
 import numpy as np
-from functools import partial
+from datetime import datetime, timedelta
 
-from ..base import Smoother
-from ...base import Property
-from ...models.base import LinearModel
-from ...models.transition.base import TransitionModel
-from ...models.transition.linear import LinearGaussianTransitionModel
-from ...types.multihypothesis import MultipleHypothesis
-from ...types.prediction import GaussianStatePrediction
-from ...types.update import GaussianStateUpdate
-from ...functions import gauss2sigma, unscented_transform
+from stonesoup.smoother.base import Smoother
+from stonesoup.types.detection import Detection
+from stonesoup.types.multihypothesis import MultipleHypothesis
+from stonesoup.types.state import GaussianState
+from stonesoup.types.prediction import GaussianStatePrediction
+from stonesoup.types.track import Track
+from stonesoup.types.hypothesis import SingleHypothesis
+from stonesoup.models.transition.linear import ConstantVelocity
+from stonesoup.models.measurement.linear import LinearGaussian
+from stonesoup.predictor.kalman import KalmanPredictor
+from stonesoup.types.update import GaussianStateUpdate
+from stonesoup.updater.kalman import KalmanUpdater
+from stonesoup.smoother.kalman import KalmanSmoother, ExtendedKalmanSmoother, \
+    UnscentedKalmanSmoother
 
-def get_past_weights(Particle):
-        # find parent particle
-        # parent particle.weight on to the START of the sequence
-        # repeat on particle until Particle.parent = None
 
-        ##need to work on below if recursive method interesting
-        # weights= []
-        # while Particle != None:
-        #     weights.append(Particle.weight)
-        #     print(weights[-1])
-        #     Particle=Particle.parent
-        # return reversed(weights)
-
-        # final_states= predictions[-1] #go through the set of particle predictions at the most recent timestamp 
-        # past_weights_all_particles =[] # prepare a list to hold w_t_i, the weights over time of each particle
-        # for particle_i in final_states:
-        #         past_weights_particle_i= get_past_weights(particle_i)
-        #         # print(get_past_weights(particle_i))
-        #         past_weights_all_particles.append(past_weights_particle_i)
-
-        raise NotImplementedError
-
+class WeightedSmoother(Track)
 class RBParticleSmoother(Smoother):
     r"""
-    Rao-Blackwellized Particle Smoother for conditionally linear Gaussian models. This class
-    implements the RBPS algorithm, incorporating both hierarchical and mixed linear/non-linear
-    models as transition models.
+    The Rao-Blackwellized Particle Smoother (RBPS) for conditionally linear Gaussian models, following the algorithm presented in [1]_.
+    The smoother combines particle filtering and Kalman smoothing to enable efficient smoothing in models with a mix of linear/nonlinear
+    state components, allowing for conditionally Gaussian latent variables within a broader non-Gaussian framework.
+
+    The RBParticleSmoother operates in two main steps:
+    
+    - **Forward Filtering** (Algorithm 1):
+      This step is responsible for propagating particles through a non-linear process, updating each particle's weight based on 
+      measurement likelihoods. Each particle represents a unique hypothesis about the latent state, and for each particle, a 
+      Kalman filter is used to process the conditionally Gaussian state component. For each timestep :math:`k`, particles are 
+      sequentially updated based on a measurement :math:`z_k`, and weighted according to their predicted likelihood.
+    
+    - **Backward Smoothing** (Algorithm 2):
+      The backward smoothing pass reconstructs the full posterior distribution by leveraging information from future states.
+      For each timestep :math:`k`, particles are adjusted by combining predictions with the observations of future states, 
+      weighted by smoothing gains. This smoothing gain helps correct for any estimation error accumulated during the forward pass.
+      The backward step works by beginning at the final index in the track, :math:`K`, and proceeding in reverse order to the start.
+
+    The main smoothing operations are executed in the `smooth` function, which undertakes the backward recursion by iterating from 
+    :math:`K` to :math:`1` and applying the following steps:
+
+    .. math::
+        
+        \mathbf{x}_{k|k-1} &= f(\mathbf{x}_{k-1})  \\
+        P_{k|k-1} &= F_{k} P_{k-1} F_{k}^T + Q_{k}  \\
+        G_k &= P_{k-1} F_{k}^T P_{k|k-1}^{-1} \\
+        \mathbf{x}_{k-1}^s &= \mathbf{x}_{k-1} + G_k (\mathbf{x}_{k}^s - \mathbf{x}_{k|k-1})  \\
+        P_{k-1}^s &= P_{k-1} + G_k (P_{k}^s - P_{k|k-1}) G_k^T
+
+    where:
+    - :math:`\mathbf{x}_{k|k-1}` and :math:`P_{k|k-1}` are the predicted state and covariance.
+    - :math:`\mathbf{x}_{k-1}^s` and :math:`P_{k-1}^s` represent the smoothed state and covariance.
+
+    The filter component operates by tracking the `Track` object for each particle, where the predicted and updated states are retrieved.
+    During backward smoothing, the smoothing gain :math:`G_k` is applied, and the forward-passed state vectors are adjusted 
+    based on the future states. This design enables the RBPS to handle high-dimensional and partially linear models with 
+    reduced computational overhead, particularly where state dynamics exhibit linearity conditioned on the particle path.
+
+    References
+
+    .. [1] Doucet, A., Godsill, S., and Andrieu, C. "On Sequential Monte Carlo Sampling Methods for Bayesian Filtering and Smoothing",
+       Statistics and Computing, 2000.
     """
 
-    # Transition models to be defined
-    transition_model_hierarchical = Property(doc="Hierarchical transition model.")
-    transition_model_mixed = Property(doc="Mixed linear/non-linear transition model.")
+
+    # # Transition models to be defined
+    # transition_model_hierarchical = Property(doc="Hierarchical transition model.")
+    # transition_model_mixed = Property(doc="Mixed linear/non-linear transition model.")
 
     def forward_filter(self, track):
         """
