@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from datetime import timedelta
 import copy
-from typing import Sequence, Iterable, Union, List, Optional, Callable
+from typing import Sequence, Iterable, Union, List, Optional, Callable, Dict, Tuple
 
 from scipy.linalg import block_diag
 import numpy as np
@@ -218,7 +218,7 @@ class CombinedLevyTransitionModel(TransitionModel, LevyModel):
             return np.array(ret).view(CovarianceMatrices)
 
 
-    def function(self, state, time_interval: timedelta, noise=False, **kwargs) -> StateVector:
+    def function(self, state, time_interval: timedelta, noise=False, latents_history=None, **kwargs) -> StateVector:
         """Applies each transition model in :py:attr:`~model_list` in turn to the state's
         corresponding state vector components.
         For example, in a 3D state space, with :py:attr:`~model_list` = [modelA(ndim_state=2),
@@ -250,7 +250,13 @@ class CombinedLevyTransitionModel(TransitionModel, LevyModel):
             noise_loop = noise
         else:
             noise_loop = False
-        latents = self.sample_latents(time_interval=time_interval, num_samples=1)
+        
+        
+        if latents_history is None:
+            latents = self.sample_latents(time_interval=time_interval, num_samples=1)  
+        else:
+            latents, latents_history = self.sample_latents(time_interval=time_interval, num_samples=1, latents_history=latents_history)               
+
         for model in self.model_list:
             temp_state.state_vector = state.state_vector[
                 ndim_count : model.ndim_state + ndim_count, :
@@ -262,14 +268,55 @@ class CombinedLevyTransitionModel(TransitionModel, LevyModel):
 
         if isinstance(noise, bool):
             noise = 0
-        return state_vector + noise
 
-    def sample_latents(self, time_interval: timedelta, num_samples: int, random_state: Optional[np.random.RandomState]=None) -> Latents:
+        if latents_history is None:
+            return state_vector + noise
+        else:
+            return state_vector+ noise, latents_history
+
+    # def sample_latents(self, time_interval: timedelta, num_samples: int, random_state: Optional[np.random.RandomState]=None) -> Latents:
+    #     dt = time_interval.total_seconds()
+    #     latents = Latents(num_samples=num_samples)
+    #     for m in self.model_list:
+    #         if m.driver and not latents.exists(m.driver):
+    #             jsizes, jtimes = m.driver.sample_latents(dt=dt, num_samples=num_samples, random_state=random_state)
+    #             latents.add(driver=m.driver, jsizes=jsizes, jtimes=jtimes)
+    #     return latents
+    
+    # sample latents function should now work without needing to use a different 'with history' version
+    # it should output differently depending on whether a history input is given
+
+    def sample_latents(
+        self, time_interval: timedelta, num_samples: int, 
+        latents_history: Optional[Dict] = None, 
+        random_state: Optional[np.random.RandomState] = None
+    ) -> Union[Latents, Tuple[Latents, Dict]]:
         dt = time_interval.total_seconds()
         latents = Latents(num_samples=num_samples)
+
+        # Initialize history dictionary if it's the first call
+        if latents_history == 'begin_latents_history':
+            latents_history = {}
+
         for m in self.model_list:
             if m.driver and not latents.exists(m.driver):
-                jsizes, jtimes = m.driver.sample_latents(dt=dt, num_samples=num_samples, random_state=random_state)
+                jsizes, jtimes = m.driver.sample_latents(
+                    dt=dt, num_samples=num_samples, random_state=random_state
+                )
                 latents.add(driver=m.driver, jsizes=jsizes, jtimes=jtimes)
-        return latents
+                if latents_history is not None:
+                    # Initialize history for this driver if not already present
+                    if m.driver not in latents_history:
+                        latents_history[m.driver] = []
+                    # Append (jsizes, jtimes) as a tuple for this driver
+                    latents_history[m.driver].append((jsizes, jtimes))
+                    
+        if latents_history is not None:
+            return latents, latents_history
+        else:
+            return latents
+        
+
+
+
 
