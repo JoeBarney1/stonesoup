@@ -20,7 +20,9 @@ from stonesoup.smoother.kalman import KalmanSmoother, ExtendedKalmanSmoother, \
     UnscentedKalmanSmoother
 
 
-class WeightedSmoother(Track)
+class WeightedSmoother(Smoother):
+    print('not implemented')
+
 class RBParticleSmoother(Smoother):
     r"""
     The Rao-Blackwellized Particle Smoother (RBPS) for conditionally linear Gaussian models, following the algorithm presented in [1]_.
