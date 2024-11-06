@@ -267,7 +267,62 @@ class KalmanUpdater(Updater):
         return MeasurementPrediction.from_state(
             predicted_state, pred_meas, innov_cov, cross_covar=meas_cross_cov)
 
-    def update(self, hypothesis, **kwargs):
+    # def update(self, hypothesis, **kwargs):
+    #     r"""The Kalman update method. Given a hypothesised association between
+    #     a predicted state or predicted measurement and an actual measurement,
+    #     calculate the posterior state.
+
+    #     Parameters
+    #     ----------
+    #     hypothesis : :class:`~.SingleHypothesis`
+    #         the prediction-measurement association hypothesis. This hypothesis
+    #         may carry a predicted measurement, or a predicted state. In the
+    #         latter case a predicted measurement will be calculated.
+    #     **kwargs : various
+    #         These are passed to :meth:`predict_measurement`
+
+    #     Returns
+    #     -------
+    #     : :class:`~.GaussianStateUpdate`
+    #         The posterior state Gaussian with mean :math:`\mathbf{x}_{k|k}` and
+    #         covariance :math:`P_{x|x}`
+
+    #     """
+    #     # Get the predicted state out of the hypothesis
+    #     predicted_state = hypothesis.prediction
+
+    #     # If there is no measurement prediction in the hypothesis then do the
+    #     # measurement prediction (and attach it back to the hypothesis).
+    #     if hypothesis.measurement_prediction is None:
+    #         # Get the measurement model out of the measurement if it's there.
+    #         # If not, use the one native to the updater (which might still be
+    #         # none)
+    #         measurement_model = hypothesis.measurement.measurement_model
+    #         measurement_model = self._check_measurement_model(
+    #             measurement_model)
+
+    #         # Attach the measurement prediction to the hypothesis
+    #         hypothesis.measurement_prediction = self.predict_measurement(
+    #             predicted_state, measurement_model=measurement_model, **kwargs)
+
+    #     # Kalman gain and posterior covariance
+    #     posterior_covariance, kalman_gain = self._posterior_covariance(hypothesis)
+
+    #     # Posterior mean
+    #     posterior_mean = self._posterior_mean(predicted_state, kalman_gain,
+    #                                           hypothesis.measurement,
+    #                                           hypothesis.measurement_prediction)
+
+    #     if self.force_symmetric_covariance:
+    #         posterior_covariance = \
+    #             (posterior_covariance + posterior_covariance.T)/2
+
+    #     return Update.from_state(
+    #         hypothesis.prediction,
+    #         posterior_mean, posterior_covariance,
+    #         timestamp=hypothesis.measurement.timestamp, hypothesis=hypothesis)
+    
+    def update(self, hypothesis, kalman_history=None, **kwargs):
         r"""The Kalman update method. Given a hypothesised association between
         a predicted state or predicted measurement and an actual measurement,
         calculate the posterior state.
@@ -305,6 +360,8 @@ class KalmanUpdater(Updater):
             hypothesis.measurement_prediction = self.predict_measurement(
                 predicted_state, measurement_model=measurement_model, **kwargs)
 
+        
+            
         # Kalman gain and posterior covariance
         posterior_covariance, kalman_gain = self._posterior_covariance(hypothesis)
 
@@ -313,15 +370,34 @@ class KalmanUpdater(Updater):
                                               hypothesis.measurement,
                                               hypothesis.measurement_prediction)
 
+        
+        
         if self.force_symmetric_covariance:
             posterior_covariance = \
                 (posterior_covariance + posterior_covariance.T)/2
+        
+        # Initialize history dictionary if it's the first call
+        if kalman_history == 'begin_kalman_history':
+            kalman_history = {
+                "kalman_means": [],
+                "kalman_covariances": []
+            }
+        if kalman_history is not None:
+            # Append the current values to the history
+            kalman_history["kalman_means"].append([posterior_mean])
+            kalman_history["kalman_covariances"].append([posterior_covariance])
 
-        return Update.from_state(
+            return Update.from_state(
+            hypothesis.prediction,
+            posterior_mean, posterior_covariance,
+            timestamp=hypothesis.measurement.timestamp, hypothesis=hypothesis) , kalman_history
+        
+        else:
+            return Update.from_state(
             hypothesis.prediction,
             posterior_mean, posterior_covariance,
             timestamp=hypothesis.measurement.timestamp, hypothesis=hypothesis)
-
+    
 
 class ExtendedKalmanUpdater(KalmanUpdater):
     r"""The Extended Kalman Filter version of the Kalman Updater. Inherits most
