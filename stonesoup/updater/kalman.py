@@ -359,9 +359,6 @@ class KalmanUpdater(Updater):
             # Attach the measurement prediction to the hypothesis
             hypothesis.measurement_prediction = self.predict_measurement(
                 predicted_state, measurement_model=measurement_model, **kwargs)
-
-        
-            
         # Kalman gain and posterior covariance
         posterior_covariance, kalman_gain = self._posterior_covariance(hypothesis)
 
@@ -369,13 +366,9 @@ class KalmanUpdater(Updater):
         posterior_mean = self._posterior_mean(predicted_state, kalman_gain,
                                               hypothesis.measurement,
                                               hypothesis.measurement_prediction)
-
-        
-        
         if self.force_symmetric_covariance:
             posterior_covariance = \
                 (posterior_covariance + posterior_covariance.T)/2
-        
         # Initialize history dictionary if it's the first call
         if kalman_history == 'begin_kalman_history':
             kalman_history = {
@@ -388,16 +381,15 @@ class KalmanUpdater(Updater):
             kalman_history["kalman_covariances"].append([posterior_covariance])
 
             return Update.from_state(
-            hypothesis.prediction,
-            posterior_mean, posterior_covariance,
-            timestamp=hypothesis.measurement.timestamp, hypothesis=hypothesis) , kalman_history
-        
+                hypothesis.prediction,
+                posterior_mean, posterior_covariance,
+                timestamp=hypothesis.measurement.timestamp, hypothesis=hypothesis) , kalman_history
         else:
             return Update.from_state(
-            hypothesis.prediction,
-            posterior_mean, posterior_covariance,
-            timestamp=hypothesis.measurement.timestamp, hypothesis=hypothesis)
-    
+                hypothesis.prediction,
+                posterior_mean, posterior_covariance,
+                timestamp=hypothesis.measurement.timestamp, hypothesis=hypothesis)       
+
 
 class ExtendedKalmanUpdater(KalmanUpdater):
     r"""The Extended Kalman Filter version of the Kalman Updater. Inherits most
