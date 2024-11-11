@@ -14,7 +14,6 @@ class Particle(Type):
     state_vector: StateVector = Property(doc="State vector")
     weight: float = Property(doc='Weight of particle')
     parent: 'Particle' = Property(default=None, doc='Parent particle')
-    # history: Sequence[float] = Property(default=None, doc='History of previous weights, means, and covariances')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)       
