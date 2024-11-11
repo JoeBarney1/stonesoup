@@ -666,12 +666,13 @@ class MarginalisedParticleUpdater(ParticleUpdater):
         return np.einsum('ijk,jm->imk', predicted_state.covariance, measurement_matrix.T)
 
     def _innovation_covariance(self, m_cross_cov, meas_mat, meas_mod):
-        meas_covar = meas_mod.covar() # R
-        # HPH.T + R        
+        meas_covar = meas_mod.covar()  # R
+        # HPH.T + R
         return np.einsum('ij,jkl->ikl', meas_mat, m_cross_cov) + meas_covar[..., np.newaxis]
 
     def _posterior_mean(self, predicted_state, kalman_gain, measurement, measurement_prediction):
-        tmp = np.einsum('jkl,kl->jl', kalman_gain, (measurement.state_vector - measurement_prediction.state_vector))
+        tmp = np.einsum('jkl,kl->jl', kalman_gain,
+                        (measurement.state_vector - measurement_prediction.state_vector))
         post_mean = predicted_state.state_vector + tmp
         return post_mean.view(StateVectors)
                  
@@ -685,68 +686,16 @@ class MarginalisedParticleUpdater(ParticleUpdater):
             
         #     kalman_gain = mp_cross_covar @ np.linalg.inv(mp_covar)
         #     post_cov[..., p] = predicted_covar[..., p] - kalman_gain @ mp_covar @ kalman_gain.T
-        mp_covar = hypothesis.measurement_prediction.covariance # M x M X N
-        mp_cross_covar =  hypothesis.measurement_prediction.cross_covar
-        inv = np.linalg.inv(mp_covar.T).T # M x M X N
-        kalman_gain = np.einsum("jki, lki -> jli", mp_cross_covar, inv) # M x M X N
+        mp_covar = hypothesis.measurement_prediction.covariance     # M x M X N
+        mp_cross_covar = hypothesis.measurement_prediction.cross_covar
+        inv = np.linalg.inv(mp_covar.T).T  # M x M X N
+        kalman_gain = np.einsum("jki, lki -> jli", mp_cross_covar, inv)  # M x M X N
         tmp = np.einsum("jki, lki -> jli", mp_covar, kalman_gain)
         post_cov = predicted_covar - np.einsum("jli, lki -> jki", kalman_gain, tmp)
        
         return post_cov.view(CovarianceMatrix), kalman_gain
-
-    def update(self, hypothesis, **kwargs):
-        predicted_state = hypothesis.prediction
-
-        if hypothesis.measurement.measurement_model is None:
-            measurement_model = self.measurement_model
-        else:
-            measurement_model = hypothesis.measurement.measurement_model
-
-
-        if hypothesis.measurement_prediction is None:
-            # Attach the measurement prediction to the hypothesis
-            hypothesis.measurement_prediction = self.predict_measurement(
-                predicted_state, measurement_model=measurement_model, **kwargs)
-
-
-        posterior_covariance, kalman_gain = self._posterior_covariance(hypothesis)
-
-        # Posterior mean
-        posterior_mean = self._posterior_mean(predicted_state, kalman_gain,
-                                              hypothesis.measurement,
-                                              hypothesis.measurement_prediction)
-
-        posterior = Update.from_state(
-            state_vector=posterior_mean,
-            covariance=posterior_covariance,
-            state=hypothesis.prediction,
-            hypothesis=hypothesis,
-            timestamp=hypothesis.prediction.timestamp
-        )
-
-        new_weight = posterior.log_weight + measurement_model.logpdf(
-            hypothesis.measurement, posterior, **kwargs)
-
-
-        # Normalise the weights
-        new_weight -= logsumexp(new_weight) 
-        
-        posterior.log_weight = new_weight
-
-        # Resample
-        resample_flag = True
-        if self.resampler is not None:
-            resampled_state = self.resampler.resample(posterior)
-            if resampled_state == posterior:
-                resample_flag = False
-            posterior = resampled_state
-
-        if self.regulariser is not None and resample_flag:
-            prior = hypothesis.prediction.parent
-            posterior = self.regulariser.regularise(prior, posterior)
-        return  posterior
     
-    def update_with_history(self, hypothesis, history=None, **kwargs):
+    def update(self, hypothesis, history=None, **kwargs):
         predicted_state = hypothesis.prediction
 
         if hypothesis.measurement.measurement_model is None:
@@ -786,12 +735,12 @@ class MarginalisedParticleUpdater(ParticleUpdater):
                 "particle_log_weights": [],
                 "particle_means": [],
                 "particle_covariances": []
-            }
+                }
         if history is not None:
             # Append the current values to the history
             history["particle_log_weights"].append(posterior.log_weight)
             history["particle_means"].append([posterior.state_vector])
-            history["particle_covariances"].append([posterior.covariance])
+            history["particle_covariances"].append([posterior.covariance])            
 
         # Resample
         resample_flag = True
@@ -805,11 +754,62 @@ class MarginalisedParticleUpdater(ParticleUpdater):
             prior = hypothesis.prediction.parent
             posterior = self.regulariser.regularise(prior, posterior)
 
+
         if history is not None:
             # Return the posterior and updated history
             return posterior, history
         else:
             return posterior
+        
+    # def update(self, hypothesis, **kwargs):
+    #     predicted_state = hypothesis.prediction
+
+    #     if hypothesis.measurement.measurement_model is None:
+    #         measurement_model = self.measurement_model
+    #     else:
+    #         measurement_model = hypothesis.measurement.measurement_model
+
+    #     if hypothesis.measurement_prediction is None:
+    #         # Attach the measurement prediction to the hypothesis
+    #         hypothesis.measurement_prediction = self.predict_measurement(
+    #             predicted_state, measurement_model=measurement_model, **kwargs)
+
+    #     posterior_covariance, kalman_gain = self._posterior_covariance(hypothesis)
+
+    #     # Posterior mean
+    #     posterior_mean = self._posterior_mean(predicted_state, kalman_gain,
+    #                                           hypothesis.measurement,
+    #                                           hypothesis.measurement_prediction)
+
+    #     posterior = Update.from_state(
+    #         state_vector=posterior_mean,
+    #         covariance=posterior_covariance,
+    #         state=hypothesis.prediction,
+    #         hypothesis=hypothesis,
+    #         timestamp=hypothesis.prediction.timestamp
+    #     )
+
+    #     new_weight = posterior.log_weight + measurement_model.logpdf(
+    #         hypothesis.measurement, posterior, **kwargs)
+
+    #     # Normalise the weights
+    #     new_weight -= logsumexp(new_weight) 
+        
+    #     posterior.log_weight = new_weight
+
+    #     # Resample
+    #     resample_flag = True
+    #     if self.resampler is not None:
+    #         resampled_state = self.resampler.resample(posterior)
+    #         if resampled_state == posterior:
+    #             resample_flag = False
+    #         posterior = resampled_state
+
+    #     if self.regulariser is not None and resample_flag:
+    #         prior = hypothesis.prediction.parent
+    #         posterior = self.regulariser.regularise(prior, posterior)
+    #     return posterior
+    
 
     @lru_cache()
     def predict_measurement(self, predicted_state, measurement_model=None,
