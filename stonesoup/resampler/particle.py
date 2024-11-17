@@ -14,9 +14,9 @@ class SystematicResampler(Resampler):
 
     """
 
-    def resample(self, particles, nparts=None):
+    def resample(self, particles, nparts=None, resample_index=False):
         """
-        Resample the particles
+        Resample the particles. Assign parents and return index if required.
 
         Parameters
         ----------
@@ -52,8 +52,15 @@ class SystematicResampler(Resampler):
         index = weight_order[np.searchsorted(cdf, np.log(u_j))]
 
         new_particles = particles[index]
-        new_particles.log_weight = np.full((nparts, ), np.log(1/nparts))
-        return new_particles
+        new_particles.log_weight = np.full((nparts,), np.log(1 / nparts))
+        if  resample_index:
+            # Assign parent relationships
+            for i, idx in enumerate(index):
+                new_particles[i].parent = particles[idx]
+            #return index for backwards-tracing
+            return new_particles, index
+        else:
+            return new_particles
 
 
 class ESSResampler(Resampler):
