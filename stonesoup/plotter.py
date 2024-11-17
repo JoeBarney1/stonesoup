@@ -1330,14 +1330,62 @@ class Plotterly(_Plotter):
                 track_colors[track] = self.get_next_color()
 
             if self.dimension == 1:  # plot 1D tracks
+                
+                # Plot uncertainty if requested (as vertical bars)
+                if uncertainty:
+                    name = track_kwargs['legendgroup'] + "<br>(Error bars)"
+                    add_legend = name not in {trace.legendgroup for trace in self.fig.data}
 
-                if uncertainty or particle:
-                    raise NotImplementedError
+                    for i, state in enumerate(track):
+                        ellipse_kwargs = dict(
+                            mode='lines+markers',marker=dict(symbol="cross",color="black"),
+                            opacity=0.5, hoverinfo='skip',
+                            legendgroup=name, name=name,
+                            legendrank=track_kwargs['legendrank'] + 10)
+                        covar = state.covar[mapping[0], mapping[0]]  # Extract variance in the {x or y} -dir
+                        err = np.sqrt(covar)  # Use the standard deviation as the error bar
+                        
+                        if add_legend:
+                            ellipse_kwargs['showlegend'] = True
+                            add_legend = False
+                        else:
+                            ellipse_kwargs['showlegend'] = False
+                        
+                        self.fig.add_scatter(
+                            x=[state.timestamp, state.timestamp],
+                            y=[state.mean[mapping[0]] - err, state.mean[mapping[0]] + err],
+                            **ellipse_kwargs
+                        )
+            
+                # Plot particles if requested
+                if particle:
+                    name = track_kwargs['legendgroup'] + "<br>(Particles)"
+                    add_legend = name not in {trace.legendgroup for trace in self.fig.data}
 
+                    for i, state in enumerate(track):
+                        particle_kwargs = dict(
+                        mode='markers', marker=dict(size=2),
+                        opacity=0.8, hoverinfo='skip',
+                        legendgroup=name, name=name,
+                        legendrank=track_kwargs['legendrank'] + 20)
+
+                        particle_y = [float(val) for val in state.state_vector[mapping]]
+                        if add_legend:
+                            particle_kwargs['showlegend'] = True
+                            add_legend = False
+                        else:
+                            particle_kwargs['showlegend'] = False
+                        self.fig.add_scatter(
+                            x=[state.timestamp] * len(particle_y),
+                            y=particle_y, **particle_kwargs
+                        )
+                
+                    # raise NotImplementedError
+                
                 self.fig.add_scatter(
                     x=[state.timestamp for state in track],
                     y=[float(getattr(state, 'mean', state.state_vector)[mapping[0]])
-                       for state in track],
+                    for state in track],
                     text=[self._format_state_text(state) for state in track],
                     **scatter_kwargs)
 
