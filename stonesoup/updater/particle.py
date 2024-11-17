@@ -730,30 +730,35 @@ class MarginalisedParticleUpdater(ParticleUpdater):
         posterior.log_weight = new_weight
 
         # Initialize history dictionary if input is given
-        if history == 'begin_history':
+        if history == True:
             history = {
                 "particle_log_weights": [],
                 "particle_means": [],
-                "particle_covariances": []
+                "particle_covariances": [],
+                "resample_indices":[]
                 }
-        if history is not None:
-            # Append the current values to the history
-            history["particle_log_weights"].append(posterior.log_weight)
-            history["particle_means"].append([posterior.state_vector])
-            history["particle_covariances"].append([posterior.covariance])            
-
+                   
         # Resample
         resample_flag = True
         if self.resampler is not None:
-            resampled_state = self.resampler.resample(posterior)
+            if history is not None:
+                resampled_state, resample_index = self.resampler.resample(posterior,resample_index=True)
+            else:
+                resampled_state = self.resampler.resample(posterior)
             if resampled_state == posterior:
                 resample_flag = False
             posterior = resampled_state
 
+        if history is not None:
+            # Append the current values to the history
+            history["particle_log_weights"].append([posterior.log_weight])
+            history["particle_means"].append([posterior.state_vector])
+            history["particle_covariances"].append([posterior.covariance]) 
+            history["resample_indices"].append([resample_index])
+
         if self.regulariser is not None and resample_flag:
             prior = hypothesis.prediction.parent
             posterior = self.regulariser.regularise(prior, posterior)
-
 
         if history is not None:
             # Return the posterior and updated history
