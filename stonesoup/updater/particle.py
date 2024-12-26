@@ -694,7 +694,7 @@ class MarginalisedParticleUpdater(ParticleUpdater):
        
         return post_cov.view(CovarianceMatrix), kalman_gain
 
-    def update(self, hypothesis, **kwargs):
+    def update(self, hypothesis, store_extra_data=None, **kwargs):
         predicted_state = hypothesis.prediction
 
         if hypothesis.measurement.measurement_model is None:
@@ -733,13 +733,40 @@ class MarginalisedParticleUpdater(ParticleUpdater):
 
         posterior.log_weight = new_weight
 
+        if store_extra_data == True:
+            posterior.extra_data = {
+                "prior_mean":None,
+                "prior_covar":None,
+                "linear_transition_matrix":None,
+                "predicted_means": None,
+                "predicted_covars": None,
+                
+                "posterior_log_weights": None,
+                "resample_indices":None,
+                }
+                   
         # Resample
         resample_flag = True
         if self.resampler is not None:
-            resampled_state = self.resampler.resample(posterior)
+            if store_extra_data == True:
+                resampled_state, resample_index = self.resampler.resample(posterior,resample_index=True)
+            else:
+                resampled_state = self.resampler.resample(posterior)
             if resampled_state == posterior:
                 resample_flag = False
             posterior = resampled_state
+
+        if store_extra_data ==True:
+            # Append conditional data from prediction to keep it
+            #TODO: change this so that only the first prior mean and covar are stored, as the rest can be taken from the subsequent posteriors
+            posterior.extra_data["prior_mean"]=predicted_state.parent.state_vector
+            posterior.extra_data["prior_covar"]=predicted_state.parent.covariance
+            posterior.extra_data["linear_transition_matrix"]=predicted_state.linear_transition_matrix
+            posterior.extra_data["predicted_means"] =predicted_state.state_vector
+            posterior.extra_data["predicted_covars"]=predicted_state.covariance
+            # Append data from resampling process,'predicted weights' are just posterior weights of index before
+            posterior.extra_data["posterior_log_weights"]=posterior.log_weight
+            posterior.extra_data["resample_indices"]=resample_index
 
         if self.regulariser is not None and resample_flag:
             prior = hypothesis.prediction.parent
