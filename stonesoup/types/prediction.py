@@ -13,6 +13,7 @@ from ..base import Property
 from ..models.transition.base import TransitionModel
 from ..types.state import CreatableFromState, CompositeState
 
+import numpy as np
 
 class Prediction(Type, CreatableFromState):
     """ Prediction type
@@ -237,6 +238,7 @@ class MarginalisedParticleStatePrediction(Prediction, MarginalisedParticleState)
 
     This is a simple RBParticle state update object.
     """
+    linear_transition_matrix: np.ndarray = Property(default=None,doc='transition matrix F representing linear component of update step')
     pass
 
 
