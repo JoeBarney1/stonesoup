@@ -1,0 +1,9 @@
+{
+    "launch": {
+
+        "configurations": [],
+        "compounds": []
+    },
+    "python.jupyternotebook.memoryLimit": 4096,
+    "typescript.tsserver.maxTsServerMemory": 4096
+}
