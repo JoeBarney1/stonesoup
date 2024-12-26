@@ -148,6 +148,7 @@ class CompositeUpdate(Update, CompositeState):
 
 
 class MarginalisedParticleStateUpdate(Update, MarginalisedParticleState):
+    extra_data: dict = Property(default=None, doc = "optional dict object to store additional particle information")
     """RBStateUpdate type
 
     This is a simple MarginalisedParticle state update object.
