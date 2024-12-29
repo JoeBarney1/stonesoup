@@ -13,7 +13,7 @@ class SystematicResampler(Resampler):
     CDF. Complexity of order O(N) where N is the number of resampled particles.
 
     """
-    def resample(self, particles, nparts=None, resample_index=False):
+    def resample(self, particles, nparts=None):
         """
         Resample the particles
 
@@ -52,14 +52,8 @@ class SystematicResampler(Resampler):
 
         new_particles = particles[index]
         new_particles.log_weight = np.full((nparts, ), np.log(1/nparts))
-        if  resample_index:
-            # Assign parent relationships
-            for i, idx in enumerate(index):
-                new_particles[i].parent = particles[idx]
-            #return index for backwards-tracing
-            return new_particles, index
-        else:
-            return new_particles
+        new_particles.resample_index=index
+        return new_particles
 
 
 class ESSResampler(Resampler):
