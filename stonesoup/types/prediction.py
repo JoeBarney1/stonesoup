@@ -8,12 +8,11 @@ from .state import (State, GaussianState, EnsembleState,
                     ParticleState, MultiModelParticleState, RaoBlackwellisedParticleState,
                     SqrtGaussianState, InformationState, TaggedWeightedGaussianState,
                     WeightedGaussianState, CategoricalState, ASDGaussianState,
-                    BernoulliParticleState, MarginalisedParticleState, KernelParticleState)
+                    BernoulliParticleState, KernelParticleState, MarginalisedParticleState)
 from ..base import Property
 from ..models.transition.base import TransitionModel
 from ..types.state import CreatableFromState, CompositeState
 
-import numpy as np
 
 class Prediction(Type, CreatableFromState):
     """ Prediction type
@@ -232,26 +231,37 @@ class CompositeMeasurementPrediction(MeasurementPrediction, CompositeState):
             "prediction. All sub-measurement-predictions must have matching timestamp.")
 
 
+MeasurementPrediction.register(CompositeState)  # noqa: E305
+
 
 class MarginalisedParticleStatePrediction(Prediction, MarginalisedParticleState):
-    """RBStateUpdate type
+    """Marginalised particle state prediction type
 
-    This is a simple RBParticle state update object.
+    This is a simple MarginalisedParticle state update object.
     """
     linear_transition_matrix: np.ndarray = Property(default=None,doc='transition matrix F representing linear component of update step')
     pass
 
 
-class MarginalisedParticleMeasurementPrediction(MeasurementPrediction, MarginalisedParticleState):
+class MarginalisedParticleMeasurementPrediction(
+    MeasurementPrediction, MarginalisedParticleState
+):
+    """Marginalised particle state measurement prediction type"""
+
     cross_covar: CovarianceMatrices = Property(
-    default=None, doc="The state-measurement cross covariance matrix")
+        default=None, doc="The state-measurement cross covariance matrix"
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.cross_covar is not None \
-                and self.cross_covar.shape[1] != self.state_vector.shape[0]:
-            raise ValueError("cross_covar should have the same number of "
-                             "columns as the number of rows in state_vector")
-        
+        if (
+            self.cross_covar is not None
+            and self.cross_covar.shape[1] != self.state_vector.shape[0]
+        ):
+            raise ValueError(
+                "cross_covar should have the same number of "
+                "columns as the number of rows in state_vector"
+            )
 
-MeasurementPrediction.register(CompositeState)  # noqa: E305
+
+MeasurementPrediction.register(MarginalisedParticleState)
