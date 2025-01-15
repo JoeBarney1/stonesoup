@@ -1,18 +1,11 @@
 #for generic PS
-from statistics import covariance
-from typing import final
-from optree import NONE_IS_LEAF
-from stonesoup.models import transition
-from stonesoup.predictor.particle import MarginalisedParticlePredictor
-from stonesoup.types import particle, track
 from stonesoup.types.track import Track
 from stonesoup.types.state import MarginalisedParticleState
 from stonesoup.types.update import MarginalisedParticleStateUpdate
 from stonesoup.types.numeric import Probability
-from stonesoup.updater.tests.test_multi_model_particle import transition_matrix
-from .base import Property, Smoother
+from stonesoup.smoother.base import Property, Smoother
 import numpy as np
-from stonesoup.models.transition.linear import LinearGaussianTimeInvariantTransitionModel, LinearGaussianTransitionModel
+from stonesoup.models.transition.linear import LinearGaussianTimeInvariantTransitionModel
 from stonesoup.types.prediction import GaussianStatePrediction
 from stonesoup.types.update import GaussianStateUpdate
 from stonesoup.types.state import GaussianState
