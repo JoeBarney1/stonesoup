@@ -542,7 +542,8 @@ class MarginalisedParticlePredictor(ParticlePredictor):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+    
+    @predict_lru_cache()
     def predict(self, prior, timestamp=None, **kwargs):
         try:
             time_interval = timestamp - prior.timestamp
