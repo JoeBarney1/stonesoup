@@ -530,8 +530,7 @@ class SMCPHDPredictor(Predictor):
 class MarginalisedParticlePredictor(ParticlePredictor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # self.k_predictor = KalmanPredictor(*args, **kwargs)
-
+    
     @predict_lru_cache()
     def predict(self, prior, timestamp=None, **kwargs):
         try:
