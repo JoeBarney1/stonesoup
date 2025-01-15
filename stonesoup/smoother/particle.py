@@ -288,16 +288,6 @@ class CarterKohnParticleSmoother(MarginalisedKalmanSmoother):
     """
     A smoother implementing the Carter and Kohn (1994) method for Gaussian state-space models.
     It samples states recursively backward using Kalman smoothing principles.
-        1. **Forward pass (Kalman filter):**
-        for \( t = 1 \) to \( T \):
-            Compute the Kalman filter updates:
-            - \( x_{t|t-1} = F_t x_{t-1|t-1} \)
-            - \( P_{t|t-1} = F_t P_{t-1|t-1} F_t^T + Q_t \)
-            - \( K_t = P_{t|t-1} H_t^T (H_t P_{t|t-1} H_t^T + R_t)^{-1} \)
-            - \( x_{t|t} = x_{t|t-1} + K_t (y_t - H_t x_{t|t-1}) \)
-            - \( P_{t|t} = P_{t|t-1} - K_t H_t P_{t|t-1} \)
-
-        2. **Backward sampling (Carter-Kohn):**
         Initialize \( x_T^{(i)} \sim N(x_{T|T}, P_{T|T}) \)
         for \( t = T-1 \) to \( 1 \):
             - \( x_{t|T}^{(i)} = \mathbb{E}[x_t | x_{t+1}, y_{1:T}] + \text{noise} \)
@@ -307,7 +297,7 @@ class CarterKohnParticleSmoother(MarginalisedKalmanSmoother):
                 \( \Sigma_{t|T} = P_{t|t} - J_t P_{t+1|t} J_t^T \)
             - Sample \( x_t^{(i)} \sim N(\mu_{t|T}, \Sigma_{t|T}) \)
 
-        3. **Return smoothed samples** \( x_{1:T}^{(i)} \).
+        Return smoothed samples \( x_{1:T}^{(i)} \).
         """
 
     track: Track = Property(doc="Filtered track resulting from the forward pass")
@@ -324,50 +314,10 @@ class CarterKohnParticleSmoother(MarginalisedKalmanSmoother):
         # Convert particle tracks to GaussianStateUpdate tracks
         gaussian_tracks = self.particle_paths_to_gaussian_paths(lag_length)
 
-        smoothed_track_list = []
 
-        for gaussian_track in gaussian_tracks:
-            track_length = len(gaussian_track)
-            subsq_state = gaussian_track[-1]
+        return gaussian_tracks
 
-            smoothed_track = Track()
-            smoothed_track.append(subsq_state)
-
-            # Backward sampling using Carter-Kohn
-            for t in range(track_length - 2, -1, -1):
-                current_state = gaussian_track[t]
-                F = current_state.hypothesis.prediction.transition_model.matrix()
-
-                # Posterior mean and covariance
-                post_sv = current_state.state_vector
-                post_covar = current_state.covar
-
-                # Compute smoothing gain
-                pred_covar = subsq_state.covar
-                ksmooth_gain = post_covar @ F.T @ np.linalg.inv(pred_covar)
-
-                # Smoothed mean and covariance
-                smooth_mean = post_sv + ksmooth_gain @ (subsq_state.state_vector -
-                                                        current_state.hypothesis.prediction.state_vector)
-                smooth_covar = post_covar - ksmooth_gain @ pred_covar @ ksmooth_gain.T
-
-                # Sample from the smoothed Gaussian
-                smooth_sample = np.random.multivariate_normal(
-                    smooth_mean.flatten(), smooth_covar
-                ).reshape(-1, 1)
-
-                # Update the subsq_state
-                subsq_state = GaussianState(
-                    state_vector=smooth_sample,
-                    covar=smooth_covar,
-                    timestamp=current_state.timestamp,
-                )
-
-                smoothed_track.insert(0, subsq_state)
-
-            smoothed_track_list.append(smoothed_track)
-
-        return smoothed_track_list
+        
     
 class MCparticle_smoother(ParticleSmoother):
     track: Track=Property()
