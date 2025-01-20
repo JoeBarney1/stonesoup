@@ -7,8 +7,8 @@ from .base import Smoother
 from ..base import Property
 from ..models.base import LinearModel
 from ..types.multihypothesis import MultipleHypothesis
-from ..types.prediction import GaussianStatePrediction
-from ..types.update import GaussianStateUpdate
+from ..types.prediction import GaussianStatePrediction, MarginalisedParticleStatePrediction
+from ..types.update import GaussianStateUpdate, MarginalisedParticleStateUpdate
 from ..models.transition.base import TransitionModel
 from ..models.transition.linear import LinearGaussianTransitionModel
 from ..functions import gauss2sigma, unscented_transform
@@ -72,9 +72,9 @@ class KalmanSmoother(Smoother):
             The prediction associated with the prediction (i.e. itself), or the prediction from the
             hypothesis used to generate an update.
         """
-        if isinstance(state, GaussianStatePrediction):
+        if isinstance(state, GaussianStatePrediction) or isinstance(state, MarginalisedParticleStatePrediction):
             return state
-        elif isinstance(state, GaussianStateUpdate):
+        elif isinstance(state, GaussianStateUpdate) or isinstance(state, MarginalisedParticleStateUpdate):
             if isinstance(state.hypothesis, MultipleHypothesis):
                 predictions = {hypothesis.prediction for hypothesis in state.hypothesis}
                 if len(predictions) == 1:
@@ -145,9 +145,14 @@ class KalmanSmoother(Smoother):
             The smoothing gain
 
         """
-        return state.covar \
-            @ self._transition_matrix(state, self._transition_model(prediction), **kwargs).T \
-            @ np.linalg.inv(prediction.covar)
+        try:
+            return state.covar \
+                @ self._transition_matrix(state, self._transition_model(prediction), **kwargs).T \
+                @ np.linalg.inv(prediction.covar)
+        except:
+             return state.covariance \
+                @ self._transition_matrix(state, self._transition_model(prediction), **kwargs).T \
+                @ np.linalg.inv(prediction.covariance)
 
     def smooth(self, track, **kwargs):
         """
@@ -184,9 +189,12 @@ class KalmanSmoother(Smoother):
                 state, prediction, time_interval=time_interval, **kwargs)
             smooth_mean = state.state_vector + ksmooth_gain @ (subsq_state.state_vector -
                                                                prediction.state_vector)
-            smooth_covar = state.covar + \
-                ksmooth_gain @ (subsq_state.covar - prediction.covar) @ ksmooth_gain.T
-
+            try:
+                smooth_covar = state.covar + \
+                    ksmooth_gain @ (subsq_state.covar - prediction.covar) @ ksmooth_gain.T
+            except:
+                smooth_covar = state.covariance + \
+                    ksmooth_gain @ (subsq_state.covariance - prediction.covariance) @ ksmooth_gain.T
             # Create a new type called SmoothedState?
 
             subsq_state = type(state).from_state(state, smooth_mean, smooth_covar)
