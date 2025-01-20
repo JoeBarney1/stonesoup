@@ -1,5 +1,6 @@
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Union, Optional
+from typing import TYPE_CHECKING, Union, Optional, Callable
+from collections import namedtuple
 from datetime import timedelta
 import numpy as np
 from scipy.stats import multivariate_normal
@@ -356,7 +357,11 @@ class LevyModel(Model):
     driver: LevyDriver = Property(doc="Levy process noise driver")
     mu_W: Optional[float] = Property(default=None, doc="Condtional Gaussian mean")
     sigma_W2: Optional[float] = Property(default=None, doc="Conditional Gaussian variance")
-    
+    mu_W_transition_model: Optional[Callable] = Property(
+        default=None, doc="Optional transition model for mu_W"
+    )
+    mu_W_array: Optional[np.ndarray] = None  # Cache the computed mu_W_array
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
@@ -367,35 +372,71 @@ class LevyModel(Model):
     def _integrate(self, func: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarray:
         res, err = quad_vec(func, a=a, b=b)
         return res
+
+    def _integral(self, dt: float) -> np.ndarray:
+        def func(dt: int):
+            return self._integrand(dt, jtimes=np.zeros((1, 1)))[0, 0, :]  # currying
+        return self._integrate(func, a=0, b=dt)
+    
+    def _mu_W_array(self,latents:Latents, time_interval:timedelta, mu_W: Optional[float] = None,**kwargs) -> np.ndarray:
+        """Model covariance"""
+        assert latents is not None
+        dt = time_interval.total_seconds()
+        if latents.exists(self.driver):
+            jsizes = latents.sizes(self.driver)
+            jtimes = latents.times(self.driver)
+        else:
+            jsizes, jtimes = None, None
+        return self.driver._mu_W_array(         #returns mu_W_array, mu_prev where mu_prev is mu_value for most recent timestep
+            jtimes=jtimes,
+            dt=dt,
+            num_samples=latents.num_samples,
+            mu_W=mu_W
+        )
     
     def mean(
         self, latents: Latents, time_interval: timedelta, **kwargs
     ) -> Union[StateVector, StateVectors]:
         """Model mean"""
         dt = time_interval.total_seconds()
-        integrand_f = self._integrand
-        func = lambda dt: integrand_f(dt, jtimes=np.zeros((1, 1)))[0, 0, :] # currying
-        integral_f = lambda dt: self._integrate(func, a=0, b=dt)
+        if latents.exists(self.driver):
+            jsizes = latents.sizes(self.driver)
+            jtimes = latents.times(self.driver)
+        else:
+            jsizes, jtimes = None, None
+        if self.driver.mu_W_transition_model is not None:
+            self.mu_W, self.mu_W_array=self._mu_W_array(latents=latents,
+                                                        time_interval=time_interval,
+                                                        mu_W=self.mu_W,)
         return self.driver.mean(
             latents=latents,
             dt=dt,
             e_ft_func=integral_f,
             ft_func=integrand_f,
             mu_W=self.mu_W,
+            mu_W_array=self.mu_W_array,
+            num_samples=latents.num_samples,
         )
 
     def covar(self, latents: Latents, time_interval: timedelta, **kwargs) -> Union[CovarianceMatrix, CovarianceMatrices]:
         """Model covariance"""
         dt = time_interval.total_seconds()
-        integrand_f = self._integrand
-        func = lambda dt: integrand_f(dt, jtimes=np.zeros((1, 1)))[0, 0, :]
-        integral_f = lambda dt: self._integrate(func, a=0, b=dt)
+        if latents.exists(self.driver):
+            jsizes = latents.sizes(self.driver)
+            jtimes = latents.times(self.driver)
+        else:
+            jsizes, jtimes = None, None
+        if self.driver.mu_W_transition_model is not None:
+            self.mu_W, self.mu_W_array=self._mu_W_array(latents=latents,
+                                                        time_interval=time_interval,
+                                                        mu_W=self.mu_W,)
         return self.driver.covar(
             latents=latents,
             dt=dt,
             e_ft_func=integral_f,
             ft_func=integrand_f,
             mu_W=self.mu_W,
+            mu_W_array=self.mu_W_array,
             sigma_W2=self.sigma_W2,
         )
 

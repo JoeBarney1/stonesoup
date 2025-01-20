@@ -1,3 +1,5 @@
+from typing import Callable, Generator, Optional, Union
+from stonesoup.types.state import State, GaussianState
 from datetime import timedelta
 import numpy as np
 from numpy import ndarray
@@ -93,6 +95,35 @@ class GaussianDriver(LevyDriver):
             covar = np.tile(covar, (num_samples, 1, 1))
             return covar.view(CovarianceMatrices)
 
+    def rvs(
+        self,
+        mean: StateVector,
+        covar: CovarianceMatrix,
+        random_state: Optional[Generator] = None,
+        num_samples: int = 1,
+        **kwargs
+    ) -> Union[StateVector, StateVectors]:
+        """Computes the driving noise term given the mean and covariance matrix specified.
+
+
+        Args:
+            mean (StateVector): The Gaussian mean vector.
+            covar (CovarianceMatrices): The Gaussian covariance matrix.
+            random_state (Optional[np.random.RandomState], optional): RNG to use. Defaults to None.
+            num_samples (int, optional): Number of driving noise samples. Defaults to 1.
+
+        Returns:
+            Union[StateVector, StateVectors]: Driving noise samples.
+        """
+        if random_state is None:
+            random_state = self.random_state
+        noise = random_state.multivariate_normal(mean.flatten(), covar, size=num_samples)
+        noise = noise.T
+        if num_samples == 1:
+            return noise.view(StateVector)
+        else:
+            return noise.view(StateVectors)
+        
 
 class AlphaStableNSMDriver(NormalSigmaMeanDriver):
     alpha: float = Property(doc="Alpha parameter.")
@@ -123,12 +154,12 @@ class AlphaStableNSMDriver(NormalSigmaMeanDriver):
         return super()._residual_mean(e_ft=e_ft, mu_W=mu_W, truncation=truncation)
 
     def _centering(self, e_ft: np.ndarray, truncation: float, mu_W: float) -> StateVector:
-        if 1 < self.alpha < 2:
-            term = e_ft * mu_W  # (m, 1)
-            return -self._first_moment(truncation=truncation) * term  # (m, 1)
-        elif 0 < self.alpha < 1:
+        if 0 < self.alpha < 1 or self.mu_W_transition_model is not None: #paper doesn't cover centering terms so set to zero if time-varying
             m = e_ft.shape[0]
             return np.zeros((m, 1))
+        elif 1 < self.alpha < 2:
+            term = e_ft * mu_W  # (m, 1) 
+            return -self._first_moment(truncation=truncation) * term  # (m, 1) [should be implementable as dt/T *E[mu_W(Vi)*jsizes[i]]*e_ft for time-varying mu_W ]
         else:
             raise AttributeError("alpha must be 0 < alpha < 2")
 
