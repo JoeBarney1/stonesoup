@@ -5,7 +5,6 @@ from typing import Iterable, List, Optional, Sequence, Union
 
 import numpy as np
 from scipy.linalg import block_diag
-
 from stonesoup.base import Property
 from stonesoup.models.base import GaussianModel, Latents, LevyModel, Model
 from stonesoup.models.base_driver import ConditionallyGaussianDriver
@@ -167,6 +166,18 @@ class CombinedLevyTransitionModel(TransitionModel, LevyModel):
         mu = [m.mu_W if m.mu_W is not None else m.driver.mu_W for m in self.model_list]
         return np.atleast_2d(mu).T
 
+    @property
+    def mu_W_transition_model(self): 
+        mu_W_transition_model = [m.mu_W_transition_model if m.mu_W_transition_model is not None
+                                  else m.driver.mu_W_transition_model for m in self.model_list]
+        return mu_W_transition_model
+    
+    @property
+    def mu_W_array(self):
+        mu_W_array = [m.mu_W_array if m.mu_W_array is not None
+                                  else m.driver.mu_W_array for m in self.model_list]
+        return mu_W_array
+        
     @property
     def sigma_W2(self):
         sigma2 = [

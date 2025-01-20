@@ -1,51 +1,21 @@
 from abc import abstractmethod
-from enum import Enum
-from typing import Callable, Generator, Optional, Tuple, Union
-from datetime import timedelta
+import copy
+from typing import Union, Optional
 import numpy as np
-from stonesoup.types.state import   GaussianState
-from stonesoup.base import Base, Property
-from stonesoup.types.array import (
-    CovarianceMatrices,
-    CovarianceMatrix,
-    StateVector,
-    StateVectors,
-)
+from stonesoup.base import Property
+from stonesoup.types.numeric import Probability
+from stonesoup.types.state import State, GaussianState
+from typing import Callable, Generator, Optional, Tuple, Union, List, Iterable, Sequence
+from stonesoup.models.driver import GaussianDriver, LevyDriver
+from stonesoup.types.array import StateVector, StateVectors, CovarianceMatrix, CovarianceMatrices
+from stonesoup.models.base import Model, Latents, GaussianModel
+from stonesoup.models.base_driver import NoiseCase
+from stonesoup.models.transition.base import TransitionModel
+from datetime import timedelta
+from scipy.integrate import quad_vec
+from scipy.stats import multivariate_normal
+from scipy.linalg import block_diag
 
-
-class NoiseCase(Enum):
-    """Different methods of approximating the residuals for
-    the truncated series representation of the associated
-    Levy integrals
-    """
-
-    TRUNCATED = 0
-    GAUSSIAN_APPROX = 1
-    PARTIAL_GAUSSIAN_APPROX = 2
-
-
-class Driver(Base):
-    """Base class for all driver classes use to drive transition models."""
-
-    pass
-
-
-class LevyDriver(Driver):
-    """Driver type
-
-    Base/Abstract class for all stochastic Levy noise driving processes
-    used to drive :class:`~.LevyModel` instances.
-    """
-
-    seed: Optional[int] = Property(default=None, doc="Seed for random number generation")
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.random_state = np.random.default_rng(self.seed)
-
-    @abstractmethod
-    def characteristic_func():
-        """Characteristic function for associated Levy distribution"""
 
 
 class ConditionallyGaussianDriver(LevyDriver):
@@ -202,7 +172,7 @@ class ConditionallyGaussianDriver(LevyDriver):
         """
 
     def _residual_mean(
-        self, e_ft: np.ndarray, truncation: float, mu_W: float, # TODO: add mu_W_array: np.array and method
+        self, e_ft: np.ndarray, truncation: float, mu_W: float
     ) -> StateVector:
         """Calculates the mean of Gaussian approximate residuals. Residuals
         arises from the truncated series representation of the Levy stotchastic
@@ -258,6 +228,7 @@ class ConditionallyGaussianDriver(LevyDriver):
 
         for j in range(num_samples):
             initial_mu_W = GaussianState(state_vector=np.array([[padded_mu_W[j]]]), covar=covar)
+            print(initial_mu_W)
             prev_mu_W = initial_mu_W
             for i in range(num_jumps):
                 if i == 0:
@@ -265,6 +236,7 @@ class ConditionallyGaussianDriver(LevyDriver):
                     interval = timedelta(seconds=sorted_jtimes[i][j])  # Convert to timedelta
                 else:
                     interval = timedelta(seconds=sorted_jtimes[i][j] - sorted_jtimes[i - 1][j])  # Convert difference to timedelta
+
                 prev_mu_W_state_vector = self.mu_W_transition_model.function(prev_mu_W, noise=True, time_interval=interval) 
                 mu_W_array[i][j] = prev_mu_W_state_vector[0] #add the float of the state vector value to the array
                 prev_mu_W =  GaussianState(state_vector=prev_mu_W_state_vector, covar=covar) #transform float to gauss state for next update
@@ -277,6 +249,7 @@ class ConditionallyGaussianDriver(LevyDriver):
             padded_mu_W[j]=last_mu_W
         if num_samples>1:
             last_mu_W=padded_mu_W
+        print(last_mu_W)
         return last_mu_W, mu_W_array
     
     def mean(
@@ -314,16 +287,13 @@ class ConditionallyGaussianDriver(LevyDriver):
         num_samples = jsizes.shape[1]
         truncation = self.c * dt
         ft = ft_func(dt=dt, jtimes=jtimes)  # (n_jumps, n_samples, m, 1)
-
         if self.mu_W_transition_model is None:
             series = np.sum(jsizes[..., None, None] * ft, axis=0)  # (n_samples, m, 1)
             m = series * mu_W
-
         else:
             m = np.sum(jsizes[..., None, None] * ft * mu_W_array[..., None, None], axis=0)  # (n_samples, m, 1) sum over varying mean terms directly
-        
-        e_ft = e_ft_func(dt=dt)  # (m, 1)       
-            
+
+        e_ft = e_ft_func(dt=dt)  # (m, 1)
         residual_mean = self._residual_mean(e_ft=e_ft, mu_W=mu_W, truncation=truncation)[
             None, ...
         ]
@@ -419,6 +389,7 @@ class ConditionallyGaussianDriver(LevyDriver):
         assert isinstance(covar, CovarianceMatrix)
         if random_state is None:
             random_state = self.random_state
+
         noise = random_state.multivariate_normal(mean.flatten(), covar, size=num_samples)
         noise = noise.T
         if num_samples == 1:
@@ -454,40 +425,410 @@ class NormalSigmaMeanDriver(ConditionallyGaussianDriver):
             raise AttributeError("Invalid noise case.")
         return r_cov  # (m, m)
     
+class AlphaStableNSMDriver(NormalSigmaMeanDriver):
+    """Implements the Alpha Stable NSM noise driver to be used with :class:`~.LevyModel`."""
+
+    alpha: float = Property(doc="Alpha parameter.")
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        if (
+            np.isclose(self.alpha, 0.0)
+            or np.isclose(self.alpha, 1.0)
+            or np.isclose(self.alpha, 2.0)
+        ):
+            raise AttributeError("alpha must be 0 < alpha < 1 or 1 < alpha < 2.")
+
+    def _hfunc(self, epochs: np.ndarray) -> np.ndarray:
+        return np.power(epochs, -1.0 / self.alpha)
+
+    def _first_moment(self, **kwargs) -> float:
+        return self.alpha / (1.0 - self.alpha) * np.power(self.c, 1.0 - 1.0 / self.alpha)
+
+    def _second_moment(self, **kwargs) -> float:
+        return self.alpha / (2.0 - self.alpha) * np.power(self.c, 1.0 - 2.0 / self.alpha)
+
+    def _residual_mean(
+        self, e_ft: np.ndarray, truncation: float, mu_W: float
+    ) -> StateVector:
+        if 1 < self.alpha < 2:
+            m = e_ft.shape[0]
+            r_mean = np.zeros((m, 1))
+            return r_mean
+        return super()._residual_mean(e_ft=e_ft, mu_W=mu_W, truncation=truncation)
+
+    def _centering(self, e_ft: np.ndarray, truncation: float, mu_W: float) -> StateVector:
+        if 0 < self.alpha < 1 or self.mu_W_transition_model is not None: #paper doesn't cover centering terms so set to zero if time-varying
+            m = e_ft.shape[0]
+            return np.zeros((m, 1))
+        elif 1 < self.alpha < 2:
+            term = e_ft * mu_W  # (m, 1) 
+            return -self._first_moment(truncation=truncation) * term  # (m, 1) [should be implementable as dt/T *E[mu_W(Vi)*jsizes[i]]*e_ft for time-varying mu_W ]
+        else:
+            raise AttributeError("alpha must be 0 < alpha < 2")
+
     def characteristic_func(self):
         # TODO
         raise NotImplementedError
 
+class LevyModel(Model):
+    """
+    Class to be derived from for Levy models.
+    For now, we consider only conditionally Gaussian ones
+    """
 
-class NormalVarianceMeanDriver(ConditionallyGaussianDriver):
-    """Implements the Normal Variance Mean (NVM) Levy models."""
+    driver: Union[ConditionallyGaussianDriver, GaussianDriver] = Property(
+        doc="Conditional Gaussian process noise driver"
+    )
+    mu_W: Optional[float] = Property(default=None, doc="Condtional Gaussian mean")
+    sigma_W2: Optional[float] = Property(default=None, doc="Conditional Gaussian variance")
+    mu_W_transition_model: Optional[Callable] = Property(
+        default=None, doc="Optional transition model for mu_W"
+    )
+    mu_W_array: Optional[np.ndarray] = None  # Cache the computed mu_W_array
 
-    def _jump_power(self, jsizes: np.ndarray) -> np.ndarray:
-        return jsizes
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    def _centering(self, e_ft: np.ndarray, truncation: float, mu_W: float) -> StateVector:
-        m = e_ft.shape[0]
-        return np.zeros((m, 1))
+    @abstractmethod
+    def _integrand(self, dt: float, jtimes: np.ndarray) -> np.ndarray:
+        pass
 
-    def _residual_covar(
-        self, e_ft: np.ndarray, truncation: float, mu_W: float, sigma_W2: float, **kwargs
-    ) -> CovarianceMatrix:
-        mu_W = mu_W
-        sigma_W2 = sigma_W2
-        if self.noise_case == NoiseCase.TRUNCATED:
-            m = e_ft.shape[0]
-            r_cov = np.zeros((m, m))
-        elif self.noise_case == NoiseCase.GAUSSIAN_APPROX:
-            r_cov = (
-                e_ft
-                @ e_ft.T
-                * (
-                    self._second_moment(truncation=truncation) * mu_W**2
-                    + self._first_moment(truncation=truncation) * sigma_W2
-                )
-            )
-        elif self.noise_case == NoiseCase.PARTIAL_GAUSSIAN_APPROX:
-            r_cov = e_ft @ e_ft.T * self._first_moment(truncation=truncation) * sigma_W2
+    def _integrate(self, func: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        res, err = quad_vec(func, a=a, b=b)
+        return res
+
+    def _integral(self, dt: float) -> np.ndarray:
+        def func(dt: int):
+            return self._integrand(dt, jtimes=np.zeros((1, 1)))[0, 0, :]  # currying
+        return self._integrate(func, a=0, b=dt)
+    
+    def _mu_W_array(self,latents:Latents, time_interval:timedelta, mu_W: Optional[float] = None,**kwargs) -> np.ndarray:
+        """Model covariance"""
+        assert latents is not None
+        dt = time_interval.total_seconds()
+        if latents.exists(self.driver):
+            jsizes = latents.sizes(self.driver)
+            jtimes = latents.times(self.driver)
         else:
-            raise AttributeError("Invalid noise case.")
-        return r_cov  # (m, m)
+            jsizes, jtimes = None, None
+        return self.driver._mu_W_array(         #returns mu_W_array, mu_prev where mu_prev is mu_value for most recent timestep
+            jtimes=jtimes,
+            dt=dt,
+            num_samples=latents.num_samples,
+            mu_W=mu_W
+        )
+    
+    def mean(
+        self, latents: Latents, time_interval: timedelta, **kwargs
+    ) -> Union[StateVector, StateVectors]:
+        """Model mean"""
+        assert latents is not None
+        dt = time_interval.total_seconds()
+        if latents.exists(self.driver):
+            jsizes = latents.sizes(self.driver)
+            jtimes = latents.times(self.driver)
+        else:
+            jsizes, jtimes = None, None    
+        if self.driver.mu_W_transition_model is not None:
+            self.mu_W, self.mu_W_array=self._mu_W_array(latents=latents,
+                                                        time_interval=time_interval,
+                                                        mu_W=self.mu_W,)
+        return self.driver.mean(
+            jsizes=jsizes,
+            jtimes=jtimes,
+            dt=dt,
+            e_ft_func=self._integral,
+            ft_func=self._integrand,
+            mu_W=self.mu_W,
+            mu_W_array=self.mu_W_array,
+            num_samples=latents.num_samples,
+        )
+
+    def covar(
+        self, latents: Latents, time_interval: timedelta, **kwargs
+    ) -> Union[CovarianceMatrix, CovarianceMatrices]:
+        """Model covariance"""
+        assert latents is not None
+        dt = time_interval.total_seconds()
+        if latents.exists(self.driver):
+            jsizes = latents.sizes(self.driver)
+            jtimes = latents.times(self.driver)
+        else:
+            jsizes, jtimes = None, None
+        if self.driver.mu_W_transition_model is not None:
+            self.mu_W, self.mu_W_array=self._mu_W_array(latents=latents,
+                                                        time_interval=time_interval,
+                                                        mu_W=self.mu_W,)
+        return self.driver.covar(
+            jsizes=jsizes,
+            jtimes=jtimes,
+            dt=dt,
+            e_ft_func=self._integral,
+            ft_func=self._integrand,
+            mu_W=self.mu_W,
+            mu_W_array=self.mu_W_array,
+            sigma_W2=self.sigma_W2,
+            num_samples=latents.num_samples,
+        )
+
+    def sample_latents(
+        self,
+        time_interval: timedelta,
+        num_samples: int,
+        random_state: Optional[np.random.RandomState] = None,
+    ) -> Latents:
+        dt = time_interval.total_seconds()
+        latents = Latents(num_samples=num_samples)
+        if isinstance(self.driver, ConditionallyGaussianDriver):
+            jsizes, jtimes = self.driver.sample_latents(
+                dt=dt, num_samples=num_samples, random_state=random_state
+            )
+            latents.add(driver=self.driver, jsizes=jsizes, jtimes=jtimes)
+        return latents
+
+    def rvs(
+        self,
+        latents: Optional[Latents] = None,
+        n_rvs_samples_for_each_mean_covar_pair: int = 1,
+        random_state: Optional[np.random.RandomState] = None,
+        **kwargs
+    ) -> Union[StateVector, StateVectors]:
+        noise = 0
+        n_mean_covar_pair = 1
+        if not latents:
+            latents = self.sample_latents(
+                num_samples=n_mean_covar_pair, random_state=random_state, **kwargs
+            )
+        mean = self.mean(latents=latents, **kwargs)
+        if mean is None or None in mean:
+            raise ValueError("Cannot generate rvs from None-type mean")
+        assert isinstance(mean, StateVector)
+
+        covar = self.covar(latents=latents, **kwargs)
+        if covar is None or None in covar:
+            raise ValueError("Cannot generate rvs from None-type covariance")
+        assert isinstance(covar, CovarianceMatrix)
+
+        noise += self.driver.rvs(
+            mean=mean,
+            covar=covar,
+            random_state=random_state,
+            num_samples=n_rvs_samples_for_each_mean_covar_pair,
+            **kwargs
+        )
+        return noise
+
+    def condpdf(
+        self, state1: State, state2: State, latents: Optional[Latents] = None, **kwargs
+    ) -> Union[Probability, np.ndarray]:
+        r"""Model conditional pdf/likelihood evaluation function"""
+        return Probability.from_log_ufunc(
+            self.logcondpdf(state1, state2, latents=latents, **kwargs)
+        )
+
+    def logcondpdf(
+        self, state1: State, state2: State, latents: Optional[Latents] = None, **kwargs
+    ) -> Union[float, np.ndarray]:
+        r"""Model log conditional pdf/likelihood evaluation function"""
+        if latents is None:
+            raise ValueError("Latents cannot be none.")
+
+        mean = self.mean(latents=latents, **kwargs)
+        if mean is None or None in mean:
+            raise ValueError("Cannot generate pdf from None-type mean")
+        assert isinstance(mean, StateVector)
+
+        covar = self.covar(latents=latents, **kwargs)
+        if covar is None or None in covar:
+            raise ValueError("Cannot generate pdf from None-type covariance")
+        assert isinstance(covar, CovarianceMatrix)
+
+        likelihood = np.atleast_1d(
+            multivariate_normal.logpdf(
+                (state1.state_vector - self.function(state2, **kwargs)).T, mean=mean, cov=covar
+            )
+        )
+
+        if len(likelihood) == 1:
+            likelihood = likelihood[0]
+
+        return likelihood
+
+    def logpdf(self, state1: State, state2: State, **kwargs) -> Union[Probability, np.ndarray]:
+        r"""Model log pdf/likelihood evaluation function"""
+        return NotImplementedError
+
+    def pdf(self, state1: State, state2: State, **kwargs) -> Union[Probability, np.ndarray]:
+        r"""Model pdf/likelihood evaluation function"""
+        return Probability.from_log_ufunc(self.logpdf(state1, state2, **kwargs))
+    
+class CombinedLevyTransitionModel(TransitionModel, LevyModel):
+    r"""Combine multiple models into a single model by stacking them.
+
+    The assumption is that all models are Gaussian.
+    Time Variant, and Time Invariant models can be combined together.
+    If any of the models are time variant the keyword argument "time_interval"
+    must be supplied to all methods
+    """
+    model_list: Sequence[GaussianModel] = Property(doc="List of Transition Models.")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert len(self.model_list) != 0
+
+    def _integrand(self, dt: float, jtimes: np.ndarray):
+        return NotImplementedError
+
+    @property
+    def driver(self) -> List[Iterable]:
+        return [model.driver for model in self.model_list]
+
+    @property
+    def mu_W(self):
+        mu = [m.mu_W if m.mu_W is not None else m.driver.mu_W for m in self.model_list]
+        return np.atleast_2d(mu).T
+
+    @property
+    def mu_W_transition_model(self): 
+        mu_W_transition_model = [m.mu_W_transition_model if m.mu_W_transition_model is not None
+                                  else m.driver.mu_W_transition_model for m in self.model_list]
+        return mu_W_transition_model
+    
+    @property
+    def mu_W_array(self):
+        mu_W_array = [m.mu_W_array if m.mu_W_array is not None
+                                  else m.driver.mu_W_array for m in self.model_list]
+        return mu_W_array
+        
+    @property
+    def sigma_W2(self):
+        sigma2 = [
+            m.sigma_W2 if m.sigma_W2 is not None else m.driver.sigma_W2
+            for m in self.model_list
+        ]
+        return np.diag(sigma2)
+
+    @property
+    def ndim_state(self):
+        """ndim_state getter method
+
+        Returns
+        -------
+        : :class:`int`
+            The number of combined model state dimensions.
+        """
+        return sum(model.ndim_state for model in self.model_list)
+
+    def mean(self, **kwargs) -> Union[StateVector, StateVectors]:
+        """Returns the transition model noise mean vector.
+
+        Returns
+        -------
+        : :class:`stonesoup.types.state.StateVector` of shape\
+        (:py:attr:`~ndim_state`, 1)
+            The process noise mean.
+        """
+        mean_list = [model.mean(**kwargs) for _, model in enumerate(self.model_list)]
+        if len(mean_list[0].shape) == 2:
+            return np.vstack(mean_list).view(StateVector)
+        else:
+            return np.concatenate(mean_list, axis=1).view(StateVectors)
+    def covar(self, **kwargs) -> Union[CovarianceMatrix, CovarianceMatrices]:
+        """Returns the transition model noise covariance matrix.
+
+        Returns
+        -------
+        : :class:`stonesoup.types.state.CovarianceMatrix` of shape\
+        (:py:attr:`~ndim_state`, :py:attr:`~ndim_state`)
+            The process noise covariance.
+        """
+
+        covar_list = [model.covar(**kwargs) for _, model in enumerate(self.model_list)]
+        if len(covar_list[0].shape) == 2:
+            return block_diag(*covar_list).view(CovarianceMatrix)
+        else:
+            N = covar_list[0].shape[0]
+            ret = []
+            for n in range(N):
+                tmp = []
+                for tensor in covar_list:  # D
+                    tmp.append(tensor[n])
+                ret.append(block_diag(*tmp))
+            return np.array(ret).view(CovarianceMatrices)
+
+    def function(
+        self, state, time_interval: timedelta, noise=False, **kwargs
+    ) -> StateVector:
+        """Applies each transition model in :py:attr:`~model_list` in turn to the state's
+        corresponding state vector components.
+        For example, in a 3D state space, with :py:attr:`~model_list` = [modelA(ndim_state=2),
+        modelB(ndim_state=1)], this would apply modelA to the state vector's 1st and 2nd elements,
+        then modelB to the remaining 3rd element.
+
+        Parameters
+        ----------
+        state : :class:`stonesoup.state.State`
+            The state to be transitioned according to the models in :py:attr:`~model_list`.
+        time_interval : :class:`timestamp.timedelta`
+            The time interval between two observations.
+        noise : :class:`bool`
+
+
+        Returns
+        -------
+        state_vector: :class:`stonesoup.types.array.StateVector`
+            of shape (:py:attr:`~ndim_state, 1`). The resultant state vector of the transition.
+        """
+
+        temp_state = copy.copy(state)
+        ndim_count = 0
+        if state.state_vector.shape[1] == 1:
+            state_vector = np.zeros(state.state_vector.shape).view(StateVector)
+        else:
+            state_vector = np.zeros(state.state_vector.shape).view(StateVectors)
+        # To handle explicit noise vector(s) passed in we set the noise for the individual models
+        # to False and add the noise later. When noise is Boolean, we just pass in that value.
+        if noise is None:
+            noise = False
+        if isinstance(noise, bool):
+            noise_loop = noise
+        else:
+            noise_loop = False
+        latents = self.sample_latents(time_interval=time_interval, num_samples=1)
+        for model in self.model_list:
+            temp_state.state_vector = state.state_vector[
+                ndim_count: model.ndim_state + ndim_count, :
+            ]
+            state_vector[ndim_count: model.ndim_state + ndim_count, :] += model.function(
+                state=temp_state,
+                latents=latents,
+                time_interval=time_interval,
+                noise=noise_loop,
+                **kwargs
+            )
+            ndim_count += model.ndim_state
+
+        if isinstance(noise, bool):
+            noise = 0
+        return state_vector + noise
+
+    def sample_latents(
+        self,
+        time_interval: timedelta,
+        num_samples: int,
+        random_state: Optional[np.random.RandomState] = None,
+    ) -> Latents:
+        dt = time_interval.total_seconds()
+        latents = Latents(num_samples=num_samples)
+        for m in self.model_list:
+            if (
+                m.driver
+                and isinstance(m.driver, ConditionallyGaussianDriver)
+                and not latents.exists(m.driver)
+            ):
+                jsizes, jtimes = m.driver.sample_latents(
+                    dt=dt, num_samples=num_samples, random_state=random_state
+                )
+                latents.add(driver=m.driver, jsizes=jsizes, jtimes=jtimes)
+        return latents

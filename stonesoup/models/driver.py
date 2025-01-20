@@ -1,5 +1,6 @@
 from typing import Callable, Generator, Optional, Union
-
+from stonesoup.types.state import State, GaussianState
+from datetime import timedelta
 import numpy as np
 from scipy.special import gamma as gammafnc
 from scipy.special import gammainc
@@ -135,7 +136,7 @@ class GaussianDriver(LevyDriver):
             return noise.view(StateVector)
         else:
             return noise.view(StateVectors)
-
+        
 
 class AlphaStableNSMDriver(NormalSigmaMeanDriver):
     """Implements the Alpha Stable NSM noise driver to be used with :class:`~.LevyModel`."""
@@ -170,12 +171,12 @@ class AlphaStableNSMDriver(NormalSigmaMeanDriver):
         return super()._residual_mean(e_ft=e_ft, mu_W=mu_W, truncation=truncation)
 
     def _centering(self, e_ft: np.ndarray, truncation: float, mu_W: float) -> StateVector:
-        if 1 < self.alpha < 2:
-            term = e_ft * mu_W  # (m, 1)
-            return -self._first_moment(truncation=truncation) * term  # (m, 1)
-        elif 0 < self.alpha < 1:
+        if 0 < self.alpha < 1 or self.mu_W_transition_model is not None: #paper doesn't cover centering terms so set to zero if time-varying
             m = e_ft.shape[0]
             return np.zeros((m, 1))
+        elif 1 < self.alpha < 2:
+            term = e_ft * mu_W  # (m, 1) 
+            return -self._first_moment(truncation=truncation) * term  # (m, 1) [should be implementable as dt/T *E[mu_W(Vi)*jsizes[i]]*e_ft for time-varying mu_W ]
         else:
             raise AttributeError("alpha must be 0 < alpha < 2")
 

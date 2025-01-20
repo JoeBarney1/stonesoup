@@ -12,7 +12,7 @@ from stonesoup.models.base import (
     Latents,
     LevyModel,
 )
-from stonesoup.models.transition.base import CombinedLevyTransitionModel,     TransitionModel
+from stonesoup.models.transition.base import TransitionModel, CombinedLevyTransitionModel
 from stonesoup.types.array import StateVector, StateVectors
 
 
