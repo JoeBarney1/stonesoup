@@ -11,6 +11,7 @@ from matplotlib import pyplot as plt
 from matplotlib.legend_handler import HandlerPatch
 from matplotlib.lines import Line2D
 from matplotlib.patches import Ellipse
+from matplotlib.colors import to_rgba
 from mergedeep import merge
 from scipy.integrate import quad
 from scipy.optimize import brentq
@@ -1331,58 +1332,6 @@ class Plotterly(_Plotter):
 
             if self.dimension == 1:  # plot 1D tracks
 
-                #   raise NotImplementedError
-                # Plot uncertainty if requested (as vertical bars)
-                if uncertainty:
-                    name = track_kwargs['legendgroup'] + "<br>(Error bars)"
-                    add_legend = name not in {trace.legendgroup for trace in self.fig.data}
-
-                    for i, state in enumerate(track):
-                        ellipse_kwargs = dict(
-                            mode='lines+markers',marker=dict(symbol="cross",color="black"),
-                            opacity=0.5, hoverinfo='skip',
-                            legendgroup=name, name=name,
-                            legendrank=track_kwargs['legendrank'] + 10)
-                        covar = state.covar[mapping[0], mapping[0]]  # Extract variance in the {x or y} -dir
-                        err = np.sqrt(covar)  # Use the standard deviation as the error bar
-                        
-                        if add_legend:
-                            ellipse_kwargs['showlegend'] = True
-                            add_legend = False
-                        else:
-                            ellipse_kwargs['showlegend'] = False
-                        
-                        self.fig.add_scatter(
-                            x=[state.timestamp, state.timestamp],
-                            y=[state.mean[mapping[0]] - err, state.mean[mapping[0]] + err],
-                            **ellipse_kwargs
-                        )
-            
-                # Plot particles if requested
-                if particle:
-                    name = track_kwargs['legendgroup'] + "<br>(Particles)"
-                    add_legend = name not in {trace.legendgroup for trace in self.fig.data}
-
-                    for i, state in enumerate(track):
-                        particle_kwargs = dict(
-                        mode='markers', marker=dict(size=2),
-                        opacity=0.8, hoverinfo='skip',
-                        legendgroup=name, name=name,
-                        legendrank=track_kwargs['legendrank'] + 20)
-
-                        particle_y = [float(val) for val in state.state_vector[mapping]]
-                        if add_legend:
-                            particle_kwargs['showlegend'] = True
-                            add_legend = False
-                        else:
-                            particle_kwargs['showlegend'] = False
-                        self.fig.add_scatter(
-                            x=[state.timestamp] * len(particle_y),
-                            y=particle_y, **particle_kwargs
-                        )
-                
-                    
-                
                 self.fig.add_scatter(
                     x=[state.timestamp for state in track],
                     y=[float(getattr(state, 'mean', state.state_vector)[mapping[0]])
@@ -1442,7 +1391,7 @@ class Plotterly(_Plotter):
             track_colors[track] = (self.fig.data[-1].line.color
                                    or self.fig.data[-1].marker.color
                                    or self.get_next_color())
-
+            
         # earlier checking means this only applies to 2D.
         if uncertainty and self.dimension == 2:
             name = track_kwargs['legendgroup'] + "<br>(Ellipses)"
@@ -1462,6 +1411,64 @@ class Plotterly(_Plotter):
                         ellipse_kwargs['showlegend'] = False
 
                     self.fig.add_scatter(x=points[0, :], y=points[1, :], **ellipse_kwargs)
+        
+        
+        elif uncertainty and self.dimension==1:
+            name = track_kwargs['legendgroup'] + "<br>(Error bars)"
+            add_legend = name not in {trace.legendgroup for trace in self.fig.data}
+            for track in tracks:
+
+                track_color = to_rgba(track_colors[track], alpha=0.5)  # Set desired alpha (e.g., 0.5 for 50% transparency)
+                # Step 3: Convert RGBA to string format for Plotly
+                lighter_track_color = f"rgba({int(track_color[0]*255)},{int(track_color[1]*255)}, {int(track_color[2]*255)}, {0.2})"
+                error_area_kwargs = dict(
+                        mode='lines', 
+                        line=dict(width=0),
+                        fillcolor=lighter_track_color,
+                        opacity=0.2, hoverinfo='skip',
+                        legendgroup=name, name=name,
+                        legendrank=track_kwargs['legendrank'] + 10,
+                        )
+                
+                # Arrays to hold the top and bottom error points
+                top_error_points = []
+                bottom_error_points = []
+                x_points = []
+                for i, state in enumerate(track):
+                    covar = state.covar[mapping[0], mapping[0]]  # Extract variance in the {x or y} -dir
+                    err = np.sqrt(covar)  # Use the standard deviation as the error bar
+                    
+                        # Calculate the top and bottom error bounds
+                    top_error = state.mean[mapping[0]] + err * 2
+                    bottom_error = state.mean[mapping[0]] - err * 2
+                    timestamp = state.timestamp
+
+                    # Store the x, top, and bottom error points
+                    x_points.append(timestamp)
+                    top_error_points.append(top_error)
+                    bottom_error_points.append(bottom_error)
+
+                if add_legend:
+                        error_area_kwargs['showlegend'] = True
+                        add_legend = False
+                else:
+                        error_area_kwargs['showlegend'] = False
+
+                # After collecting all the points,plot the filled error margin
+                self.fig.add_scatter(
+                    x=x_points,  # The x points must be in order for both top and bottom
+                    y=top_error_points ,  # Top + reversed bottom points
+                    **error_area_kwargs  # Don't draw any line for the filled region
+                )
+
+                error_area_kwargs['showlegend'] = False
+
+                self.fig.add_scatter(
+                    x=x_points,  # The x points must be in order for both top and bottom
+                    y=bottom_error_points ,  # Top + reversed bottom points
+                    fill='tonexty',  # Fill the area between the two lines
+                    **error_area_kwargs  # Don't draw any line for the filled region
+                )
 
         if particle and self.dimension == 2:
             name = track_kwargs['legendgroup'] + "<br>(Particles)"
@@ -1480,6 +1487,29 @@ class Plotterly(_Plotter):
                         particle_kwargs['showlegend'] = False
                     data = state.state_vector[mapping[:2], :]
                     self.fig.add_scattergl(x=data[0], y=data[1], **particle_kwargs)
+
+        # Plot particles if requested
+        elif particle and self.dimension == 1:
+            name = track_kwargs['legendgroup'] + "<br>(Particles)"
+            add_legend = name not in {trace.legendgroup for trace in self.fig.data}
+            for track in tracks:
+                for i, state in enumerate(track):
+                    particle_kwargs = dict(
+                    mode='markers', marker=dict(size=2, color=track_colors[track]),
+                    opacity=0.8, hoverinfo='skip',
+                    legendgroup=name, name=name,
+                    legendrank=track_kwargs['legendrank'] + 20)
+
+                    particle_y = [float(val) for val in state.state_vector[mapping]]
+                    if add_legend:
+                        particle_kwargs['showlegend'] = True
+                        add_legend = False
+                    else:
+                        particle_kwargs['showlegend'] = False
+                    self.fig.add_scatter(
+                        x=[state.timestamp] * len(particle_y),
+                        y=particle_y, **particle_kwargs
+                    )
 
     @staticmethod
     def _generate_ellipse_points(state, mapping, n_points=30):
