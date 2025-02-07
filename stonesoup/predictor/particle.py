@@ -574,29 +574,15 @@ class MarginalisedParticlePredictor(ParticlePredictor):
         #     epochs = epochs_l[..., p]
         #     jtimes = jtimes_l[..., p]
 
-        #     process_mean = model.mean(time_interval=time_interval, epochs=epochs, jtimes=jtimes, use_individual=use_individual)
-        #     process_covar = model.covar(time_interval=time_interval, epochs=epochs, jtimes=jtimes, use_individual=use_individual)
-        #     F = model.matrix(time_interval=time_interval, **kwargs)
-        #     # print(prior.covariance[..., p].shape)
-        #     # print(process_mean, prior.state_vector[..., 0].shape)
-
-        #     mean = F @ prior.state_vector[..., p:p+1] + process_mean
-        #     covar = F @ prior.covariance[..., p] @ F.T + process_covar
-
-        #     new_covariance[..., p] = covar
-        #     new_state_vector[..., p] = multivariate_normal.rvs(mean.flatten(), covar)
-        # print(new_covariance[..., 0])
-        # print(new_covariance[..., 1])
-        # print(ret.covar)
-        ret = Prediction.from_state(prior,
-                                     parent=prior,
-                                     state_vector=new_state_vector,
-                                     covariance=new_covariance,
-                                     timestamp=timestamp,
-                                     transition_model=self.transition_model,
-                                     linear_transition_matrix=F)
-        
-        # print(ret.statecovar)
-        # print(ret.covar)
+        ret = Prediction.from_state(
+            prior,
+            parent=prior,
+            state_vector=new_state_vector,
+            covariance=new_covariance,
+            timestamp=timestamp,
+            transition_model=self.transition_model,
+            linear_transition_matrix=F,
+            process_mean=process_mean,
+            process_covar=process_covar)
         return ret
         

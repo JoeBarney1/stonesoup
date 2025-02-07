@@ -51,7 +51,7 @@ class SystematicResampler(Resampler):
 
         new_particles = particles[index]
         new_particles.log_weight = np.full((nparts, ), np.log(1/nparts))
-        new_particles.resample_index=index
+        new_particles.resample_index=index.astype(int)
         return new_particles
 
 
