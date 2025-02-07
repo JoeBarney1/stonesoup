@@ -239,7 +239,9 @@ class MarginalisedParticleStatePrediction(Prediction, MarginalisedParticleState)
 
     This is a simple MarginalisedParticle state update object.
     """
-    linear_transition_matrix: np.ndarray = Property(default=None,doc='transition matrix F representing linear component of update step')
+    linear_transition_matrix : np.ndarray = Property(default=None)
+    process_mean : np.ndarray = Property(default=None)
+    process_covar : np.ndarray = Property(default=None)
     pass
 
 

@@ -571,5 +571,7 @@ class MarginalisedParticlePredictor(ParticlePredictor):
             covariance=new_covariance,
             timestamp=timestamp,
             transition_model=self.transition_model,
-            linear_transition_matrix=F)
+            linear_transition_matrix=F,
+            process_mean=process_mean,
+            process_covar=process_covar)
         return ret
