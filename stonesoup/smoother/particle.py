@@ -7,6 +7,7 @@ from scipy.stats import multivariate_normal
 from stonesoup.models.transition.categorical import MarkovianTransitionModel
 from stonesoup.predictor.kalman import KalmanPredictor
 from stonesoup.types.multihypothesis import MultipleHypothesis
+from stonesoup.types.particle import Particle
 from stonesoup.types.prediction import MarginalisedParticleStatePrediction
 from stonesoup.types.state import CategoricalState
 from stonesoup.types.track import Track
@@ -27,7 +28,7 @@ class ParticleSmoother(Smoother):
     """
 
     # Making track a property
-    track: Track = Property(doc="The filtered track resulting from the forward pass")
+    track: Track = Property(doc="The filtered track resulting from the forward pass",default=None)
 
     def smooth():
         raise NotImplementedError
@@ -35,14 +36,17 @@ class ParticleSmoother(Smoother):
     #TODO: would this work!? would be so simple if so. 
     # could slot in resample index and rejumble the array as required
     # Would then add a 'display particle-paths' plot function which simply plots track[t][i] for i in range(num_particles).
-    def particle_paths(self, max_lag=None):
+    def particle_paths(self,track=None, max_lag=None):
         """
         Create a single Track containing all particle states for times t in
         [earliest_t..earliest_t+max_lag], each as a MarginalisedParticleState.
         """
-        track_length = len(self.track)
-        num_particles = len(self.track[0])
-        particle_indices,prior_idx_t = self.get_particle_track_indices(earliest_t=0)
+        if track is None:
+            track=self.track
+
+        track_length = len(track)
+        num_particles = len(track[0])
+        particle_indices,prior_idx_t = self.get_particle_track_indices(track=track,earliest_t=0)
         combined_track = Track()
         prev_idx_t=prior_idx_t
 
@@ -53,7 +57,7 @@ class ParticleSmoother(Smoother):
 
             
             # Retrieve the full state at time t
-            state_t = self.track[t]
+            state_t = track[t]
             timestamp = state_t.timestamp
             prediction = state_t.hypothesis.prediction
 
@@ -101,7 +105,7 @@ class ParticleSmoother(Smoother):
     #  making sure that each follows the right resample index so each has the correct parents.
     # issue with RTS is that we need to resample each chain properly. so possibly need a big old matrix,
     #  with one for each set of timesteps but believe that'd be exponential, so must be a better solution
-    def get_particle_track_indices(self, earliest_t=0, final_timestep=None):
+    def get_particle_track_indices(self,track=None, earliest_t=0, final_timestep=None):
         """
         Compute the particle track indices array based on resampling history.
 
@@ -121,12 +125,15 @@ class ParticleSmoother(Smoother):
             track[t][particle_indices[i,t]] gives the particle at time 't' corresponding to the 'ith'
             descendant/sub-track from time 'final_timestep'. 
         """
+        if track is None:
+            track=self.track
+
         #sets final_timestep to last observation if entry None or too high
-        track_length = len(self.track)
+        track_length = len(track)
         if final_timestep is None or final_timestep >= track_length: 
             final_timestep = track_length - 1
 
-        num_particles = len(self.track[0])
+        num_particles = len(track[0])
         particle_indices = np.full((num_particles, track_length), 
                                    num_particles, #will throw an index error if any elements unassigned
                                    dtype=int) 
@@ -136,17 +143,17 @@ class ParticleSmoother(Smoother):
 
         # Fill indices backward in time
         for t in range(final_timestep - 1, earliest_t - 1, -1):
-            particle_indices[:, t] = self.track[t + 1].resample_index[particle_indices[:, t + 1]]
-            print(f"{len(np.unique(particle_indices[:,t]))} unique particles at time t={self.track[t].timestamp}")
+            particle_indices[:, t] = track[t + 1].resample_index[particle_indices[:, t + 1]]
+            print(f"{len(np.unique(particle_indices[:,t]))} unique particles at time t={track[t].timestamp}")
                 
         if earliest_t>0:
             prior_indices=None
         else:
-            prior_indices = self.track[0].resample_index[particle_indices[:, 0]]
+            prior_indices = track[0].resample_index[particle_indices[:, 0]]
         
         return particle_indices, prior_indices
     
-    def particle_paths_separated(self, max_lag=None, **kwargs):
+    def particle_paths_separated(self, track=None, max_lag=None, **kwargs):
         # max_lag is how far forward we want to use data. 
         # if proof of independence some steps forward, we can use this to
         # avoid excessively long lag times which only weight a single particle
@@ -166,9 +173,11 @@ class ParticleSmoother(Smoother):
             - List of Tracks for each particle.
             - 2D array of indices for each particle at each timestep.
         """
-        
-        num_particles = len(self.track[0])
-        track_length = len(self.track)
+        if track is None:
+            track=self.track
+
+        num_particles = len(track[0])
+        track_length = len(track)
         particle_track_list = [Track() for _ in range(num_particles)]
        
        #TODO: need to fix this max_lag logic as currently doesn't work with Kalman smoother 
@@ -179,13 +188,13 @@ class ParticleSmoother(Smoother):
 
         # Build the particle tracks using the indices
         for t in range(track_length):
-            state_t = self.track[t]
+            state_t = track[t]
             prediction=state_t.hypothesis.prediction
 
             # Recalculate particle indices array to reintroduce culled particles
             if t + max_lag <= track_length - 1:
                 final_timestep = t + max_lag
-                particle_indices,_ = self.get_particle_track_indices(earliest_t=t, final_timestep=final_timestep)
+                particle_indices,_ = self.get_particle_track_indices(track=track,earliest_t=t, final_timestep=final_timestep)
             
             current_indices=[]
             for i in range(num_particles):
@@ -325,8 +334,6 @@ class MarginalisedKalmanSmoother(ParticleSmoother,KalmanSmoother):
     .. [1] Särkä S. 2013, Bayesian filtering and smoothing, Cambridge University Press
 
     """
-
-    track :Track = Property()
     transition_matrix : np.ndarray=Property(default=None)
 
     def _prediction(self, state):
@@ -401,9 +408,6 @@ class MarginalisedKalmanSmoother(ParticleSmoother,KalmanSmoother):
             The smoothing gain
 
         """
-        # return state.covariance \
-        # @ self._transition_matrix(prediction).T \
-        # @ np.linalg.inv(prediction.covariance)
 
         covar_state = np.moveaxis(state.covariance, 2, 0)   # (N, M, M)
         F = self._transition_matrix(prediction) #MxM
@@ -417,7 +421,7 @@ class MarginalisedKalmanSmoother(ParticleSmoother,KalmanSmoother):
 
         return np.moveaxis(ksmooth_gain, 0, 2)  # (M, M, N)
     
-    def smooth(self, track=None, **kwargs):
+    def smooth(self, culled_track=None, **kwargs):
         """
         Perform the backward recursion to smooth the track.
 
@@ -432,8 +436,11 @@ class MarginalisedKalmanSmoother(ParticleSmoother,KalmanSmoother):
             Smoothed track
 
         """
-        if track is None:
+        if culled_track is None:
             track=self.track
+            culled_track=ParticleSmoother().particle_paths(track=track)
+        track=culled_track
+
         try:
             self._prediction(track[0])
             start = 0
@@ -485,20 +492,19 @@ class MarginalisedKalmanSmoother(ParticleSmoother,KalmanSmoother):
     
     def smooth_track_list(self,track_list,**kwargs):
         collated_track=self.collate_tracks(track_list=track_list)
-        smoothed_track_list=self.smooth(collated_track)
-        return smoothed_track_list   
-
+        culled_track=self.particle_paths(track=collated_track)
+        smoothed_track_list=self.smooth(culled_track=culled_track)
+        return smoothed_track_list
 
 class CarterKohnSampler(MarginalisedKalmanSmoother):
     """
     Carter-Kohn smoother implementation in Stone Soup framework.
     """
     # Tells us if we are using MCMC method or not (if None, we're just smoothing)
-    MCMCsample: bool = Property(default=None)
+    MCMCsample: bool = Property(default=False)
 
     # If MCMCsample=None, we only need these:
     measurements: list = Property(default=None)
-    track: Track = Property(default=None)
 
     # If MCMCsample=True, we need these:
     parameters: list[tuple] = Property(default=None)
@@ -521,11 +527,7 @@ class CarterKohnSampler(MarginalisedKalmanSmoother):
     def __init__(self, *args, **kwargs):
         """Custom init to check required properties depending on MCMCsample."""
         super().__init__(*args, **kwargs)
-        if self.MCMCsample is None:
-            # We require track for standard smoothing
-            if self.track is None:
-                raise ValueError("If MCMCsample=None, you must provide 'track'")
-        else:
+        if self.MCMCsample is not None:
             # If MCMCsample is True, we typically require all the others
             required_props = [
                 "parameters", "C", "X_prior", "K_prior", "K_transition_matrix",
@@ -553,14 +555,19 @@ class CarterKohnSampler(MarginalisedKalmanSmoother):
         
         return self.generated_states, self.parameters, self.indicator_variables
 
-    def smooth(self, track=None, **kwargs):
+    def smooth(self, culled_track=None, **kwargs):
         """
         Vectorised backward pass for Carter-Kohn or standard smoothing,
         handling shapes (M,N) for state vectors and (M,M,N) for covariances.
         If N=1, it degenerates to the single-track case.
         """
-        if track is None:
-            track = self.track
+        if culled_track is None:
+            track=self.track
+            if track is None:
+                raise ValueError("If MCMCsample=None and you are smoothing, you must provide 'track'") 
+            culled_track=ParticleSmoother().particle_paths(track=track)
+
+        track=culled_track
 
         smoothed_track = Track()
 
@@ -873,254 +880,6 @@ class CarterKohnSampler(MarginalisedKalmanSmoother):
         self.parameters.append(tuple(new_parameters))
         self.conditional_models=self.conditional_models_funct(new_parameters,self.C)
 
-# class ResamplingSmoother(MarginalisedKalmanSmoother):
-#     track :Track = Property()
-#     measurement_model: MeasurementModel = Property()
-#     transition_matrix : np.ndarray=Property(default=None)
-
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-
-    
-#     def backwards_pass(self, max_lag=None):
-#         rts_smoother=MarginalisedKalmanSmoother(self.track)
-#         smoothed_tracks = rts_smoother.smooth()
-#         return smoothed_tracks
-    
-#     def sample_multiple_state_vectors(self,means, covariances):
-#         """
-#         Sample multiple state vectors from multivariate normal distributions.
-
-#         Parameters
-#         ----------
-#         means : np.ndarray
-#             Mean vectors of shape (M, N), where M is the state dimension, and N is the number of particles.
-#         covariances : np.ndarray
-#             Covariance matrices of shape (M, M, N), one per particle.
-
-#         Returns
-#         -------
-#         np.ndarray
-#             Sampled state vectors of shape (M, N).
-#         """
-#         M, N = means.shape
-
-#         # Generate standard normal samples (M, N)
-#         Z = np.random.randn(M, N)
-
-#         # Compute Cholesky decomposition for each covariance matrix (M, M, N)
-#         L = np.linalg.cholesky(covariances.transpose(2, 0, 1)).transpose(1, 2, 0)  # Shape: (M, M, N)
-
-#         # Transform standard normal samples
-#         samples = means + np.einsum('ijk,jk->ik', L, Z)
-
-#         return samples
-    
-#     def predictor(self, prior, **kwargs):        
-#         filtered_prediction= self._prediction(prior)
-#         process_mean = filtered_prediction.process_mean
-#         process_covar = filtered_prediction.process_covar
-#         F= self._transition_matrix(filtered_prediction) # (M, M)
-
-#         new_state_vector = F @ prior.state_vector + process_mean 
-#         tmp = np.einsum("jik, li-> jlk", prior.covariance, F)  # ()
-#         new_covariance = np.einsum("ij, jlk->ilk", F, tmp) + process_covar
-
-#         randomly_sampled_state_vector = self.sample_multiple_state_vectors(new_state_vector,new_covariance)
-#         ret = Prediction.from_state(
-#             prior,
-#             parent=prior,
-#             state_vector=StateVectors(randomly_sampled_state_vector),
-#             covariance=CovarianceMatrices(new_covariance),
-#             linear_transition_matrix=F)
-#         return ret
-    
-#     def smooth(self, RTS_smoothed_tracks = None, max_lag=None, **kwargs):  
-#         """
-#         Perform Carter-Kohn smoothing using RTS smoothing and forward sampling.
-
-#         Parameters
-#         ----------
-#         RTS_smoothed_tracks : list of Tracks, optional
-#             Smoothed tracks generated by the RTS smoother.
-#         max_lag : int, optional
-#             Maximum lag to consider for smoothing.
-        
-#         Returns
-#         -------
-#         Track
-#             A single smoothed track representing the sampled trajectory.
-#         """
-
-#         # Use the RTS smoother if smoothed tracks are not provided
-#         if RTS_smoothed_tracks is None:
-#             RTS_smoothed_tracks = self.backwards_pass(max_lag=None)
-
-#         updater=MarginalisedParticleUpdater(self.measurement_model)
-#         smoothed_track=self.collate_tracks(RTS_smoothed_tracks)
-
-#         Resampled_smoothed_track_track = Track()  # To store the single smoothed track
-
-#         # Loop over all tracks (particles) at time t
-#         for t,smoothed_state in enumerate(smoothed_track):
-            
-#             measurement = smoothed_state.hypothesis.measurement
-
-#             # Prediction using the transition model
-#             if t == 0:
-#                 prediction = self._prediction(smoothed_state)  # For t=0, no prior prediction is needed
-#             else:
-#                 prediction = self.predictor(smoothed_state) # iterates forwards once, randomly sampling.
-            
-#             hypothesis= type(smoothed_state.hypothesis)(measurement=measurement,
-#                                                         prediction=prediction,
-#                                                         )     
-#             reweighted_update= updater.update(hypothesis)
-            
-#             Resampled_smoothed_track_track.append(reweighted_update)
-
-#         return Resampled_smoothed_track_track
-    
-
-# def mean_track(track_list):
-#     """
-#     Compute the mean track from a list of tracks, with optional exclusion of extreme values element-wise.
-#     #TODO: make this output the same state as the input track list, rather than just gaussian.
-#     Parameters
-#     ----------
-#     track_list : list of Tracks
-#         List of tracks, where each track is a list of states.
-#     exclude_percent : float, optional
-#         Percentage of extreme values to exclude from the top and bottom for each element.
-#         For example, `exclude_percent=10` excludes the top and bottom 10% of values element-wise.
-
-#     Returns
-#     -------
-#     Track
-#         A track representing the mean of all input tracks.
-#     """
-
-#     num_particles=len(track_list) #assumes each track is a single particle state
-#     track_length = len(track_list[0])
-
-#     if any(len(track) != track_length for track in track_list):
-#         raise ValueError("All tracks must have the same length.")
-
-#     mean_track = Track()
-
-#     for t in range(track_length):
-#         # Collect state vectors and covariances at timestep t
-#         state_vectors = np.array([track[t].state_vector.flatten() for track in track_list])  # Shape: (num_tracks, state_dim)
-#         covariances = np.array([track[t].covar for track in track_list])  # Shape: (num_tracks, state_dim, state_dim)
-        
-#         # Create a GaussianState for the mean state at this timestep
-#         mean_state = MarginalisedParticleState(
-#             state_vector=np.mean(state_vectors, axis=0)[:, np.newaxis],  # Ensure the vector is column-shaped
-#             covariance= np.mean(covariances, axis=0),
-#             weight=np.array([Probability(1)]),
-#             timestamp=track_list[0][t].timestamp  # Use the timestamp from the first track
-#         )
-
-#         mean_track.append(mean_state)
-
-#     return mean_track  
-
-# def flatten_and_pad_prediction_tracks(self, track_list=None,max_lag=None,**kwargs):
-#     """This will iterate over a set of tracks, taking from them the predicted states
-#     It will combine these states into one large state_vecto and covariance matrix for every timestep
-#     This will then be input into a MarginalisedParticleStatePrediction object, overwhich the KalmanSmoother will be able to iterate
-#         Parameters
-#     ----------
-#     track_list : list of lists
-#         A list of lists of track_list, where each track contains one particle state per timestep.
-
-#     Returns
-#     -------
-#     list of MarginalisedParticleStatePrediction
-#         A list of MarginalisedParticleStatePrediction objects, one per timestep.
-#     """
-#     if track_list is None:
-#         track_list=ParticleSmoother(self.track).smooth(max_lag=None)
-
-#     num_timesteps = len(track_list[0])  # Number of timesteps
-
-#     predictions_track = Track() # List to store MarginalisedParticleStatePrediction objects
-
-#     for t in range(num_timesteps):
-#         # Combine state vectors
-#         combined_state_vector = np.vstack([
-#             np.vstack((track[t].hypothesis.prediction.state_vector, np.array([[1]]))) for track in track_list
-#         ])  # Shape: ((M+1)*N, 1)
-
-#         # Combine covariance matrices
-#         combined_covariance = block_diag(*[
-#         block_diag(track[t].hypothesis.prediction.covariance, np.array([[1]])) for track in track_list
-#         ])  # Shape: ((M+1)*N, (M+1)*N)
-
-#         # Assume all tracks share the same timestamp and linearised_transition_model
-#         timestamp = track_list[0][t].timestamp
-#         linearised_transition_model = CombinedLinearGaussianTransitionModel(model_list=[track[t].hypothesis.prediction.linearised_transition_model for track in track_list])
-
-#         # Create MarginalisedParticleStatePrediction object
-#         state = MarginalisedParticleStatePrediction(
-#             state_vector=StateVector(combined_state_vector),
-#             covariance=CovarianceMatrix(combined_covariance),
-#             timestamp=timestamp,
-#             linearised_transition_model=linearised_transition_model
-#         )
-#         predictions_track.append(state)
-
-#     return predictions_track
-
-# def separate_and_unpad(self,predictions_track,M):
-#     """
-#     Reverse the flatten_and_pad_Prediction_tracks process to restore the original structure.
-
-#     Parameters
-#     ----------
-#     predictions_track : list of MarginalisedParticleStatePrediction
-#         A list of MarginalisedParticleStatePrediction objects, each representing a timestep.
-
-#     Returns
-#     -------
-#     list of Tracks
-#         A list of N Tracks, each containing a single particle state per timestep.
-#     """
-#     # Initialise list of tracks
-#     num_particles=predictions_track[0].state_vector.shape[0]//(M+1)
-    
-#     restored_tracks = [Track() for _ in range(num_particles)]
-
-#     for t, state in enumerate(predictions_track):
-#         combined_state_vector = state.state_vector
-#         combined_covariance = state.covariance
-#         timestamp = state.timestamp
-#         linearised_transition_model = state.linearised_transition_model
-
-#         for i in range(num_particles):
-#             # Extract state vector for particle i
-#             start_idx = i * (M + 1)
-#             end_idx = start_idx + M
-#             state_vector = combined_state_vector[start_idx:end_idx]
-
-#             # Extract covariance matrix for particle i
-#             cov_start_idx = i * (M + 1)
-#             cov_end_idx = cov_start_idx + (M + 1)
-#             covariance = combined_covariance[cov_start_idx:cov_end_idx, cov_start_idx:cov_end_idx]
-
-#             # Remove padding from covariance
-#             covariance = covariance[:M, :M]
-
-#             # Create particle state and append to the respective track
-#             particle_state = MarginalisedParticleStatePrediction(
-#                 state_vector=state_vector,
-#                 covariance=covariance,
-#                 timestamp=timestamp,
-#                 linearised_transition_model=linearised_transition_model.model_list[i]
-#             )
-#             restored_tracks[i].append(particle_state)
-
-#     return restored_tracks
 
 # def particle_paths_to_gaussian_paths(track, max_lag=None,   **kwargs):
 #     """
@@ -1174,37 +933,3 @@ class CarterKohnSampler(MarginalisedKalmanSmoother):
 
 #     return gaussian_track_list 
 
-# def get_descendant_count(self, earliest_t=0, final_timestep=None, particle_indices=None, **kwargs):
-#     [NB: currently redundant due to mean_track funct and us always keeping duplicate particles. if latter changes,
-#     this will be used to scale weight of particles (and thus smooth in computationally efficient manner)]
-#     """
-#     Computes descendant counts for particles at `earliest_t` with respect to `final_timestep`.
-
-#     Parameters
-#     ----------
-#     earliest_t : int
-#         The earliest timestep to consider.
-#     final_timestep : int, optional
-#         The final timestep to consider. Defaults to the last timestep in the track.
-
-#     Returns
-#     -------
-#     np.ndarray
-#         A 1D array where each element corresponds to the number of descendants
-#         at `final_timestep` for the respective particle at `earliest_t`.
-#     """
-#     num_particles = len(self.track[0])
-
-#     # Avoid recomputing particle indices if possible (if final_timestep is const.)
-#     if particle_indices is None:
-#         particle_indices = self.get_particle_track_indices(earliest_t=earliest_t, final_timestep=final_timestep)
-
-#     # Count occurrences of each particle index at earliest_timestep
-#     earliest_indices = particle_indices[:, earliest_t]
-#     descendant_counts = np.zeros((num_particles,), dtype=int)
-
-#     # Use np.unique to count occurrences
-#     unique, counts = np.unique(earliest_indices, return_counts=True)
-#     descendant_counts[unique.astype(int)] = counts
-
-#     return descendant_counts
