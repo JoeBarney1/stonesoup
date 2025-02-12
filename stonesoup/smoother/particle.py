@@ -105,7 +105,7 @@ class ParticleSmoother(Smoother):
     #  making sure that each follows the right resample index so each has the correct parents.
     # issue with RTS is that we need to resample each chain properly. so possibly need a big old matrix,
     #  with one for each set of timesteps but believe that'd be exponential, so must be a better solution
-    def get_particle_track_indices(self,track=None, earliest_t=0, final_timestep=None):
+    def get_particle_track_indices(self,track=None, earliest_t=0, final_timestep=None,store_particle_nums=False,**kwargs):
         """
         Compute the particle track indices array based on resampling history.
 
@@ -128,7 +128,9 @@ class ParticleSmoother(Smoother):
         if track is None:
             track=self.track
 
-        #sets final_timestep to last observation if entry None or too high
+        # if store_particle_nums:
+        #     particle_nums=np.zeros_like(track)
+
         track_length = len(track)
         if final_timestep is None or final_timestep >= track_length: 
             final_timestep = track_length - 1
@@ -144,6 +146,8 @@ class ParticleSmoother(Smoother):
         # Fill indices backward in time
         for t in range(final_timestep - 1, earliest_t - 1, -1):
             particle_indices[:, t] = track[t + 1].resample_index[particle_indices[:, t + 1]]
+            # if store_particle_nums:
+            #     particle_nums[t]=len(np.unique(particle_indices[:,t]))
             print(f"{len(np.unique(particle_indices[:,t]))} unique particles at time t={track[t].timestamp}")
                 
         if earliest_t>0:
