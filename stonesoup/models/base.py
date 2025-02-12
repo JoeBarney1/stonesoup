@@ -448,7 +448,7 @@ class LevyModel(Model):
     mu_W_transition_model: Optional[Callable] = Property(
         default=None, doc="Optional transition model for mu_W"
     )
-    mu_W_state: Optional[np.ndarray] = None  # Cache the computed mu_W_state
+    mu_W_state: Optional[np.ndarray] = Property(default=None, doc="intermediate mu states over the sub interval") 
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
