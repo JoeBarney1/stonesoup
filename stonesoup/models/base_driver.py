@@ -2,8 +2,8 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Callable, Generator, Optional, Tuple, Union
 from datetime import timedelta
+from scipy.stats import multivariate_normal
 import numpy as np
-from stonesoup.types.state import   GaussianState
 from stonesoup.base import Base, Property
 from stonesoup.types.array import (
     CovarianceMatrices,
@@ -229,55 +229,79 @@ class ConditionallyGaussianDriver(LevyDriver):
             raise AttributeError("invalid noise case")
         return self._first_moment(truncation=truncation) * r_mean  # (m, 1)
     
-    def _mu_W(self, jtimes: np.ndarray, dt: float, mu_W: Optional[float] = None, resample_index=None, **kwargs) -> Tuple[np.ndarray, float]: 
+    def _mu_W(self, jtimes: np.ndarray, dt: float, mu_W: Optional[float] = None, **kwargs) -> Tuple[np.ndarray, np.ndarray]:
         """
         Computes the time-varying mu_W based on the transition model or returns the constant mu_W.
 
         Args:
-            jtimes (np.ndarray): Array of jump times.
+            jtimes (np.ndarray): Jump times, shape (J, N), where J is the number of jumps, N is the number of particles.
             dt (float): The total time interval.
+            mu_W (Optional[float]): Initial mu_W, defaults to self.mu_W if None.
+            resample_index (np.ndarray, optional): Resampling indices for particle realignment.
 
         Returns:
-            Tuple[np.ndarray, float]: A tuple containing the array of mu_W values and the final mu_W value.
+            Tuple[np.ndarray, np.ndarray]: 
+            - last_mu_W (M, N): Final mu_W for each sample path.
+            - mu_W_state (M, N, J): mu_W values at each jump for each sample path.
         """
-        if self.mu_W_transition_model is None:
-            return self.mu_W, np.full_like(jtimes, self.mu_W)
 
-        n_mu_dim=self.mu_W_transition_model.ndim
-        covar=np.zeros((n_mu_dim,n_mu_dim))
-
-        mu_W_array = np.zeros_like(jtimes)
-        sorted_jtimes = np.sort(jtimes, axis=0)        
-        # print(sorted_jtimes, sorted_jtimes.shape)
-
-        num_samples = jtimes.shape[1]
-        num_jumps=jtimes.shape[0]
-
-        mu_W = np.atleast_2d(mu_W if mu_W is not None else self.mu_W)
-        padded_mu_W=np.full(max(num_samples,2), mu_W)
-
-        for j in range(num_samples):
-            initial_mu_W = GaussianState(state_vector=np.array([[padded_mu_W[j]]]), covar=covar)
-            prev_mu_W = initial_mu_W
-            for i in range(num_jumps):
-                if i == 0:
-                    # The first jump time interval is just jtime - 0
-                    interval = timedelta(seconds=sorted_jtimes[i][j])  # Convert to timedelta
-                else:
-                    interval = timedelta(seconds=sorted_jtimes[i][j] - sorted_jtimes[i - 1][j])  # Convert difference to timedelta
-                prev_mu_W_state_vector = self.mu_W_transition_model.function(prev_mu_W, noise=True, time_interval=interval) 
-                mu_W_array[i][j] = prev_mu_W_state_vector[0] #add the float of the state vector value to the array
-                prev_mu_W =  GaussianState(state_vector=prev_mu_W_state_vector, covar=covar) #transform float to gauss state for next update
-                #TODO: use some form of prediction model to add mu_W's covariance (even though not used)
         
-            # For the last interval, update with (dt - jtimes[-1])
-            final_interval = timedelta(seconds=dt - sorted_jtimes[-1][j]) 
-            prev_mu_W_state_vector = self.mu_W_transition_model.function(prev_mu_W, noise=True, time_interval=final_interval) 
-            last_mu_W =  prev_mu_W_state_vector[0] #add the float to the output
-            padded_mu_W[j]=last_mu_W
-        if num_samples>1:
-            last_mu_W=padded_mu_W
-        return last_mu_W, mu_W_array
+
+        J, num_samples = jtimes.shape   # J = num_jumps, N = num_samples
+        sorted_jtimes = np.sort(jtimes, axis=0)  # (J, N)
+
+        #mu_W is either input or we use one attached to driver
+        mu_W = np.atleast_2d(mu_W if mu_W is not None else self.mu_W) 
+        M,N = mu_W.shape
+        if num_samples!=N:
+             mu_W = np.tile(mu_W, (1, num_samples))  # Repeat Mx1 across N to become MxN
+
+        #if there is no mu_W_state, we are in our first iteration OR we are in a time-invariant model and must either way convert our float value to an array
+        if self.mu_W_state is None:
+            mu_W_state = np.repeat(mu_W[:, np.newaxis, :], J, axis=1)  # Expand to (M, J, N)
+        else:
+            mu_W_state = self.mu_W_state  # Keep existing (M, J, N)
+        #if no transition model, assume its time invariant and output float mu, and an array of mu's which are redundant/a filler
+        if self.mu_W_transition_model is None:
+            return  mu_W, mu_W_state
+
+        #Now we are confirmed in a time-varying model, we set mu_W as our previous mu, 
+        #find all the next ones over each sub-interval, and return the mu at the end of the interval, 
+        # alongside an array of all the intermediate values
+
+        prev_mu=mu_W #(MxN) prev_mu is the most recent mu, so goes on the end of the intermediate ones
+        mu_W_state = np.concatenate([mu_W_state, prev_mu[:,None,:]], axis=1)  # (Mx(J+1)xN)
+
+        # Compute time intervals (J+1, N) using slicing
+        intervals = np.zeros((J + 1, num_samples))
+        intervals[0, :] = sorted_jtimes[0, :]  # First interval
+        intervals[1:-1, :] = sorted_jtimes[1:, :] - sorted_jtimes[:-1, :]  # Intermediate intervals
+        intervals[-1, :] = dt - sorted_jtimes[-1, :]  # Final interval (dt - last jump)
+
+        # Compute transition matrices and covariances using intervals
+        #These are formed in the hopes of some 
+        matrices = np.zeros((M, M, J+1, num_samples)) # MxMxJxN
+        covar = np.zeros((M, M, J+1, num_samples)) # MxMxJxN
+        noise = np.zeros((M, J+1, num_samples)) # MxJxN
+
+        for j in range(J+1):
+            for i in range(num_samples):
+                matrices[..., j, i] = self.mu_W_transition_model.matrix(timedelta(seconds=intervals[j, i]))
+                covar[..., j, i] = self.mu_W_transition_model.covar(timedelta(seconds=intervals[j, i]))
+                noise[..., j, i] = multivariate_normal.rvs(mean=np.zeros(M), cov=covar[..., j, i]) # Mx1 sample
+
+            # Update all states at once to hopefully save some computation
+            mu_W_state_at_j = np.einsum("lmn,mn->ln",matrices[...,j,:], prev_mu) + noise[...,j,:] # MxN states added at 
+            mu_W_state[..., j,:] = mu_W_state_at_j
+            prev_mu=mu_W_state_at_j
+
+        # Return all but the last time step (MxJxN)
+        mu_W_state = mu_W_state[..., :-1,:]   
+
+        # Extract final state (MxN)
+        last_mu_W = mu_W_state[..., -1,:]
+
+        return last_mu_W, mu_W_state
     
     def mean(
         self,
@@ -287,7 +311,7 @@ class ConditionallyGaussianDriver(LevyDriver):
         e_ft_func: Callable[..., np.ndarray],
         dt: float,
         mu_W: Optional[float] = None,
-        mu_W_array: Optional[np.ndarray] = None,
+        mu_W_state: Optional[np.ndarray] = None,
         **kwargs
     ) -> Union[StateVector, StateVectors]:
         """Computes mean vectors. The number of mean vectors is dependent on the
@@ -315,19 +339,16 @@ class ConditionallyGaussianDriver(LevyDriver):
         truncation = self.c * dt
         ft = ft_func(dt=dt, jtimes=jtimes)  # (n_jumps, n_samples, m, 1)
 
-        mu_W_array=self.mu_W_state.state_vector
+        mu_W_array=mu_W_state[0,:,:] # MxJxN->JxN
         if self.mu_W_transition_model is None:
             series = np.sum(jsizes[..., None, None] * ft, axis=0)  # (n_samples, m, 1)
             m = series * mu_W
-
         else:
             m = np.sum(jsizes[..., None, None] * ft * mu_W_array[..., None, None], axis=0)  # (n_samples, m, 1) sum over varying mean terms directly
         
         e_ft = e_ft_func(dt=dt)  # (m, 1)       
             
-        residual_mean = self._residual_mean(e_ft=e_ft, mu_W=mu_W, truncation=truncation)[
-            None, ...
-        ]
+        residual_mean = self._residual_mean(e_ft=e_ft, mu_W=mu_W, truncation=truncation)[None, ...]
         centering = (
             dt * self._centering(e_ft=e_ft, mu_W=mu_W, truncation=truncation)[None, ...]
         )
