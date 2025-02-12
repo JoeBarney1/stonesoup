@@ -64,7 +64,7 @@ class ConditionallyGaussianDriver(LevyDriver):
     mu_W_transition_model: Optional[Callable] = Property(
         default=None, doc="Optional transition model for mu_W"
     )
-    mu_W_state: Optional[np.ndarray] = None  # Cache the computed mu_W_state
+    mu_W_state: Optional[np.ndarray] = Property(default=None, doc="intermediate states for mu over each interval") # Cache the computed mu_W_state
 
 
     def _thinning_probabilities(self, jsizes: np.ndarray) -> np.ndarray:
@@ -245,64 +245,67 @@ class ConditionallyGaussianDriver(LevyDriver):
             - mu_W_state (M, N, J): mu_W values at each jump for each sample path.
         """
 
-        
+        #if no transition model, assume its time invariant and output float mu, and an array of mu's which are redundant/a filler
+        if self.mu_W_transition_model is None:
+            return  mu_W, None
 
         J, num_samples = jtimes.shape   # J = num_jumps, N = num_samples
         sorted_jtimes = np.sort(jtimes, axis=0)  # (J, N)
 
-        #mu_W is either input or we use one attached to driver
         mu_W = np.atleast_2d(mu_W if mu_W is not None else self.mu_W) 
         M,N = mu_W.shape
-        if num_samples!=N:
-             mu_W = np.tile(mu_W, (1, num_samples))  # Repeat Mx1 across N to become MxN
+        
+        if num_samples!=N: #only other time we'd have a dimensional mismatch is in our first iteration
+                mu_W = np.tile(mu_W, (1, num_samples))  # Repeat Mx1 across N to become MxN
+                mu_W_state = np.repeat(mu_W[:, np.newaxis, :], J, axis=1)  # Expand to (M, J, N)
+                N=num_samples
+                print('reset')
 
-        #if there is no mu_W_state, we are in our first iteration OR we are in a time-invariant model and must either way convert our float value to an array
-        if self.mu_W_state is None:
-            mu_W_state = np.repeat(mu_W[:, np.newaxis, :], J, axis=1)  # Expand to (M, J, N)
-        else:
-            mu_W_state = self.mu_W_state  # Keep existing (M, J, N)
-        #if no transition model, assume its time invariant and output float mu, and an array of mu's which are redundant/a filler
-        if self.mu_W_transition_model is None:
-            return  mu_W, mu_W_state
+        prev_mu=np.atleast_2d(mu_W) #(MxN) prev_mu is the most recent mu, so goes on the end of the intermediate ones
+        
+        if self.mu_W_state is None: #explicitly set to None if you want to avoid varying within the interval
+            matrix= self.mu_W_transition_model.matrix(timedelta(seconds=dt)) # MxM
+            covar = self.mu_W_transition_model.covar(timedelta(seconds=dt)) #MxM
+            noise = multivariate_normal.rvs(mean=np.zeros(M), cov=covar,size=N) # MxN
+            last_mu_W = np.einsum("lm,mn->ln",matrix, prev_mu) + noise # MxN states added at 
+            self.mu_W=last_mu_W
+            return last_mu_W, None
 
-        #Now we are confirmed in a time-varying model, we set mu_W as our previous mu, 
-        #find all the next ones over each sub-interval, and return the mu at the end of the interval, 
-        # alongside an array of all the intermediate values
+        else: #This is to update the mean at every single jump time. 
+            # The differing times for each set of particles make it expensive and tough to vectorise
+            # an example could be to set the groundtruth model to use this, but the inference to only approximate via the above method
+            longer_mu_W_state = np.zeros((M,J+1,N)) # (Mx(J+1)xN)
+            # Compute time intervals (J+1, N) using slicing
+            intervals = np.zeros((J + 1, num_samples))
+            intervals[0, :] = sorted_jtimes[0, :]  # First interval
+            intervals[1:-1, :] = sorted_jtimes[1:, :] - sorted_jtimes[:-1, :]  # Intermediate intervals
+            intervals[-1, :] = dt - sorted_jtimes[-1, :]  # Final interval (dt - last jump)
 
-        prev_mu=mu_W #(MxN) prev_mu is the most recent mu, so goes on the end of the intermediate ones
-        mu_W_state = np.concatenate([mu_W_state, prev_mu[:,None,:]], axis=1)  # (Mx(J+1)xN)
+            # Compute transition matrices and covariances using intervals
+            #These are formed in the hopes of some 
+            matrices = np.zeros((M, M, J+1, num_samples)) # MxMxJxN
+            covar = np.zeros((M, M, J+1, num_samples)) # MxMxJxN
+            noise = np.zeros((M, J+1, num_samples)) # MxJxN
 
-        # Compute time intervals (J+1, N) using slicing
-        intervals = np.zeros((J + 1, num_samples))
-        intervals[0, :] = sorted_jtimes[0, :]  # First interval
-        intervals[1:-1, :] = sorted_jtimes[1:, :] - sorted_jtimes[:-1, :]  # Intermediate intervals
-        intervals[-1, :] = dt - sorted_jtimes[-1, :]  # Final interval (dt - last jump)
+            for j in range(J+1):
+                for i in range(num_samples):
+                    matrices[..., j, i] = self.mu_W_transition_model.matrix(timedelta(seconds=intervals[j, i]))
+                    covar[..., j, i] = self.mu_W_transition_model.covar(timedelta(seconds=intervals[j, i]))
+                    noise[..., j, i] = multivariate_normal.rvs(mean=np.zeros(M), cov=covar[..., j, i]) # Mx1 sample
 
-        # Compute transition matrices and covariances using intervals
-        #These are formed in the hopes of some 
-        matrices = np.zeros((M, M, J+1, num_samples)) # MxMxJxN
-        covar = np.zeros((M, M, J+1, num_samples)) # MxMxJxN
-        noise = np.zeros((M, J+1, num_samples)) # MxJxN
+                # Update all states at once to hopefully save some computation
+                mu_W_state_at_j = np.einsum("lmn,mn->ln",matrices[...,j,:], prev_mu) + noise[...,j,:] # MxN states added at 
+                longer_mu_W_state[..., j,:] = mu_W_state_at_j
+                prev_mu=mu_W_state_at_j
 
-        for j in range(J+1):
-            for i in range(num_samples):
-                matrices[..., j, i] = self.mu_W_transition_model.matrix(timedelta(seconds=intervals[j, i]))
-                covar[..., j, i] = self.mu_W_transition_model.covar(timedelta(seconds=intervals[j, i]))
-                noise[..., j, i] = multivariate_normal.rvs(mean=np.zeros(M), cov=covar[..., j, i]) # Mx1 sample
+            # Return all but the last time step (MxJxN)
+            mu_W_state = longer_mu_W_state[..., :-1,:]   
+            self.mu_W_state=mu_W_state
+            # Extract final state (MxN)
+            last_mu_W = longer_mu_W_state[..., -1,:]
+            self.mu_W=last_mu_W
+            return last_mu_W, mu_W_state
 
-            # Update all states at once to hopefully save some computation
-            mu_W_state_at_j = np.einsum("lmn,mn->ln",matrices[...,j,:], prev_mu) + noise[...,j,:] # MxN states added at 
-            mu_W_state[..., j,:] = mu_W_state_at_j
-            prev_mu=mu_W_state_at_j
-
-        # Return all but the last time step (MxJxN)
-        mu_W_state = mu_W_state[..., :-1,:]   
-
-        # Extract final state (MxN)
-        last_mu_W = mu_W_state[..., -1,:]
-
-        return last_mu_W, mu_W_state
-    
     def mean(
         self,
         jsizes: np.array,
@@ -339,11 +342,11 @@ class ConditionallyGaussianDriver(LevyDriver):
         truncation = self.c * dt
         ft = ft_func(dt=dt, jtimes=jtimes)  # (n_jumps, n_samples, m, 1)
 
-        mu_W_array=mu_W_state[0,:,:] # MxJxN->JxN
-        if self.mu_W_transition_model is None:
+        if self.mu_W_transition_model is None or mu_W_state is None:
             series = np.sum(jsizes[..., None, None] * ft, axis=0)  # (n_samples, m, 1)
             m = series * mu_W
         else:
+            mu_W_array=mu_W_state[0,:,:] # MxJxN->JxN
             m = np.sum(jsizes[..., None, None] * ft * mu_W_array[..., None, None], axis=0)  # (n_samples, m, 1) sum over varying mean terms directly
         
         e_ft = e_ft_func(dt=dt)  # (m, 1)       
