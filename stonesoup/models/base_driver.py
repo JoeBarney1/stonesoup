@@ -64,7 +64,7 @@ class ConditionallyGaussianDriver(LevyDriver):
     mu_W_transition_model: Optional[Callable] = Property(
         default=None, doc="Optional transition model for mu_W"
     )
-    mu_W_array: Optional[np.ndarray] = None  # Cache the computed mu_W_array
+    mu_W_state: Optional[np.ndarray] = None  # Cache the computed mu_W_state
 
 
     def _thinning_probabilities(self, jsizes: np.ndarray) -> np.ndarray:
@@ -202,7 +202,7 @@ class ConditionallyGaussianDriver(LevyDriver):
         """
 
     def _residual_mean(
-        self, e_ft: np.ndarray, truncation: float, mu_W: float, # TODO: add mu_W_array: np.array and method
+        self, e_ft: np.ndarray, truncation: float, mu_W: float,
     ) -> StateVector:
         """Calculates the mean of Gaussian approximate residuals. Residuals
         arises from the truncated series representation of the Levy stotchastic
@@ -229,7 +229,7 @@ class ConditionallyGaussianDriver(LevyDriver):
             raise AttributeError("invalid noise case")
         return self._first_moment(truncation=truncation) * r_mean  # (m, 1)
     
-    def _mu_W_array(self, jtimes: np.ndarray, dt: float, mu_W: Optional[float] = None, **kwargs) -> Tuple[np.ndarray, float]: 
+    def _mu_W(self, jtimes: np.ndarray, dt: float, mu_W: Optional[float] = None, resample_index=None, **kwargs) -> Tuple[np.ndarray, float]: 
         """
         Computes the time-varying mu_W based on the transition model or returns the constant mu_W.
 
@@ -315,6 +315,7 @@ class ConditionallyGaussianDriver(LevyDriver):
         truncation = self.c * dt
         ft = ft_func(dt=dt, jtimes=jtimes)  # (n_jumps, n_samples, m, 1)
 
+        mu_W_array=self.mu_W_state.state_vector
         if self.mu_W_transition_model is None:
             series = np.sum(jsizes[..., None, None] * ft, axis=0)  # (n_samples, m, 1)
             m = series * mu_W
@@ -344,7 +345,7 @@ class ConditionallyGaussianDriver(LevyDriver):
         e_ft_func: Callable[..., np.ndarray],
         dt: float,
         mu_W: Optional[float] = None,
-        mu_W_array: Optional[np.ndarray] = None,
+        mu_W_state: Optional[np.ndarray] = None,
         sigma_W2: Optional[float] = None,
         **kwargs
     ) -> Union[CovarianceMatrix, CovarianceMatrices]:
