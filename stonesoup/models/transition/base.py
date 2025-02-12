@@ -173,10 +173,10 @@ class CombinedLevyTransitionModel(TransitionModel, LevyModel):
         return mu_W_transition_model
     
     @property
-    def mu_W_array(self):
-        mu_W_array = [m.mu_W_array if m.mu_W_array is not None
-                                  else m.driver.mu_W_array for m in self.model_list]
-        return mu_W_array
+    def mu_W_state(self):
+        mu_W_state = [m.mu_W_state if m.mu_W_state is not None
+                                  else m.driver.mu_W_state for m in self.model_list]
+        return mu_W_state
         
     @property
     def sigma_W2(self):
