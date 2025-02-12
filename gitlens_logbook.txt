@@ -1,0 +1,90 @@
+42c26516 - JoeBarney1, 2 hours ago : change requirement of track property in class, and allow it to be input into the smooth funct. Introduce culled_track variable to clarify inputs
+b3346d7a - JoeBarney1, 4 days ago : added CK sampler and demonstrations. vectorised all smoothing. added path plotting functionality. store F, mu and C. resample index integers for faster indexing. remove old tvm file.
+f1e67d0f - JoeBarney1, 2 weeks ago : restore kalman smoother to original format
+3b6e4e30 - JoeBarney1, 3 weeks ago : enable access to kalman smoother for conditionally gaussian tracks
+8d4bf810 - JoeBarney1, 3 weeks ago : changes made to facilitate time-varying skewness. first moment, centering, residuals not edited yet
+bccd4c28 - JoeBarney1, 3 weeks ago : enable plotting of 2std error margin in 1D and sync colours
+5140e65c - JoeBarney1, 4 weeks ago : import module to allow storing of transition matrix in prediction state
+95089a0d - JoeBarney1, 4 weeks ago : remove placeholder C-K sampler code
+69373c3b - JoeBarney1, 4 weeks ago : added to allow multi-object tracking
+4e846864 - JoeBarney1, 4 weeks ago : file for time varying drivers before integration
+6b0a3c9c - JoeBarney1, 4 weeks ago : removed outdated file
+0d50ae88 - JoeBarney1, 4 weeks ago : removed uncessary imports
+1840a38e - JoeBarney1, 4 weeks ago : Merge remote-tracking branch 'zhenyuen/levy-models-slow' into JB-Lms
+1f7f13f8 - JoeBarney1, 6 weeks ago : On JB-Lms: !!GitHub_Desktop<JB-Lms>
+2d06a692 - JoeBarney1, 6 weeks ago : index on JB-Lms: 77062ba1 Merge branch 'two-months-ago' into JB-Lms
+d3f8cd80 - JoeBarney1, 6 weeks ago : TrackerSmoother Updated
+77062ba1 - JoeBarney1, 6 weeks ago : Merge branch 'two-months-ago' into JB-Lms
+4ab4153f - JoeBarney1, 6 weeks ago : notebook for time-varying mean investigation
+1a39f2c4 - JoeBarney1, 6 weeks ago : document showing all tracking visualisation and smoothing capabilities added
+4663b952 - JoeBarney1, 6 weeks ago : basic notebook to show multi-object tracking capabilities
+353d76b0 - JoeBarney1, 6 weeks ago : introduce 3 smoother classes. first culls particle not resampled. second is RTS smoother and third is CarterKohn smoother.
+57343897 - JoeBarney1, 6 weeks ago : no need to store extra data. removed from updater class, resample index added to update state during resampling
+819207e6 - JoeBarney1, 7 weeks ago : added linear transition matrix to MPSPrediction class to enable storage and use in smoothing.
+5457e17e - JoeBarney1, 7 weeks ago : implement the extra_data class enabled in the MPS update state, by creating the dictionary when the updater class is used.
+114528d8 - JoeBarney1, 7 weeks ago : add extra_data property to MPS update class, to store data needed for smoothing
+aa6160ea - JoeBarney1, 7 weeks ago : added storing of resample index, allowing retracement after filtering
+ed5a41e4 - JoeBarney1, 7 weeks ago : added ability to plot inference process in 1D, adding both error bars and particle scatter overlay.
+5d8c3dcc - JoeBarney1, 7 weeks ago : added predict lru cache to allow multi-object tracking. added storage of linear transition matrix to MPPredictor class for RTS smoother and other functions going forward.
+2d70f0bd - JoeBarney1, 7 weeks ago : administrative changes over term, mainly deleting files
+d3372323 - JoeBarney1, 7 weeks ago : CK funct of ParticleSmoother
+f2c0bd2a - JoeBarney1, 9 weeks ago : added 1 and 2D plots for tracking, plus description of algorithms
+15fd7e88 - JoeBarney1, 9 weeks ago : correct descendant smoothing lag logic
+1c22330e - JoeBarney1, 9 weeks ago : multiobjectclutter implementation testing
+155f0104 - JoeBarney1, 9 weeks ago : file to begin TVM implementation
+e286b2f8 - JoeBarney1, 2 months ago : revert prev change as core issue fixed
+084d5d81 - JoeBarney1, 2 months ago : add cache funct to MPpredictor, if input is track it takes last state
+70fc96b2 - JoeBarney1, 2 months ago : remove previous debugging code to clear up space
+08e90b47 - JoeBarney1, 2 months ago : changed the prior input to the most recent track state, rather than the whole track.
+b79a0e5a - JoeBarney1, 2 months ago : added aims about max_lag for particle smoother/marginalised smoother
+7e520b60 - JoeBarney1, 2 months ago : remove unnecessary kalman history
+cf05a340 - JoeBarney1, 2 months ago : remove process mean/covar properties from MPprediction
+9cec4fd9 - JoeBarney1, 2 months ago : introduce marginalised particle smoother
+a0641b91 - JoeBarney1, 2 months ago : add 'extra data' dict to updater, update class
+afab7c8f - JoeBarney1, 2 months ago : return resample index to default false
+2b148803 - JoeBarney1, 2 months ago : add F to predictor
+ef321e1c - JoeBarney1, 2 months ago : remove history from transition model (is in MPpredictor now)
+e379a06d - JoeBarney1, 2 months ago : delete random
+6e0de656 - JoeBarney1, 2 months ago : delete random
+1f95b9f3 - JoeBarney1, 3 months ago : streamline smoother class
+d1030ffd - JoeBarney1, 3 months ago : deleting checkpoints of old files
+a14ecb6c - JoeBarney1, 3 months ago : modify levy langevin tutorial notebook to test tracking visualisation and smoothing functions
+abd90035 - JoeBarney1, 3 months ago : modify systematic resampler to assign parents to resampled particles, and return resampling index
+d1af55a2 - JoeBarney1, 3 months ago : introduction of particle smoother class. descendant smoother and particle path generator both implemented.
+28c9b38b - JoeBarney1, 3 months ago : undid history property additions. might revert when attempting to modularise
+c9573651 - JoeBarney1, 3 months ago : add resampling indices to history generator within updater. still need to modularise
+6d63b750 - JoeBarney1, 3 months ago : RBPS no longer an aim
+444c9e77 - JoeBarney1, 3 months ago : tested latent storage. reset kernel to save space
+50e36136 - JoeBarney1, 3 months ago : plot files now automatically store elsewhere
+583470db - JoeBarney1, 3 months ago : 1D particles and uncertainty plotting
+291185ef - JoeBarney1, 3 months ago : rename plots
+3055b478 - JoeBarney1, 3 months ago : administrative changes
+b00ab4c8 - JoeBarney1, 3 months ago : add history funct to updater to store prev. weights, means and covars
+b629fcda - JoeBarney1, 3 months ago : formatting changes
+fc859f2a - JoeBarney1, 3 months ago : as before
+91110e8c - JoeBarney1, 3 months ago : RBPS skeleton update, add weightedsmoother funct
+5bce51f7 - JoeBarney1, 3 months ago : add store function to kalman updater
+e418e337 - JoeBarney1, 3 months ago : store particle info before updating
+d04bf049 - JoeBarney1, 3 months ago : moved velocity tracking notebook
+0411ccc0 - JoeBarney1, 3 months ago : ability to store history of latents, for conditional smoothing
+fa7fc1c3 - JoeBarney1, 3 months ago : comment out additional classes whilst history held in updater
+c4c30a26 - JoeBarney1, 3 months ago : particle functionality
+3a08f4da - JoeBarney1, 3 months ago : accept changes
+14f94c5c - JoeBarney1, 3 months ago : Merge branch 'main' of https://github.com/dstl/Stone-Soup
+ebb1ae21 - JoeBarney1, 3 months ago : Merge branch 'main' of https://github.com/dstl/Stone-Soup
+0ea2c724 - JoeBarney1, 3 months ago : delete smoothedparticle
+e177a84d - JoeBarney1, 3 months ago : smoothed particle class
+021278ca - JoeBarney1, 3 months ago : test file for RBPS class
+e65bb1d1 - JoeBarney1, 3 months ago : deleted
+f979629d - JoeBarney1, 3 months ago : add smoothed particle class
+23932771 - JoeBarney1, 3 months ago : test particle properties
+0f424193 - JoeBarney1, 3 months ago : moved folders
+ecfd5f19 - JoeBarney1, 3 months ago : to import history
+ffb857f0 - JoeBarney1, 3 months ago : update to history property
+0f273492 - JoeBarney1, 3 months ago : add history property to particle type
+98179207 - JoeBarney1, 3 months ago : created files for potential project directions
+b5d2c3e2 - JoeBarney1, 3 months ago : deleted old version
+bd2a1d32 - JoeBarney1, 3 months ago : initial discussion of potential extensions
+f2404686 - JoeBarney1, 3 months ago : tracking of velocity, and position with more particles
+8eabf831 - JoeBarney1, 3 months ago : Update Initial_model_extension_discussion.ipynb
+65d2fa91 - JoeBarney1, 4 months ago : copy of tutorial, to add thoughts on extension
