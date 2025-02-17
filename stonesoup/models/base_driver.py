@@ -429,9 +429,16 @@ class ConditionallyGaussianDriver(LevyDriver):
         truncation = self.c * dt
         ft = ft_func(dt=dt, jtimes=jtimes)  # (n_jumps, n_samples, m, 1)
 
-        if self.mu_W_transition_model is None or mu_W_state is None:
+        if self.mu_W_transition_model is None: #if mu_W is a float value
             series = np.sum(jsizes[..., None, None] * ft, axis=0)  # (n_samples, m, 1)
             m = series * mu_W
+        elif mu_W_state is None: #annoyingly have wrongly put mu shape as MxN
+                series = np.sum(jsizes[..., None, None] * ft, axis=0)  # (n_samples, m, 1)
+                #TODO: 1. need to correct all the logic to NxM (currently doing with the following two lines)
+                mu_W=np.atleast_2d(mu_W[0,...]) #MxN--> 1xN
+                mu_W=mu_W.T  #shape will now be Nx1= num_samples x 1
+                mu_W = np.repeat(mu_W[:, np.newaxis, :], series.shape[1], axis=1)  # Expand to (N, m, 1)
+                m = series * mu_W
         else:
             mu_W_array=mu_W_state[0,:,:] # MxJxN->JxN
             m = np.sum(jsizes[..., None, None] * ft * mu_W_array[..., None, None], axis=0)  # (n_samples, m, 1) sum over varying mean terms directly
