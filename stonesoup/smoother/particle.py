@@ -368,18 +368,6 @@ class CarterKohnSmoother(MarginalisedKalmanSmoother):
             current_state = track[t]
             time_interval = subsq_state.timestamp - current_state.timestamp
 
-            # If MCMCsample is True, get K(t) and pick measurement model
-            if self.MCMCsample:
-                K_t = np.argmax(self.indicator_variables[t])
-                measurement_model= self.conditional_models["measurement"][K_t]
-                H =measurement_model.matrix()
-                # v = measurement_model.noise_covar()
-                C = 1 if K_t == 0 else 100
-            else:
-                # If no Markov switching, just use measurement model from the forward pass
-                H = current_state.hypothesis.measurement.measurement_model.matrix()
-                C = 1
-
             x_t_given_t = current_state.state_vector.copy()   # (M, N)
             
             # Attempt to get the forward prediction
@@ -440,9 +428,6 @@ class CarterKohnSmoother(MarginalisedKalmanSmoother):
                 # update S_t_given_t => subtract gain*gai^T * R_t_i
                 S_t_given_t-=np.einsum("lmn,n->lmn",np.einsum("mn, ln->mln",gain,gain),R_t_i) 
 
-                if self.MCMCsample:
-                    self.tau_likelihood_term += np.sum(e_t_i**2 / (R_t_i * C))
-
             # Sample each column => shape (M,N)
             sampled_state = np.zeros_like(x_t_given_t)
             for idx in range(ncols):
@@ -450,35 +435,20 @@ class CarterKohnSmoother(MarginalisedKalmanSmoother):
                 cov_ = S_t_given_t[:, :, idx]
                 sampled_state[:, idx] = np.random.multivariate_normal(mean_, cov_)
 
-            if self.MCMCsample:
-                # Residual => shape depends on measurement
-                residual = (self.measurements[t].state_vector - H @ sampled_state) # same dim as measurement, call it k
-
-                self.sigma_residuals_term += np.einsum("kn,kn->n",residual, residual)/C # np.einsum
-                #Need to check this if ever used, but should be N sets of a constant, so residual.T@residual
-
-                new_state = type(current_state).from_state(
-                    current_state,
-                    state_vector=sampled_state[...,0],
-                    covar=S_t_given_t[...,0],
-                    timestamp=current_state.timestamp
-                )
-            else:
-                new_state = type(current_state).from_state(
-                    current_state,
-                    state_vector=sampled_state,
-                    covariance=S_t_given_t,
-                    hypothesis=current_state.hypothesis,
-                    timestamp=current_state.timestamp
-                )
+            new_state = type(current_state).from_state(
+                current_state,
+                state_vector=sampled_state,
+                covariance=S_t_given_t,
+                hypothesis=current_state.hypothesis,
+                timestamp=current_state.timestamp
+            )
 
             smoothed_track.insert(0, new_state)
             subsq_state = new_state
             x_t_plus_1 = sampled_state
 
-        if self.MCMCsample:
-            self.generated_states = smoothed_track
         return smoothed_track
+    
 # class CarterKohnSampler(MarginalisedKalmanSmoother):
     
 #     # Tells us if we are using MCMC method or not (if None, we're just smoothing)
