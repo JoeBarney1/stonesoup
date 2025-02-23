@@ -57,15 +57,17 @@ class SystematicResampler(Resampler):
         # if resampling with a model with a time-varying driver, need to resample the mu values as well:
         model=new_particles.hypothesis.prediction.transition_model
         index=index.astype(int)
-        if isinstance(model.mu_W_state, list) and model.mu_W_transition_model[0] is not None:
+        if isinstance(model.mu_W_state, list):
+            if model.mu_W_transition_model[0] is not None:
                 for sub_model in model.model_list:
                     sub_model.mu_W=sub_model.mu_W[...,index]
                     if sub_model.mu_W_state is not None:
                         sub_model.mu_W_state=sub_model.mu_W_state[...,index]
-        elif model.mu_W_transition_model is not None: 
-            model.mu_W=model.mu_W[...,index]
-            if model.mu_W_state is not None:
-                model.mu_W_state=model.mu_W_state[...,index]
+        else:
+            if model.mu_W_transition_model is not None: 
+                model.mu_W=model.mu_W[...,index]
+                if model.mu_W_state is not None:
+                    model.mu_W_state=model.mu_W_state[...,index]
 
         return new_particles
 
