@@ -435,8 +435,7 @@ class ConditionallyGaussianDriver(LevyDriver):
         elif mu_W_state is None: #annoyingly have wrongly put mu shape as MxN
                 series = np.sum(jsizes[..., None, None] * ft, axis=0)  # (n_samples, m, 1)
                 #TODO: 1. need to correct all the logic to NxM (currently doing with the following two lines)
-                mu_W=np.atleast_2d(mu_W[0,...]) #MxN--> 1xN
-                mu_W=mu_W.T  #shape will now be Nx1= num_samples x 1
+                mu_W=np.atleast_2d(mu_W[0,...]).T #MxN--> 1xN --> Nx1= num_samples x 1
                 mu_W = np.repeat(mu_W[:, np.newaxis, :], series.shape[1], axis=1)  # Expand to (N, m, 1)
                 m = series * mu_W
         else:
