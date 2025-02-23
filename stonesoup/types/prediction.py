@@ -1,6 +1,6 @@
 import copy
 import datetime
-from typing import Sequence
+from collections.abc import Sequence
 import numpy as np
 from .array import CovarianceMatrix, CovarianceMatrices
 from .base import Type
@@ -8,7 +8,7 @@ from .state import (State, GaussianState, EnsembleState,
                     ParticleState, MultiModelParticleState, RaoBlackwellisedParticleState,
                     SqrtGaussianState, InformationState, TaggedWeightedGaussianState,
                     WeightedGaussianState, CategoricalState, ASDGaussianState,
-                    BernoulliParticleState, KernelParticleState, MarginalisedParticleState)
+                    BernoulliParticleState,KernelParticleState,MarginalisedParticleState)
 from ..base import Property
 from ..models.transition.base import TransitionModel
 from ..types.state import CreatableFromState, CompositeState

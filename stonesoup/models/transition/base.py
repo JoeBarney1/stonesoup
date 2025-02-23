@@ -1,8 +1,11 @@
 import copy
+import copy
 from abc import abstractmethod
+from collections.abc import Sequence
 from datetime import timedelta
 from typing import Iterable, List, Optional, Sequence, Union
 
+import numpy as np
 import numpy as np
 from scipy.linalg import block_diag
 from stonesoup.base import Property

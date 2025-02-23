@@ -53,7 +53,7 @@ class Measure(BaseMeasure):
             distance measure between a pair of input :class:`~.State` objects
 
         """
-        return NotImplementedError
+        raise NotImplementedError
 
 
 class Euclidean(Measure):
@@ -128,7 +128,7 @@ class EuclideanWeighted(Measure):
         Returns
         -------
         dist : float
-            Weighted euclidean distance between two input
+            Weighted Euclidean distance between two input
             :class:`~.State` objects
 
         """

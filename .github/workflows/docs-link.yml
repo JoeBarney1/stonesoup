@@ -10,6 +10,8 @@ jobs:
     if: "${{ github.event.context == 'ci/circleci: docs' }}"
     permissions:
       statuses: write
+    permissions:
+      statuses: write
     name: Run CircleCI artifacts redirector
     steps:
       - name: GitHub Action step

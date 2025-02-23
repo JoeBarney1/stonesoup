@@ -1,7 +1,7 @@
 from abc import ABC
 import copy
 import datetime
-from typing import Mapping, Sequence, Set
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 
@@ -38,7 +38,7 @@ class RewardFunction(Base, ABC):
     and chooses the appropriate sensing configuration to use at that time step.
     """
 
-    def __call__(self, config: Mapping[Sensor, Sequence[Action]], tracks: Set[Track],
+    def __call__(self, config: Mapping[Sensor, Sequence[Action]], tracks: set[Track],
                  metric_time: datetime.datetime, *args, **kwargs):
         """
         A method which returns a reward metric based on information about the state of the
@@ -80,7 +80,7 @@ class UncertaintyRewardFunction(RewardFunction):
                                            "noise to the predicted measurements for sensor "
                                            "management.")
 
-    def __call__(self, config: Mapping[Sensor, Sequence[Action]], tracks: Set[Track],
+    def __call__(self, config: Mapping[Sensor, Sequence[Action]], tracks: set[Track],
                  metric_time: datetime.datetime, *args, **kwargs):
         """
         For a given configuration of sensors and actions this reward function calculates the
@@ -123,15 +123,21 @@ class UncertaintyRewardFunction(RewardFunction):
 
         for sensor in predicted_sensors:
 
+            ground_truth_states = dict(
+                (GroundTruthState(predicted_track.mean,
+                                  timestamp=predicted_track.timestamp,
+                                  metadata=predicted_track.metadata),
+                 predicted_track)
+                for predicted_track in predicted_tracks)
+
+            detections_set = sensor.measure(
+                set(ground_truth_states.keys()), noise=self.measurement_noise)
+
             # Assumes one detection per track
-            detections = {predicted_track: detection
-                          for detection in
-                          sensor.measure({GroundTruthState(predicted_track.mean,
-                                                           timestamp=predicted_track.timestamp,
-                                                           metadata=predicted_track.metadata)},
-                                         noise=self.measurement_noise)
-                          for predicted_track in predicted_tracks
-                          if isinstance(detection, TrueDetection)}
+            detections = {
+                ground_truth_states[detection.groundtruth_path]: detection
+                for detection in detections_set
+                if isinstance(detection, TrueDetection)}
 
             for predicted_track, detection in detections.items():
                 # Generate hypothesis based on prediction/previous update and detection
@@ -208,7 +214,7 @@ class ExpectedKLDivergence(RewardFunction):
         super().__init__(*args, **kwargs)
         self.KLD = KLDivergence()
 
-    def __call__(self, config: Mapping[Sensor, Sequence[Action]], tracks: Set[Track],
+    def __call__(self, config: Mapping[Sensor, Sequence[Action]], tracks: set[Track],
                  metric_time: datetime.datetime, *args, **kwargs):
         """
         For a given configuration of sensors and actions this reward function
@@ -275,7 +281,7 @@ class ExpectedKLDivergence(RewardFunction):
                 for n, detection in enumerate(detection_set):
 
                     # Generate hypothesis based on prediction/previous update and detection
-                    hypothesis = SingleHypothesis(predicted_track, detection)
+                    hypothesis = SingleHypothesis(predicted_track.state, detection)
 
                     # Do the update based on this hypothesis and store covariance matrix
                     update = self.updater.update(hypothesis)
@@ -301,13 +307,22 @@ class ExpectedKLDivergence(RewardFunction):
 
         for sensor in sensors:
             detections = {}
-            for predicted_track in predicted_tracks:
-                tmp_detection = sensor.measure(
-                    {GroundTruthState(predicted_track.mean,
-                                      timestamp=predicted_track.timestamp,
-                                      metadata=predicted_track.metadata)},
-                    noise=self.measurement_noise)
-                detections.update({predicted_track: tmp_detection})
+
+            ground_truth_states = dict(
+                (GroundTruthState(predicted_track.mean,
+                                  timestamp=predicted_track.timestamp,
+                                  metadata=predicted_track.metadata),
+                 predicted_track)
+                for predicted_track in predicted_tracks)
+
+            detections_set = sensor.measure(
+                set(ground_truth_states.keys()), noise=self.measurement_noise)
+
+            # Assumes one detection per track
+            detections = {
+                ground_truth_states[detection.groundtruth_path]: {detection}
+                for detection in detections_set
+                if isinstance(detection, TrueDetection)}
 
             if self.data_associator:
                 tmp_hypotheses = self.data_associator.associate(

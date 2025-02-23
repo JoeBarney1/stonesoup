@@ -1,11 +1,11 @@
 import copy
 import datetime
+import typing
 import uuid
 import weakref
-from collections import abc
+from collections.abc import MutableMapping, MutableSequence, Sequence
 from numbers import Integral
-from typing import MutableSequence, Any, Optional, Sequence, MutableMapping
-import typing
+from typing import Any, Optional
 
 import numpy as np
 from scipy.stats import multivariate_normal
@@ -54,10 +54,10 @@ class State(Type):
         \\*args: Sequence
             Arguments to pass to newly created state, replacing those with same name in `state`.
         target_type: Type,  optional
-            Optional argument specifying the type of of object to be created. This need not
+            Optional argument specifying the type of object to be created. This need not
             necessarily be :class:`~.State` subclass. Any arguments that match between the input
             `state` and the target type will be copied from the old to the new object (except those
-            explicitly specified in `args` and `kwargs`.
+            explicitly specified in `args` and `kwargs`).
         \\*\\*kwargs: Mapping
             New property names and associate value for use in newly created state, replacing those
             on the `state` parameter.
@@ -235,7 +235,7 @@ class ASDState(Type):
 State.register(ASDState)
 
 
-class StateMutableSequence(Type, abc.MutableSequence):
+class StateMutableSequence(Type, MutableSequence):
     """A mutable sequence for :class:`~.State` instances
 
     This sequence acts like a regular list object for States, as well as
@@ -268,7 +268,7 @@ class StateMutableSequence(Type, abc.MutableSequence):
     def __init__(self, states=None, *args, **kwargs):
         if states is None:
             states = []
-        elif not isinstance(states, abc.Sequence):
+        elif not isinstance(states, Sequence):
             # Ensure states is a list
             states = [states]
         super().__init__(states, *args, **kwargs)
@@ -318,7 +318,7 @@ class StateMutableSequence(Type, abc.MutableSequence):
         # such attribute.
         #
         # An alternative mechanism using __getattr__ seems simpler (as it skips the first few lines
-        # of code, but __getattr__ has no mechanism to capture the originally raised error.
+        # of code, but __getattr__ has no mechanism to capture the originally raised error).
         try:
             # This tries first to get the attribute from self.
             return Type.__getattribute__(self, name)
@@ -744,21 +744,24 @@ class ParticleState(State):
         """Sample mean for particles"""
         if len(self) == 1:  # No need to calculate mean
             return self.state_vector
-        return np.average(self.state_vector, axis=1, weights=np.exp(self.log_weight))
+        return np.average(self.state_vector, axis=1,
+                          weights=np.exp(self.log_weight - np.max(self.log_weight)))
 
     @clearable_cached_property('state_vector', 'log_weight', 'fixed_covar')
     def covar(self):
         """Sample covariance matrix for particles"""
         if self.fixed_covar is not None:
             return self.fixed_covar
-        return np.cov(self.state_vector, ddof=0, aweights=np.exp(self.log_weight))
+        return np.cov(self.state_vector, ddof=0,
+                      aweights=np.exp(self.log_weight - np.max(self.log_weight)))
 
     @weight.setter
     def weight(self, value):
         if value is None:
             self.log_weight = None
         else:
-            self.log_weight = np.log(np.asarray(value, dtype=np.float64))
+            with np.errstate(divide='ignore'):  # Log weight of -inf is fine
+                self.log_weight = np.log(np.asarray(value, dtype=np.float64))
             self.__dict__['weight'] = np.asanyarray(value)
 
     @weight.getter
@@ -975,7 +978,7 @@ ParticleState.register(KernelParticleState)
 class EnsembleState(State):
     r"""Ensemble State type
 
-    This is an Ensemble state object which describes the system state as a
+    This is an Ensemble state object which describes the system state as an
     ensemble of state vectors for use in Ensemble based filters.
 
     This approach is functionally identical to the Particle state type except
