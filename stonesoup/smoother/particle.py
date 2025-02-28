@@ -1,6 +1,7 @@
 #for generic PS
 from ast import FunctionType
 import copy
+from multiprocessing import Value
 from sre_parse import State
 
 from scipy.stats import multivariate_normal
@@ -38,8 +39,6 @@ class ParticleSmoother(Smoother):
         Create a single Track containing all particle states for times t in
         [earliest_t..earliest_t+max_lag], each as a MarginalisedParticleState.
         """
-        if track is None:
-            track=self.track
 
         track_length = len(track)
         num_particles = len(track[0])
@@ -102,8 +101,6 @@ class ParticleSmoother(Smoother):
             track[t][particle_indices[i,t]] gives the particle at time 't' corresponding to the 'ith'
             descendant/sub-track from time 'final_timestep'. 
         """
-        if track is None:
-            track=self.track
 
         # if store_particle_nums:
         #     particle_nums=np.zeros_like(track)
@@ -260,7 +257,7 @@ class MarginalisedKalmanSmoother(ParticleSmoother,KalmanSmoother):
 
         return np.moveaxis(ksmooth_gain, 0, 2)  # (M, M, N)
     
-    def smooth(self, culled_track=None, **kwargs):
+    def smooth(self, track=None,culled_track=None, **kwargs):
         """
         Perform the backward recursion to smooth the track.
 
@@ -276,9 +273,12 @@ class MarginalisedKalmanSmoother(ParticleSmoother,KalmanSmoother):
 
         """
         if culled_track is None:
-            track=self.track
-            culled_track=ParticleSmoother().particle_paths(track=track)
-        track=culled_track
+            if track is None:
+                raise ValueError("must input either track or culled track")
+            else:
+                culled_track=ParticleSmoother().particle_paths(track=track)
+
+        track=culled_track #start smoothing with a culled track.
 
         try:
             self._prediction(track[0])
@@ -333,22 +333,26 @@ class CarterKohnSmoother(MarginalisedKalmanSmoother):
     """
     Carter-Kohn smoother implementation in Stone Soup framework.
     """
-    # If MCMCsample=None, we only need these:
-    measurements: list = Property(default=None)
 
-    def smooth(self, culled_track=None, **kwargs):
+    def smooth(self, track=None,culled_track=None, measurements=None, **kwargs):
         """
         Vectorised backward pass for Carter-Kohn or standard smoothing,
         handling shapes (M,N) for state vectors and (M,M,N) for covariances.
         If N=1, it degenerates to the single-track case.
         """
         if culled_track is None:
-            track=self.track
             if track is None:
-                raise ValueError("If MCMCsample=None and you are smoothing, you must provide 'track'") 
-            culled_track=ParticleSmoother().particle_paths(track=track)
+                raise ValueError("must input either track or culled track")
+            else:
+                culled_track=ParticleSmoother().particle_paths(track=track)
 
-        track=culled_track
+        track=culled_track #start smoothing with a culled track.
+
+        if measurements is None:
+            measurements = []
+            for state in track: 
+                measurement=state.hypothesis.measurement
+                measurements.append(measurement)
 
         smoothed_track = Track()
 
