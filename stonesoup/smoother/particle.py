@@ -1,35 +1,19 @@
 #for generic PS
-from ast import FunctionType
 import copy
-from multiprocessing import Value
-from sre_parse import State
-
-from scipy.stats import multivariate_normal
-from stonesoup.models.transition.categorical import MarkovianTransitionModel
-from stonesoup.predictor.kalman import KalmanPredictor
 from stonesoup.types.multihypothesis import MultipleHypothesis
-from stonesoup.types.particle import Particle
 from stonesoup.types.prediction import MarginalisedParticleStatePrediction
-from stonesoup.types.state import CategoricalState
 from stonesoup.types.track import Track
 from stonesoup.types.update import MarginalisedParticleStateUpdate
-from stonesoup.types.array import CovarianceMatrices, StateVector,StateVectors
 from stonesoup.smoother.base import Property, Smoother
 import numpy as np
 from stonesoup.smoother.kalman import KalmanSmoother
 from stonesoup.types.hypothesis import SingleHypothesis
-from stonesoup.updater.kalman import KalmanUpdater
-from stonesoup.models.transition.categorical import MarkovianTransitionModel
-   
 class ParticleSmoother(Smoother):
     """
     Approximate Particle Smoother to reconstruct particle paths using the resampling history.
     This smoother traces back the origin of each particle using resampling indices and smooths  
     the resulting paths by calculating descendant-based weights.
     """
-
-    # Making track a property
-    track: Track = Property(doc="The filtered track resulting from the forward pass",default=None)
 
     def smooth():
         raise NotImplementedError
@@ -272,13 +256,10 @@ class MarginalisedKalmanSmoother(ParticleSmoother,KalmanSmoother):
             Smoothed track
 
         """
-        if culled_track is None:
-            if track is None:
-                raise ValueError("must input either track or culled track")
-            else:
-                culled_track=ParticleSmoother().particle_paths(track=track)
 
-        track=culled_track #start smoothing with a culled track.
+        culled_track=ParticleSmoother().particle_paths(track=track)
+
+        track=culled_track #rename culled_track variable for simplicity/ to avoid confusion. 
 
         try:
             self._prediction(track[0])
@@ -334,19 +315,16 @@ class CarterKohnSmoother(MarginalisedKalmanSmoother):
     Carter-Kohn smoother implementation in Stone Soup framework.
     """
 
-    def smooth(self, track=None,culled_track=None, measurements=None, **kwargs):
+    def smooth(self, track=None, measurements=None, **kwargs):
         """
         Vectorised backward pass for Carter-Kohn or standard smoothing,
         handling shapes (M,N) for state vectors and (M,M,N) for covariances.
         If N=1, it degenerates to the single-track case.
         """
-        if culled_track is None:
-            if track is None:
-                raise ValueError("must input either track or culled track")
-            else:
-                culled_track=ParticleSmoother().particle_paths(track=track)
 
-        track=culled_track #start smoothing with a culled track.
+        culled_track=ParticleSmoother().particle_paths(track=track)
+
+        track=culled_track #rename culled_track variable for simplicity/ to avoid confusion. 
 
         if measurements is None:
             measurements = []
