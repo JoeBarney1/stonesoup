@@ -217,10 +217,12 @@ class ConditionallyGaussianDriver(LevyDriver):
         Returns:
             StateVector: Mean vector of the Gaussian approximated residuals.
         """
-        if self.noise_case == NoiseCase.TRUNCATED or self.mu_W_transition_model is not None: #automatically truncate if time-varying
+        if self.noise_case == NoiseCase.TRUNCATED or self.mu_W_transition_model is not None: 
+            #automatically truncate if time-varying within sub-interval
             m = e_ft.shape[0]
             r_mean = np.zeros((m, 1))
         elif (
+            #TODO: change it to self.mu_W_state to only auto-truncate if varying within sub-interval
             self.noise_case == NoiseCase.GAUSSIAN_APPROX
             or self.noise_case == NoiseCase.PARTIAL_GAUSSIAN_APPROX
         ):
@@ -244,6 +246,22 @@ class ConditionallyGaussianDriver(LevyDriver):
             - last_mu_W (M, N): Final mu_W for each sample path.
             - mu_W_state (M, N, J): mu_W values at each jump for each sample path.
         """
+        #TODO: Need to change logic so that mu is transposed AS IN MEAN FUNCT BELOW 
+
+        #ALSO TODO: need to change logic everywhere so that if mu_W supplied is MxN (or MxNxJ), we 'strip' it to 1xN or 1xNxJ. 
+        # Here is the funct to do that, which should be used everywhere mean is accessed outside of this driver (mean, covar, centering and residual functs)
+        # This ensures the mean can be modelled as a multivariate process, albeit with only the first component being used to drive our model
+
+            # if transition_model is none:
+            #   # do nothing as mu_W will be a 1x1 array and unchanged
+            # elif mu_shape is none: #i.e. if mu is time-varying but not over a sub interval:
+            #   mu_W = np.atleast_2d(mu_W)  # Ensure mu_W is at least 2D, nxm where m>=1. 
+            #   mu_W = np.reshape(mu_W[:, 0], (-1, 1))  # Reshapes (n,) or (n, 1) to (n, 1)
+            # else: #mu is time varying within sub-interval (NOT recommended)
+            #   mu_W = np.atleast_2d(mu_W)  # Ensure mu_W is at least 2D, nxm where m>=1. 
+            #   mu_W = np.reshape(mu_W[:, 0], (-1, 1))  # Reshapes (n,) or (n, 1) to (n, 1)
+            #   mu_W_state = np.atleast_3d(mu_W)  # Ensure mu_W is at least 2D, MxJxN where m>=1. 
+            #   mu_W_state = np.reshape(mu_W[0,:,:], (-1, 1))  # Reshapes (' ', 1 or M,J,' ', 1 or N) to (1, J, N)`
 
         #if no transition model, assume its time invariant and output float mu, and an array of mu's which are redundant/a filler
         if self.mu_W_transition_model is None:
@@ -255,6 +273,10 @@ class ConditionallyGaussianDriver(LevyDriver):
         mu_W = np.atleast_2d(mu_W if mu_W is not None else self.mu_W) 
         M,N = mu_W.shape
         
+        #TODO: find a better way to reset the mean to the initial input!! 
+        # maybe just enforce having to supply a mu_W prior (i.e. submit it as an array when we're tracking)
+        # THIS IS WHAT to do^^ (as would simply reset it as we want, we wouldn't need to do this repeat, 
+        # and we could start with different mu_W values)
         if num_samples!=N: #only other time we'd have a dimensional mismatch is in our first iteration
                 mu_W = np.tile(mu_W, (1, num_samples))  # Repeat Mx1 across N to become MxN
                 mu_W_state = np.repeat(mu_W[:, np.newaxis, :], J, axis=1)  # Expand to (M, J, N)
@@ -341,20 +363,24 @@ class ConditionallyGaussianDriver(LevyDriver):
         num_samples = jsizes.shape[1]
         truncation = self.c * dt
         ft = ft_func(dt=dt, jtimes=jtimes)  # (n_jumps, n_samples, m, 1)
+        series = np.sum(jsizes[..., None, None] * ft, axis=0)  # (n_samples, m, 1)
 
         if self.mu_W_transition_model is None: #if mu_W is a float value
-            series = np.sum(jsizes[..., None, None] * ft, axis=0)  # (n_samples, m, 1)
             m = series * mu_W
-        elif mu_W_state is None: #annoyingly have wrongly put mu shape as MxN
-                series = np.sum(jsizes[..., None, None] * ft, axis=0)  # (n_samples, m, 1)
-                #TODO: 1. need to correct all the logic to NxM (currently doing with the following two lines)
-                mu_W=np.atleast_2d(mu_W[0,...]).T #MxN--> 1xN --> Nx1= num_samples x 1
-                mu_W = np.repeat(mu_W[:, np.newaxis, :], series.shape[1], axis=1)  # Expand to (N, m, 1)
-                m = series * mu_W
-        else:
-            mu_W_array=mu_W_state[0,:,:] # MxJxN->JxN
-            m = np.sum(jsizes[..., None, None] * ft * mu_W_array[..., None, None], axis=0)  # (n_samples, m, 1) sum over varying mean terms directly
-        
+        elif self.mu_W_state is None:
+            mu_W=mu_W.T # Start with mu_W having shape nxM, then take the first component
+            mu_W = np.atleast_2d(mu_W)  # Ensure mu_W is at least 2D, nxm where m>=1. 
+            mu_W = np.reshape(mu_W[:, 0], (-1, 1))  # Reshapes (n,) or (n, 1) to (n, 1)
+
+            # Multiply each mx1 section of 'series' by its corresponding mu_W value (nx1)
+            # series will be NxM x 1 and mu_W will be Nx1, resulting in NxM x 1
+            m = series * mu_W[:,None] 
+
+        elif self.mu_W_state is not None:
+            # For the else block, ensure the current logic works as expected with mu_W_state
+            mu_W_array = mu_W_state[0, :, :]  # MxJxN -> JxN (assuming it's the first component)
+            m = np.sum(jsizes[..., None, None] * ft * mu_W_array[..., None, None], axis=0)  # (n_samples, m, 1)
+
         e_ft = e_ft_func(dt=dt)  # (m, 1)       
             
         residual_mean = self._residual_mean(e_ft=e_ft, mu_W=mu_W, truncation=truncation)[None, ...]
@@ -469,16 +495,24 @@ class NormalSigmaMeanDriver(ConditionallyGaussianDriver):
     ) -> CovarianceMatrix:
         mu_W = mu_W
         sigma_W2 = sigma_W2
-        if self.noise_case == NoiseCase.TRUNCATED or self.mu_W_transition_model is not None: #automatically truncate if mu_W time-varying. given 2nd case formula, cld implement easily
+        if self.noise_case == NoiseCase.TRUNCATED or self.mu_W_state is not None: #automatically truncate if mu_W time-varying within sub-interval
             m = e_ft.shape[0]
             r_cov = np.zeros((m, m))
         elif self.noise_case == NoiseCase.GAUSSIAN_APPROX:
-            r_cov = (
+            if self.mu_W_transition_model is None: # i.e. not varying over time, so mu will be 1x1 not 1xn:
+                mu_W_squared_plus_sigma= (mu_W**2 + sigma_W2)
+            else:
+                # If no transition model, and thus mu_W is an array (1xn), use vectorized computation, result is an nxmxm array
+                mu_W = np.atleast_2d(mu_W)  # Ensure mu_W is at least 2D, nxm where m>=1. 
+                mu_W = np.reshape(mu_W[:, 0], (-1, 1))  # Reshapes (n,) or (n, 1) to (n, 1)
+                mu_W_squared_plus_sigma = (mu_W**2 + sigma_W2).T[:, None] #1xn inner goes to nx1 then broadcasted to nx1x1
+            r_cov = ( 
                 e_ft
                 @ e_ft.T
                 * self._second_moment(truncation=truncation)
-                * (mu_W**2 + sigma_W2)
+                * mu_W_squared_plus_sigma
             )
+
         elif self.noise_case == NoiseCase.PARTIAL_GAUSSIAN_APPROX:
             r_cov = e_ft @ e_ft.T * self._second_moment(truncation=truncation) * sigma_W2
         else:
@@ -505,7 +539,7 @@ class NormalVarianceMeanDriver(ConditionallyGaussianDriver):
     ) -> CovarianceMatrix:
         mu_W = mu_W
         sigma_W2 = sigma_W2
-        if self.noise_case == NoiseCase.TRUNCATED:
+        if self.noise_case == NoiseCase.TRUNCATED or self.mu_W_state is not None: #automatically truncate if mu_W time-varying within interval
             m = e_ft.shape[0]
             r_cov = np.zeros((m, m))
         elif self.noise_case == NoiseCase.GAUSSIAN_APPROX:
