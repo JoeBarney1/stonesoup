@@ -43,6 +43,8 @@ dependencies:
   - tensorflow-intel
   - tensorflow-io-gcs-filesystem
   - pip
+  - tensorflow
+  - mamba
   - pip:
       - stonesoup
       - tqdm
