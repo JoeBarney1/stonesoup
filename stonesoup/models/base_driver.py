@@ -11,6 +11,7 @@ from stonesoup.types.array import (
     StateVector,
     StateVectors,
 )
+from stonesoup.types.state import State
 
 
 class NoiseCase(Enum):
@@ -217,16 +218,22 @@ class ConditionallyGaussianDriver(LevyDriver):
         Returns:
             StateVector: Mean vector of the Gaussian approximated residuals.
         """
-        if self.noise_case == NoiseCase.TRUNCATED or self.mu_W_transition_model is not None: 
+        if self.noise_case == NoiseCase.TRUNCATED or self.mu_W_state is not None: 
             #automatically truncate if time-varying within sub-interval
             m = e_ft.shape[0]
             r_mean = np.zeros((m, 1))
         elif (
-            #TODO: change it to self.mu_W_state to only auto-truncate if varying within sub-interval
             self.noise_case == NoiseCase.GAUSSIAN_APPROX
             or self.noise_case == NoiseCase.PARTIAL_GAUSSIAN_APPROX
         ):
-            r_mean = e_ft * mu_W  # (m, 1)
+            if self.mu_W_transition_model is None:
+                r_mean = e_ft * mu_W  # (m, 1)
+            else:
+                mu_W = self.mu_W  if mu_W is None else mu_W
+                mu_W = np.atleast_2d(mu_W)# Ensure it's at least 2D, is 1xn or mxn
+                mu_W = np.atleast_2d(mu_W[0,:])  # take only the first component of the mean (the 'position')
+                # Multiply each mx1 section of 'e_ft' by its corresponding mu_W value (1xn)
+                r_mean = np.einsum("mk, kn->mn",e_ft, mu_W)
         else:
             raise AttributeError("invalid noise case")
         return self._first_moment(truncation=truncation) * r_mean  # (m, 1)
@@ -243,59 +250,45 @@ class ConditionallyGaussianDriver(LevyDriver):
 
         Returns:
             Tuple[np.ndarray, np.ndarray]: 
-            - last_mu_W (M, N): Final mu_W for each sample path.
-            - mu_W_state (M, N, J): mu_W values at each jump for each sample path.
+            - last_mu_W (M, N): mu_W values at the end of the interval. Signals both 'last' in interval, 
+              and most recent one from which we start in next iteration
+            - mu_W_state (M, N, J): mu_W values at time of each jump, for each sample path.
         """
-        #TODO: Need to change logic so that mu is transposed AS IN MEAN FUNCT BELOW 
+        #TODO: could add implementation which allows mu_W to be input as a track, which would enable us to pre-calculate the mu_W trajectories,
+        # potentially speeding up the process. would need to ensure coherency with time intervals which would likely be messy. 
 
-        #ALSO TODO: need to change logic everywhere so that if mu_W supplied is MxN (or MxNxJ), we 'strip' it to 1xN or 1xNxJ. 
-        # Here is the funct to do that, which should be used everywhere mean is accessed outside of this driver (mean, covar, centering and residual functs)
-        # This ensures the mean can be modelled as a multivariate process, albeit with only the first component being used to drive our model
-
-            # if transition_model is none:
-            #   # do nothing as mu_W will be a 1x1 array and unchanged
-            # elif mu_shape is none: #i.e. if mu is time-varying but not over a sub interval:
-            #   mu_W = np.atleast_2d(mu_W)  # Ensure mu_W is at least 2D, nxm where m>=1. 
-            #   mu_W = np.reshape(mu_W[:, 0], (-1, 1))  # Reshapes (n,) or (n, 1) to (n, 1)
-            # else: #mu is time varying within sub-interval (NOT recommended)
-            #   mu_W = np.atleast_2d(mu_W)  # Ensure mu_W is at least 2D, nxm where m>=1. 
-            #   mu_W = np.reshape(mu_W[:, 0], (-1, 1))  # Reshapes (n,) or (n, 1) to (n, 1)
-            #   mu_W_state = np.atleast_3d(mu_W)  # Ensure mu_W is at least 2D, MxJxN where m>=1. 
-            #   mu_W_state = np.reshape(mu_W[0,:,:], (-1, 1))  # Reshapes (' ', 1 or M,J,' ', 1 or N) to (1, J, N)`
-
-        #if no transition model, assume its time invariant and output float mu, and an array of mu's which are redundant/a filler
+        #if no transition model, assume its time invariant and output mu unchanged, and Nonetype for the mu_state
         if self.mu_W_transition_model is None:
             return  mu_W, None
-
+        
+        if isinstance(self.mu_W, State):
+            self.mu_W=self.mu_W.state_vector # extract only the state vector if mu input as a state
+            
         J, num_samples = jtimes.shape   # J = num_jumps, N = num_samples
         sorted_jtimes = np.sort(jtimes, axis=0)  # (J, N)
 
         mu_W = np.atleast_2d(mu_W if mu_W is not None else self.mu_W) 
-        M,N = mu_W.shape
-        
-        #TODO: find a better way to reset the mean to the initial input!! 
-        # maybe just enforce having to supply a mu_W prior (i.e. submit it as an array when we're tracking)
-        # THIS IS WHAT to do^^ (as would simply reset it as we want, we wouldn't need to do this repeat, 
-        # and we could start with different mu_W values)
-        if num_samples!=N: #only other time we'd have a dimensional mismatch is in our first iteration
-                mu_W = np.tile(mu_W, (1, num_samples))  # Repeat Mx1 across N to become MxN
-                mu_W_state = np.repeat(mu_W[:, np.newaxis, :], J, axis=1)  # Expand to (M, J, N)
-                N=num_samples
-                print('reset')
 
-        prev_mu=np.atleast_2d(mu_W) #(MxN) prev_mu is the most recent mu, so goes on the end of the intermediate ones
+        M,N = mu_W.shape
+
+        if N != num_samples:
+            raise ValueError(f".shape[1] of mu and jtimes should be equal but shapes are {M,N} and {J, num_samples} respectively")
+
+        prev_mu=mu_W  #(MxN) prev_mu is the most recent mu, so goes on the end of the intermediate ones
         
         if self.mu_W_state is None: #explicitly set to None if you want to avoid varying within the interval
             matrix= self.mu_W_transition_model.matrix(timedelta(seconds=dt)) # MxM
             covar = self.mu_W_transition_model.covar(timedelta(seconds=dt)) #MxM
             noise = multivariate_normal.rvs(mean=np.zeros(M), cov=covar,size=N) # MxN
-            last_mu_W = np.einsum("lm,mn->ln",matrix, prev_mu) + noise # MxN states added at 
+            last_mu_W = np.einsum("lm,mn->ln",matrix, prev_mu) + noise.T # MxN states added at 
             self.mu_W=last_mu_W
             return last_mu_W, None
 
         else: #This is to update the mean at every single jump time. 
+            # Infeasibly expensive with many particles, but generates more accurate trajectories.
             # The differing times for each set of particles make it expensive and tough to vectorise
-            # an example could be to set the groundtruth model to use this, but the inference to only approximate via the above method
+
+            # Could e.g. set the groundtruth model to use this, but the inference to only approximate via the above method
             longer_mu_W_state = np.zeros((M,J+1,N)) # (Mx(J+1)xN)
             # Compute time intervals (J+1, N) using slicing
             intervals = np.zeros((J + 1, num_samples))
@@ -367,25 +360,30 @@ class ConditionallyGaussianDriver(LevyDriver):
 
         if self.mu_W_transition_model is None: #if mu_W is a float value
             m = series * mu_W
-        elif self.mu_W_state is None:
-            mu_W=mu_W.T # Start with mu_W having shape nxM, then take the first component
-            mu_W = np.atleast_2d(mu_W)  # Ensure mu_W is at least 2D, nxm where m>=1. 
-            mu_W = np.reshape(mu_W[:, 0], (-1, 1))  # Reshapes (n,) or (n, 1) to (n, 1)
+        elif self.mu_W_state is None: # time varying but only once per interval
+            mu_W = self.mu_W  if mu_W is None else mu_W
+            mu_W = np.atleast_2d(mu_W)# Ensure it's at least 2D, is 1xn or mxn
+            mu_W = np.atleast_2d(mu_W[0,:])  # take only the first component of the mean (the 'position')
 
             # Multiply each mx1 section of 'series' by its corresponding mu_W value (nx1)
-            # series will be NxM x 1 and mu_W will be Nx1, resulting in NxM x 1
-            m = series * mu_W[:,None] 
+            # series will be NxM x 1 and mu_W will be Nx1x1, resulting in NxM x 1
+            m = np.einsum('nmk, kn->nmk',series, mu_W) # nxmx1
+            
 
         elif self.mu_W_state is not None:
+            mu_W = self.mu_W  if mu_W is None else mu_W
+            mu_W = np.atleast_2d(mu_W)# Ensure it's at least 2D, is 1xn or mxn
+            mu_W = np.atleast_2d(mu_W[0,:])  # take only the first component of the mean (the 'position')
+
             # For the else block, ensure the current logic works as expected with mu_W_state
             mu_W_array = mu_W_state[0, :, :]  # MxJxN -> JxN (assuming it's the first component)
             m = np.sum(jsizes[..., None, None] * ft * mu_W_array[..., None, None], axis=0)  # (n_samples, m, 1)
 
         e_ft = e_ft_func(dt=dt)  # (m, 1)       
             
-        residual_mean = self._residual_mean(e_ft=e_ft, mu_W=mu_W, truncation=truncation)[None, ...]
-        centering = (
-            dt * self._centering(e_ft=e_ft, mu_W=mu_W, truncation=truncation)[None, ...]
+        residual_mean = self._residual_mean(e_ft=e_ft, mu_W=mu_W, truncation=truncation)[None, ...] 
+        centering = ( # centering is mx1 or mxn, so this is 1xmx1 or nxmx1
+            dt * self._centering(e_ft=e_ft, mu_W=mu_W, truncation=truncation).T[...,None]
         )
         mean = m - centering + residual_mean
         if num_samples == 1:
@@ -503,10 +501,11 @@ class NormalSigmaMeanDriver(ConditionallyGaussianDriver):
                 mu_W_squared_plus_sigma= (mu_W**2 + sigma_W2)
             else:
                 # If no transition model, and thus mu_W is an array (1xn), use vectorized computation, result is an nxmxm array
-                mu_W = np.atleast_2d(mu_W)  # Ensure mu_W is at least 2D, nxm where m>=1. 
-                mu_W = np.reshape(mu_W[:, 0], (-1, 1))  # Reshapes (n,) or (n, 1) to (n, 1)
-                mu_W_squared_plus_sigma = (mu_W**2 + sigma_W2).T[:, None] #1xn inner goes to nx1 then broadcasted to nx1x1
-            r_cov = ( 
+                mu_W = self.mu_W  if mu_W is None else mu_W
+                mu_W = np.atleast_2d(mu_W)# Ensure it's at least 2D, is 1xn or mxn
+                mu_W = np.atleast_2d(mu_W[0,:])  #only use first component to drive process, is now 1xn
+                mu_W_squared_plus_sigma = (mu_W**2 + sigma_W2).T[:, None] #broadcasted to nx1x1
+            r_cov = (
                 e_ft
                 @ e_ft.T
                 * self._second_moment(truncation=truncation)
@@ -543,11 +542,19 @@ class NormalVarianceMeanDriver(ConditionallyGaussianDriver):
             m = e_ft.shape[0]
             r_cov = np.zeros((m, m))
         elif self.noise_case == NoiseCase.GAUSSIAN_APPROX:
+            if self.mu_W_transition_model is None: # i.e. not varying over time, so mu will be 1x1 not 1xn:
+                mu_W2=mu_W**2
+            else:
+                mu_W = self.mu_W  if mu_W is None else mu_W
+                mu_W = np.atleast_2d(mu_W)# Ensure it's at least 2D, is 1xn or mxn
+                mu_W = np.atleast_2d(mu_W[0,:])  # take only the first component of the mean (the 'position')
+                mu_W2=(mu_W**2).T[:, None] #n inner broadcasted to nx1x1
+                sigma_W2=sigma_W2[:, None,None] #n inner broadcasted to 1x1x1
             r_cov = (
                 e_ft
                 @ e_ft.T
                 * (
-                    self._second_moment(truncation=truncation) * mu_W**2
+                    self._second_moment(truncation=truncation) * mu_W2
                     + self._first_moment(truncation=truncation) * sigma_W2
                 )
             )
