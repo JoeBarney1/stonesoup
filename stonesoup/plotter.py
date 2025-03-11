@@ -1295,11 +1295,7 @@ class Plotterly(_Plotter):
         return colorway[color_index]
 
     def plot_tracks(self, tracks, mapping, uncertainty=False, particle=False, label="Tracks",
-<<<<<<< HEAD
                     ellipse_points=30, err_freq=1, same_color=False, plot_particle_paths=False, **kwargs):
-=======
-                    ellipse_points=30, err_freq=1, same_color=False, **kwargs):
->>>>>>> origin/main
         """Plots track(s)
 
         Plots each track generated, generating a legend automatically. If ``uncertainty=True``
