@@ -17,37 +17,37 @@ dependencies:
   - scipy
   - tensorflow =2.18
   - mamba
-  
-  - astropy
-  - confluent_kafka
-  - driven
-  - ffmpeg-python
-  - folium
-  - h5py
-  - object_detection
-  - opencv-python
-  - optree
-  - optuna
-  - ordered-set
-  - ortools
-  - pillow
-  - pymap3d
-  - pytest
-  - python-dateutil
-  - pytube
-  - requests
-  - reverb
-  - rtree
-  - ruamel.yaml
-  - tf_agents
-  - utm
-  - scikit-learn
-  - tensorflow-intel
-  - tensorflow-io-gcs-filesystem
-  - pip
-  - pip:
-      # - stonesoup
-      - tqdm
-      - rich
-      - requests
-      - kaleido
+
+  # - astropy
+  # - confluent_kafka
+  # - driven
+  # - ffmpeg-python
+  # - folium
+  # - h5py
+  # - object_detection
+  # - opencv-python
+  # - optree
+  # - optuna
+  # - ordered-set
+  # - ortools
+  # - pillow
+  # - pymap3d
+  # - pytest
+  # - python-dateutil
+  # - pytube
+  # - requests
+  # - reverb
+  # - rtree
+  # - ruamel.yaml
+  # - tf_agents
+  # - utm
+  # - scikit-learn
+  # - tensorflow-intel
+  # - tensorflow-io-gcs-filesystem
+  # - pip
+  # - pip:
+  #     # - stonesoup
+  #     - tqdm
+  #     - rich
+  #     - requests
+  #     - kaleido
