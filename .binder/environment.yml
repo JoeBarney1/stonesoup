@@ -39,11 +39,10 @@ dependencies:
   # - tf_agents
   # - utm
   # - scikit-learn
-  # - tensorflow 
   # - tensorflow-intel
   # - tensorflow-io-gcs-filesystem
   # - pip
-  - tensorflow
+  - tensorflow =2.18
   - mamba
   # - pip:
   #     # - stonesoup
