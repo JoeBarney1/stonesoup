@@ -1294,7 +1294,7 @@ class Plotterly(_Plotter):
         color_index = figure_index % max_index
         return colorway[color_index]
 
-    def plot_tracks(self, tracks, mapping, uncertainty=False, particle=False, track_label="Tracks",
+    def plot_tracks(self, tracks, mapping, uncertainty=False, particle=False, label="Tracks",
                     ellipse_points=30, err_freq=1, same_color=False, plot_particle_paths=False, **kwargs):
         """Plots track(s)
 
@@ -1562,53 +1562,56 @@ class Plotterly(_Plotter):
                     )
 
         if plot_particle_paths and self.dimension == 2:
-            name = track_kwargs['legendgroup'] + "<br>Particle Paths"
+            name = track_kwargs['legendgroup'] + "<br>(Particle Paths)"
             add_legend = name not in {trace.legendgroup for trace in self.fig.data}
             for track in tracks:
                 num_particles=track[0].state_vector.shape[1]
                 data=np.zeros((len(track),2,num_particles))
                 for t, state in enumerate(track):
-                    particle_kwargs = dict(
-                    mode='lines', line=dict(width=0.4,color=track_colors[track]),
-                    opacity=0.8, hoverinfo='skip',
+                    paths_kwargs = dict(
+                    mode='lines', 
+                    line=dict(width=0.2,color=track_colors[track]),
+                    opacity=0.2, 
+                    hoverinfo='skip',
                     legendgroup=name, name=name,
                     legendrank=track_kwargs['legendrank'] + 20)
                     data[t,0,:] = state.state_vector[mapping[0], :] 
                     data[t,1,:] = state.state_vector[mapping[1], :]                
                 for i in range(num_particles):
                     if add_legend:
-                        particle_kwargs['showlegend'] = True
+                        paths_kwargs['showlegend'] = True
                         add_legend = False
                     else:
-                        particle_kwargs['showlegend'] = False
-                    self.fig.add_scatter(x=data[:,0,i], y=data[:,1,i], **particle_kwargs)
+                        paths_kwargs['showlegend'] = False
+                    self.fig.add_scatter(x=data[:,0,i], y=data[:,1,i], **paths_kwargs)
 
         elif plot_particle_paths and self.dimension == 1:
-            name = track_kwargs['legendgroup'] + "<br>Particle Paths"
+            name = track_kwargs['legendgroup'] + "<br>(Particle Paths)"
             add_legend = name not in {trace.legendgroup for trace in self.fig.data}
             for track in tracks:
                 num_particles=track[0].state_vector.shape[1]
                 data=np.zeros((len(track),num_particles))
                 timestamps=[]
                 for t, state in enumerate(track):
-                    particle_kwargs = dict(
-                    mode='lines', line=dict(width=0.4,color=track_colors[track]),
-                    opacity=0.8, hoverinfo='skip',
+                    paths_kwargs = dict(
+                    mode='lines', 
+                    line=dict(width=0.3,color=track_colors[track]),
+                    opacity=0.4, 
+                    hoverinfo='skip',
                     legendgroup=name, name=name,
                     legendrank=track_kwargs['legendrank'] + 20)
-
                     data[t,:] = state.state_vector[mapping[:1], :] 
                     timestamps.append(state.timestamp)
                 
                 for i in range(num_particles):
                     if add_legend:
-                        particle_kwargs['showlegend'] = True
+                        paths_kwargs['showlegend'] = True
                         add_legend = False
                     else:
-                        particle_kwargs['showlegend'] = False
+                        paths_kwargs['showlegend'] = False
                     self.fig.add_scatter(
                         x=timestamps,
-                        y=data[:,i], **particle_kwargs
+                        y=data[:,i], **paths_kwargs
                     )
 
     @staticmethod
