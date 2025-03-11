@@ -1,8 +1,9 @@
 import copy
 import datetime
 from collections.abc import Sequence
+import numpy as np
 
-from .array import CovarianceMatrix
+from .array import CovarianceMatrix, CovarianceMatrices
 from .base import Type
 from .state import (State, GaussianState, EnsembleState,
                     ParticleState, MultiModelParticleState, RaoBlackwellisedParticleState,
