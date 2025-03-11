@@ -11,12 +11,12 @@ dependencies:
   # - folium
   # - h5py
   - ipywidgets
-  # - jupyter
+  - jupyter
   - matplotlib
-  # - mergedeep
-  # - more-itertools
-  # - moviepy
-  # - notebook
+  - mergedeep
+  - more-itertools
+  - moviepy
+  - notebook
   - numpy =1.24
   # - object_detection
   # - opencv-python
