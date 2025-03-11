@@ -10,11 +10,13 @@ dependencies:
   - ffmpeg-python
   - folium
   - h5py
-  - kaleido
+  - ipywidgets
+  - jupyter
   - matplotlib
   - mergedeep
   - more-itertools
   - moviepy
+  - notebook
   - numpy =1.24
   - object_detection
   - opencv-python
@@ -36,12 +38,14 @@ dependencies:
   - scipy
   - tf_agents
   - utm
+  - scikit-learn
+  - tensorflow =2.18
+  - tensorflow-intel
+  - tensorflow-io-gcs-filesystem
   - pip
   - pip:
       - stonesoup
       - tqdm
       - rich
+      - requests
       - kaleido
-      - tensorflow =2.18
-      - tensorflow-intel
-      - tensorflow-io-gcs-filesystem
