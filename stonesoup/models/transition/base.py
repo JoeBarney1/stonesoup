@@ -1,6 +1,4 @@
 import copy
-<<<<<<< HEAD
-import copy
 from abc import abstractmethod
 from collections.abc import Sequence
 from datetime import timedelta
@@ -18,20 +16,18 @@ from stonesoup.types.array import (
     StateVector,
     StateVectors,
 )
-=======
 from abc import abstractmethod
 from collections.abc import Sequence
 
 import numpy as np
 from scipy.linalg import block_diag
 
-from .base_driver import Latents, GaussianDriver, ConditionalGaussianDriver
+from stonesoup.models.base_driver import Latents, GaussianDriver, ConditionalGaussianDriver
 from ..base import Model, GaussianModel, LinearModel, TimeVariantModel
 from ...base import Property
 from ...types.array import StateVector, StateVectors, CovarianceMatrix, CovarianceMatrices
 from ...types.state import State
 from ...types.numeric import Probability
->>>>>>> origin/main
 
 
 class TransitionModel(Model):
