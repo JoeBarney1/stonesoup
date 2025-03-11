@@ -4,12 +4,6 @@ channels:
   - defaults
 dependencies:
   - python=3.10
-  # - astropy
-  # - confluent_kafka
-  # - driven
-  # - ffmpeg-python
-  # - folium
-  # - h5py
   - ipywidgets
   - jupyter
   - matplotlib
@@ -18,31 +12,37 @@ dependencies:
   - moviepy
   - notebook
   - numpy =1.24
+  - pandas
+  - plotly
+  - scipy
+  - tensorflow =2.18
+  - mamba
+  # - astropy
+  # - confluent_kafka
+  # - driven
+  # - ffmpeg-python
+  # - folium
+  # - h5py
   # - object_detection
   # - opencv-python
   # - optree
   # - optuna
   # - ordered-set
   # - ortools
-  - pandas
   # - pillow
-  - plotly
-  - pymap3d
-  - pytest
-  - python-dateutil
-  - pytube
-  - requests
-  - reverb
-  - rtree
-  - ruamel.yaml
-  - scipy
+  # - pymap3d
+  # - pytest
+  # - python-dateutil
+  # - pytube
+  # - requests
+  # - reverb
+  # - rtree
+  # - ruamel.yaml
   # - tf_agents
   # - utm
   # - scikit-learn
   # - tensorflow-intel
   # - tensorflow-io-gcs-filesystem
-  - tensorflow =2.18
-  - mamba
   # - pip:
   #     # - stonesoup
   #     - tqdm
