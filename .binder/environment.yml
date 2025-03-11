@@ -16,7 +16,6 @@ dependencies:
   - plotly
   - scipy
   - tensorflow =2.18
-  - mamba
 
   # - astropy
   # - confluent_kafka
