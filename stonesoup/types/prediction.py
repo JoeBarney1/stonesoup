@@ -1,7 +1,11 @@
 import copy
 import datetime
 from collections.abc import Sequence
+<<<<<<< HEAD
 import numpy as np
+=======
+
+>>>>>>> origin/main
 from .array import CovarianceMatrix, CovarianceMatrices
 from .base import Type
 from .state import (State, GaussianState, EnsembleState,
