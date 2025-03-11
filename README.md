@@ -13,6 +13,8 @@ Stone Soup is a software project to provide the target tracking and state estima
 community with a framework for the development and testing of tracking and state
 estimation algorithms.
 
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JoeBarney1/stonesoup/JB-Lms)
+
 An article is [available](https://www.gov.uk/government/news/dstl-shares-new-open-source-framework-initiative) that details the background to the project, and contains links to sample data.
 
 Please see the
