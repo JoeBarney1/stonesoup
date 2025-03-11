@@ -1,0 +1,22 @@
+name: stonesoup_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - jupyter
+  - notebook
+  - ipywidgets
+  - matplotlib
+  - scipy
+  - numpy=1.24  # Ensures TensorFlow compatibility
+  - pandas
+  - plotly
+  - tensorflow=2.18
+  - scikit-learn
+  - pip
+  - pip:
+      - stonesoup
+      - tqdm
+      - rich
+      - requests
+      - kaleido
