@@ -16,19 +16,6 @@ from stonesoup.types.array import (
     StateVector,
     StateVectors,
 )
-from abc import abstractmethod
-from collections.abc import Sequence
-
-import numpy as np
-from scipy.linalg import block_diag
-
-from stonesoup.models.base_driver import Latents, GaussianDriver, ConditionalGaussianDriver
-from ..base import Model, GaussianModel, LinearModel, TimeVariantModel
-from ...base import Property
-from ...types.array import StateVector, StateVectors, CovarianceMatrix, CovarianceMatrices
-from ...types.state import State
-from ...types.numeric import Probability
-
 
 class TransitionModel(Model):
     """Transition Model base class"""
