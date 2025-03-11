@@ -41,7 +41,6 @@ dependencies:
   - scikit-learn
   - tensorflow-intel
   - tensorflow-io-gcs-filesystem
-  - pip
   - tensorflow =2.18
   - mamba
   # - pip:
