@@ -27,20 +27,20 @@ dependencies:
   - pandas
   # - pillow
   - plotly
-  # - pymap3d
-  # - pytest
-  # - python-dateutil
-  # - pytube
-  # - requests
-  # - reverb
-  # - rtree
-  # - ruamel.yaml
+  - pymap3d
+  - pytest
+  - python-dateutil
+  - pytube
+  - requests
+  - reverb
+  - rtree
+  - ruamel.yaml
   - scipy
-  - tf_agents
-  - utm
-  - scikit-learn
-  - tensorflow-intel
-  - tensorflow-io-gcs-filesystem
+  # - tf_agents
+  # - utm
+  # - scikit-learn
+  # - tensorflow-intel
+  # - tensorflow-io-gcs-filesystem
   - tensorflow =2.18
   - mamba
   # - pip:
