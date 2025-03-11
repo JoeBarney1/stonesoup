@@ -475,7 +475,7 @@ class LevyModel(Model):
             jtimes = latents.times(self.driver)
         else:
             jsizes, jtimes = None, None
-        return self.driver._mu_W(         #returns mu_W_state, mu_prev where mu_prev is mu_value for most recent timestep
+        return self.driver._mu_W(        
             jtimes=jtimes,
             dt=dt,
             num_samples=latents.num_samples,
