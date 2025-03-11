@@ -4,50 +4,50 @@ channels:
   - defaults
 dependencies:
   - python=3.10
-  - astropy
-  - confluent_kafka
-  - driven
-  - ffmpeg-python
-  - folium
-  - h5py
+  # - astropy
+  # - confluent_kafka
+  # - driven
+  # - ffmpeg-python
+  # - folium
+  # - h5py
   - ipywidgets
-  - jupyter
+  # - jupyter
   - matplotlib
-  - mergedeep
-  - more-itertools
-  - moviepy
-  - notebook
+  # - mergedeep
+  # - more-itertools
+  # - moviepy
+  # - notebook
   - numpy =1.24
-  - object_detection
-  - opencv-python
-  - optree
-  - optuna
-  - ordered-set
-  - ortools
+  # - object_detection
+  # - opencv-python
+  # - optree
+  # - optuna
+  # - ordered-set
+  # - ortools
   - pandas
-  - pillow
+  # - pillow
   - plotly
-  - pymap3d
-  - pytest
-  - python-dateutil
-  - pytube
-  - requests
-  - reverb
-  - rtree
-  - ruamel.yaml
+  # - pymap3d
+  # - pytest
+  # - python-dateutil
+  # - pytube
+  # - requests
+  # - reverb
+  # - rtree
+  # - ruamel.yaml
   - scipy
-  - tf_agents
-  - utm
-  - scikit-learn
-  - tensorflow =2.18
-  - tensorflow-intel
-  - tensorflow-io-gcs-filesystem
-  - pip
+  # - tf_agents
+  # - utm
+  # - scikit-learn
+  # - tensorflow 
+  # - tensorflow-intel
+  # - tensorflow-io-gcs-filesystem
+  # - pip
   - tensorflow
   - mamba
-  - pip:
-      - stonesoup
-      - tqdm
-      - rich
-      - requests
-      - kaleido
+  # - pip:
+  #     # - stonesoup
+  #     - tqdm
+  #     - rich
+  #     - requests
+  #     - kaleido
