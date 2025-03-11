@@ -4,12 +4,12 @@ channels:
   - defaults
 dependencies:
   - python=3.10
-  - astropy
-  - confluent_kafka
-  - driven
-  - ffmpeg-python
-  - folium
-  - h5py
+  # - astropy
+  # - confluent_kafka
+  # - driven
+  # - ffmpeg-python
+  # - folium
+  # - h5py
   - ipywidgets
   # - jupyter
   - matplotlib
