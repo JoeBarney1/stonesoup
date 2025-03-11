@@ -1,46 +1,47 @@
 name: stonesoup_env
 channels:
   - conda-forge
+  - defaults
 dependencies:
-  - python=3.10
-  - astropy=6.1.7
-  - confluent_kafka=2.8.2
-  - driven=0.0.3
-  - ffmpeg-python=0.2.0
-  - folium=0.18.0
-  - h5py=3.13.0
-  - kaleido=0.2.1
-  - matplotlib=3.10.1
-  - mergedeep=1.3.4
-  - more-itertools=10.6.0
-  - moviepy=1.0.3
-  - numpy=2.2.3
-  - object_detection=0.0.3
-  - opencv-python=4.10.0.84
-  - optree=0.14.0
-  - optuna=4.2.1
-  - ordered-set=4.1.0
-  - ortools=9.12.4544
-  - pandas=2.2.3
-  - pillow=11.1.0
-  - plotly=5.24.1
-  - pymap3d=3.1.0
-  - pytest=8.3.3
-  - python-dateutil=2.9.0.post0
-  - pytube=15.0.0
-  - requests=2.32.3
-  - reverb=2.0.1
-  - rtree=1.3.0
-  - ruamel.yaml=0.18.6
-  - scipy=1.15.2
-  - tf_agents=0.19.0
-  - utm=0.7.0
+  - python
+  - astropy
+  - confluent_kafka
+  - driven
+  - ffmpeg-python
+  - folium
+  - h5py
+  - kaleido
+  - matplotlib
+  - mergedeep
+  - more-itertools
+  - moviepy
+  - numpy
+  - object_detection
+  - opencv-python
+  - optree
+  - optuna
+  - ordered-set
+  - ortools
+  - pandas
+  - pillow
+  - plotly
+  - pymap3d
+  - pytest
+  - python-dateutil
+  - pytube
+  - requests
+  - reverb
+  - rtree
+  - ruamel.yaml
+  - scipy
+  - tf_agents
+  - utm
   - pip
   - pip:
       - stonesoup
       - tqdm
       - rich
       - kaleido
-      - tensorflow==2.18.0
-      - tensorflow-intel==2.18.0
-      - tensorflow-io-gcs-filesystem==0.31.0
+      - tensorflow
+      - tensorflow-intel
+      - tensorflow-io-gcs-filesystem
