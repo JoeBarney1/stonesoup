@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python
+  - python=3.10
   - astropy
   - confluent_kafka
   - driven
@@ -15,7 +15,7 @@ dependencies:
   - mergedeep
   - more-itertools
   - moviepy
-  - numpy
+  - numpy =1.24
   - object_detection
   - opencv-python
   - optree
@@ -42,6 +42,6 @@ dependencies:
       - tqdm
       - rich
       - kaleido
-      - tensorflow
+      - tensorflow =2.18
       - tensorflow-intel
       - tensorflow-io-gcs-filesystem
