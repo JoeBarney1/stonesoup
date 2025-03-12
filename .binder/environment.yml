@@ -42,7 +42,7 @@ dependencies:
   # - ruamel.yaml
   # - tf_agents
   # - utm
-  - scikit-learn
+  # - scikit-learn 
   - tensorflow-intel =2.18.0
   - tensorflow-io-gcs-filesystem= 0.31.0
   # - pip
