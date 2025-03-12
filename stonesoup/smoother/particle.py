@@ -49,16 +49,8 @@ class ParticleSmoother(Smoother):
            the IEEE,* 95(5):899-924. (See smoothing discussion and figures)
     """
 
-    def smooth():
-        """
-        This method raises NotImplementedError to indicate that any custom
-        smooth invocation should be implemented in a subclass, and that 
-        particle paths is generally the first step before more rigorous smoothing.
-
-        Given we technically smooth, could change 'particle_paths'
-        name to 'smooth' if this is deemed clearer.
-        """
-        raise NotImplementedError
+    def smooth(self,track):
+        return self.particle_paths(track)
 
     def particle_paths(self, track):
         r"""
