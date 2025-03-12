@@ -4,19 +4,26 @@ channels:
   - defaults
 dependencies:
   - python=3.10.16
-  - ipywidgets = 8.1.5
+  - numpy=2.02
+  - scipy=1.15.2
+  - matplotlib=3.10.1
+  - tensorflow=2.18
+  - pandas=2.2.3
+  - plotly=5.24.1
+  - h5py
+  - ffmpeg-python
+  - ipywidgets
+  - pip
+  - pip:
+      - stonesoup
+      - tqdm
+      - rich
+      - kaleido  # For Plotly saving
   - jupyter
-  - matplotlib
   - mergedeep
   - more-itertools
   - moviepy 
   - notebook 
-  - numpy =2.0.2
-  - pandas = 2.2.3
-  - plotly = 5.24.1
-  - scipy = 1.15.2
-  - tensorflow =2.18.0
-  - kaleido=0.2.1
   - mamba 
 
   # - astropy
