@@ -14,10 +14,6 @@ dependencies:
   - ffmpeg-python
   - ipywidgets
   - pip
-  - pip:
-      - tqdm
-      - rich
-      - kaleido  # For Plotly saving
   - jupyter
   - mergedeep
   - more-itertools
@@ -25,12 +21,18 @@ dependencies:
   - notebook 
   - mamba 
 
+  - pip:
+      - tqdm
+      - rich
+      - kaleido  # For Plotly saving
+      # - requests
+
+
   # - astropy
   # - confluent_kafka
   # - driven
   # - ffmpeg-python
   # - folium
-  # - h5py
   # - object_detection
   # - opencv-python
   # - optree
@@ -42,7 +44,6 @@ dependencies:
   # - pytest
   # - python-dateutil
   # - pytube
-  # - requests
   # - reverb
   # - rtree
   # - ruamel.yaml
@@ -51,10 +52,3 @@ dependencies:
   # - scikit-learn 
   # - tensorflow-intel =2.18.0
   # - tensorflow-io-gcs-filesystem= 0.31.0
-  # - pip
-  # - pip:
-  #     # - stonesoup
-  #     - tqdm
-  #     - rich
-  #     - requests
-  #     - kaleido
