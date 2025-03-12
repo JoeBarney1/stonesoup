@@ -4,19 +4,20 @@ channels:
   - defaults
 dependencies:
   - python=3.10.16
-  - ipywidgets
+  - ipywidgets = 8.1.5
   - jupyter
   - matplotlib
   - mergedeep
   - more-itertools
-  - moviepy
-  - notebook
+  - moviepy 
+  - notebook 
   - numpy =2.0.2
-  - pandas
-  - plotly
-  - scipy
+  - pandas = 2.2.3
+  - plotly = 5.24.1
+  - scipy = 1.15.2
   - tensorflow =2.18.0
-  - mamba
+  - kaleido=0.2.1
+  - mamba 
 
   # - astropy
   # - confluent_kafka
