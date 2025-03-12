@@ -1,32 +1,36 @@
-"""Tests the various Kalman-based smoothers. This test replicates that the exists/existed in
+"""Tests the various Particle-based smoothers. This test replicates that the exists/existed in
 test_lineargaussian"""
 
 import pytest
 import numpy as np
 from datetime import datetime, timedelta
-
+from stonesoup.models.driver import AlphaStableNSMDriver
+from stonesoup.models.tests.conftest import sigma_W2
+from stonesoup.models.transition.levy_linear import LevyConstantVelocity, LevyLangevin
+from stonesoup.predictor.particle import MarginalisedParticlePredictor
+from stonesoup.smoother.particle import CarterKohnSmoother, MarginalisedKalmanSmoother, ParticleSmoother
+from stonesoup.types.array import CovarianceMatrices, StateVectors
 from stonesoup.types.detection import Detection
 from stonesoup.types.multihypothesis import MultipleHypothesis
-from stonesoup.types.state import GaussianState
-from stonesoup.types.prediction import GaussianStatePrediction
+from stonesoup.types.state import GaussianState, MarginalisedParticleState
+from stonesoup.types.prediction import GaussianStatePrediction, MarginalisedParticleStatePrediction
 from stonesoup.types.track import Track
 from stonesoup.types.hypothesis import SingleHypothesis
 from stonesoup.models.transition.linear import ConstantVelocity
 from stonesoup.models.measurement.linear import LinearGaussian
 from stonesoup.predictor.kalman import KalmanPredictor
-from stonesoup.types.update import GaussianStateUpdate
+from stonesoup.types.update import GaussianStateUpdate, MarginalisedParticleStateUpdate
 from stonesoup.updater.kalman import KalmanUpdater
-from stonesoup.smoother.kalman import KalmanSmoother, ExtendedKalmanSmoother, \
-    UnscentedKalmanSmoother
+from stonesoup.updater.particle import MarginalisedParticleUpdater
 
 
 @pytest.fixture(
     params=[
-        KalmanSmoother,  # Standard Kalman
-        ExtendedKalmanSmoother,  # Extended Kalman
-        UnscentedKalmanSmoother,  # Unscented Kalman
+        ParticleSmoother,  # Simple descendant-based
+        MarginalisedKalmanSmoother,  # RTS Smoother
+        CarterKohnSmoother,  # Carter-Kohn Smoother
     ],
-    ids=["standard", "extended", "unscented"]
+    ids=["particle", "kalman", "carter"]
 )
 def smoother_class(request):
     return request.param
@@ -53,15 +57,19 @@ def test_kalman_smoother(smoother_class, multi_hypothesis):
     detections = [Detection(m, timestamp=timest) for m, timest in zip(measurements, times)]
 
     # Setup models.
-    trans_model = ConstantVelocity(noise_diff_coeff=1)
+    driver=AlphaStableNSMDriver(mu_W=0,sigma_W2=2,alpha=1.9)
+    trans_model = LevyConstantVelocity(noise_diff_coeff=1,driver=driver)
     meas_model = LinearGaussian(ndim_state=2, mapping=[0], noise_covar=np.array([[0.4]]))
 
     # Tracking components
-    predictor = KalmanPredictor(transition_model=trans_model)
-    updater = KalmanUpdater(measurement_model=meas_model)
+    predictor = MarginalisedParticlePredictor(transition_model=trans_model)
+    updater = MarginalisedParticleUpdater(measurement_model=meas_model)
 
     # Prior
-    cstate = GaussianState(np.ones([2, 1]), np.eye(2), timestamp=start)
+    num_particles=100
+    cstate = MarginalisedParticleState(state_vector=StateVectors(np.ones([2, 1])*num_particles), 
+                                       covariance=CovarianceMatrices([np.eye(2) for _ in range(num_particles)]),
+                                        timestamp=start)
     track = Track()
 
     for detection in detections:
@@ -94,14 +102,16 @@ def test_kalman_smoother(smoother_class, multi_hypothesis):
 
     # Check that a prediction is smoothable and that no error chucked
     # Also remove the transition model and use the one provided by the smoother
-    track[1] = GaussianStatePrediction(pred.state_vector, pred.covar, timestamp=pred.timestamp)
+    track[1] = MarginalisedParticleStatePrediction(pred.state_vector, pred.covar, timestamp=pred.timestamp)
     smoothed_track2 = smoother.smooth(track)
-    assert isinstance(smoothed_track2[1], GaussianStatePrediction)
+    assert isinstance(smoothed_track2[1], MarginalisedParticleStatePrediction)
 
-    # Check appropriate error chucked if not GaussianStatePrediction/Update
-    track[-1] = detections[-1]
-    with pytest.raises(TypeError):
-        smoother._prediction(track[-1])
+    # Check appropriate error chucked if not MarginalisedStatePrediction/Update
+    # skip for ParticleSmoother which doesn't have a _prediction funct
+    if smoother_class == "kalman" or "carter":
+        track[-1] = detections[-1]
+        with pytest.raises(TypeError):
+            smoother._prediction(track[-1])
 
 
 def test_multi_prediction_exception(smoother_class):
@@ -109,18 +119,18 @@ def test_multi_prediction_exception(smoother_class):
     start = datetime.now()
     track = Track()
     track.states = [
-        GaussianStateUpdate(
+        MarginalisedParticleStateUpdate(
             state_vector=[1],
             covar=[[1]],
             timestamp=start,
             hypothesis=MultipleHypothesis([
                 SingleHypothesis(
-                    GaussianStatePrediction([1], [[1]], timestamp=start), None),
+                    MarginalisedParticleStatePrediction([1], [[1]], timestamp=start), None),
                 SingleHypothesis(
-                    GaussianStatePrediction([2], [[1]], timestamp=start), None),
+                    MarginalisedParticleStatePrediction([2], [[1]], timestamp=start), None),
                 ])
         ),
-        GaussianStateUpdate(
+        MarginalisedParticleStateUpdate(
             state_vector=[1],
             covar=[[1]],
             timestamp=start+timedelta(1),
@@ -132,7 +142,7 @@ def test_multi_prediction_exception(smoother_class):
             ])
         )
     ]
-    smoother = smoother_class(transition_model=ConstantVelocity(1))
+    smoother = smoother_class(transition_model=LevyConstantVelocity(1))
     with pytest.raises(
             ValueError, match="Track has MultipleHypothesis updates with multiple predictions"):
         smoother._prediction(track[0])
