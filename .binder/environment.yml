@@ -15,7 +15,6 @@ dependencies:
   - ipywidgets
   - pip
   - pip:
-      - stonesoup
       - tqdm
       - rich
       - kaleido  # For Plotly saving
