@@ -136,9 +136,9 @@ def test_multi_prediction_exception(smoother_class):
             timestamp=start+timedelta(1),
             hypothesis=MultipleHypothesis([
                 SingleHypothesis(
-                    GaussianStatePrediction([1], [[1]], timestamp=start+timedelta(1)), None),
+                    MarginalisedParticleStatePrediction([1], [[1]], timestamp=start+timedelta(1)), None),
                 SingleHypothesis(
-                    GaussianStatePrediction([2], [[1]], timestamp=start+timedelta(1)), None),
+                    MarginalisedParticleStatePrediction([2], [[1]], timestamp=start+timedelta(1)), None),
             ])
         )
     ]
