@@ -154,8 +154,8 @@ plotter_az_t_cart.fig
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 mapping = [0]
 plotter_az_t = PolarPlotterly(title="Polar - Azimuth Angle (Degrees) vs Time (s)")
-plotter_az_t.plot_ground_truths({angular_ground_truth_1}, mapping=mapping, truths_label="Target 1")
-plotter_az_t.plot_ground_truths({angular_ground_truth_2}, mapping=mapping, truths_label="Target 2")
+plotter_az_t.plot_ground_truths({angular_ground_truth_1}, mapping=mapping, label="Target 1")
+plotter_az_t.plot_ground_truths({angular_ground_truth_2}, mapping=mapping, label="Target 2")
 plotter_az_t.plot_measurements(detections, mapping=mapping, convert_measurements=False)
 plotter_az_t.fig
 

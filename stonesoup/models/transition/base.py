@@ -177,6 +177,18 @@ class CombinedLevyTransitionModel(TransitionModel, LevyModel):
         return mu_W_state
         
     @property
+    def mu_W_transition_model(self): 
+        mu_W_transition_model = [m.mu_W_transition_model if m.mu_W_transition_model is not None
+                                  else m.driver.mu_W_transition_model for m in self.model_list]
+        return mu_W_transition_model
+    
+    @property
+    def mu_W_state(self):
+        mu_W_state = [m.mu_W_state if m.mu_W_state is not None
+                                  else m.driver.mu_W_state for m in self.model_list]
+        return mu_W_state
+        
+    @property
     def sigma_W2(self):
         sigma2 = [m.sigma_W2 if m.sigma_W2 is not None else m.driver.sigma_W2 for m in self.model_list]
         return np.diag(sigma2)
@@ -207,8 +219,6 @@ class CombinedLevyTransitionModel(TransitionModel, LevyModel):
             return np.vstack(mean_list).view(StateVector)
         else:
             return np.concatenate(mean_list, axis=1).view(StateVectors)
-        
-    
     def covar(self, **kwargs) -> Union[CovarianceMatrix, CovarianceMatrices]:
         """Returns the transition model noise covariance matrix.
 
