@@ -1,5 +1,6 @@
 #for generic PS
 import copy
+from stonesoup.types import state
 from stonesoup.types.multihypothesis import MultipleHypothesis
 from stonesoup.types.prediction import MarginalisedParticleStatePrediction
 from stonesoup.types.track import Track
@@ -51,6 +52,36 @@ class ParticleSmoother(Smoother):
 
     def smooth(self,track):
         return self.particle_paths(track)
+    
+    def _prediction(self, state):
+        """
+        A. Comments
+        -----------
+        Retrieves the prediction from the state if it is a prediction type or
+        from the hypothesis if the state is an update. This is used to find the
+        forward predictive distribution required in the backward recursion.
+
+        B. MATHS
+        --------
+        The forward prediction is p(x_k | x_{k-1}, ...) in a linear-Gaussian form,
+        typically :math:`\mathcal{N}(F_{k} x_{k-1}, Q_k)` if static, or from
+        conditional processes if dynamic.
+
+        """
+        if isinstance(state, MarginalisedParticleStatePrediction):
+            return state
+        elif isinstance(state, MarginalisedParticleStateUpdate):
+            if isinstance(state.hypothesis, MultipleHypothesis):
+                predictions = {hypothesis.prediction for hypothesis in state.hypothesis}
+                if len(predictions) == 1:
+                    return predictions.pop()
+                else:
+                    raise ValueError(
+                        "Track has MultipleHypothesis updates with multiple predictions.")
+            else:
+                return state.hypothesis.prediction
+        else:
+            raise TypeError("States must be MarginalisedParticlePredictions or MarginalisedParticleUpdates.")
 
     def particle_paths(self, track):
         r"""
@@ -88,7 +119,7 @@ class ParticleSmoother(Smoother):
             idx_t = particle_indices[:, t].astype(int)  # shape (num_particles,)
             state_t = track[t]
             timestamp = state_t.timestamp
-            prediction = state_t.hypothesis.prediction
+            prediction = self._prediction(state_t)
 
             reordered_prediction = MarginalisedParticleStatePrediction(
                 state_vector=prediction.state_vector[..., prev_idx_t], 
@@ -99,20 +130,21 @@ class ParticleSmoother(Smoother):
                 process_covar=prediction.process_covar[..., prev_idx_t],
                 log_weight=np.array([np.log(1 / num_particles)] * num_particles)
             )
+            if type(state_t)==MarginalisedParticleStatePrediction:
+                combined_track.append(reordered_prediction)
+            else:
+                hypothesis = state_t.hypothesis
+                hypothesis.prediction=reordered_prediction
 
-            hypothesis = SingleHypothesis(
-                measurement=state_t.hypothesis.measurement,
-                prediction=reordered_prediction)
+                combined_state = MarginalisedParticleStateUpdate(
+                    state_vector=state_t.state_vector[..., idx_t], # shape (M, num_particles)
+                    covariance=state_t.covariance[..., idx_t],     # shape (M, M, num_particles)
+                    log_weight=np.array([np.log(1 / num_particles)] * num_particles),
+                    hypothesis=hypothesis,
+                    timestamp=timestamp
+                )
 
-            combined_state = MarginalisedParticleStateUpdate(
-                state_vector=state_t.state_vector[..., idx_t], # shape (M, num_particles)
-                covariance=state_t.covariance[..., idx_t],     # shape (M, M, num_particles)
-                log_weight=np.array([np.log(1 / num_particles)] * num_particles),
-                hypothesis=hypothesis,
-                timestamp=timestamp
-            )
-
-            combined_track.append(combined_state)
+                combined_track.append(combined_state)
             prev_idx_t=idx_t
 
         return combined_track
@@ -151,12 +183,21 @@ class ParticleSmoother(Smoother):
 
         # Fill indices backward in time
         for t in range(final_timestep - 1, earliest_t - 1, -1):
-            particle_indices[:, t] = track[t + 1].resample_index[particle_indices[:, t + 1]]
-                
+            try:
+                particle_indices[:, t] = track[t + 1].resample_index[particle_indices[:, t + 1]]
+            except AttributeError:
+                # Fallback when resample_index doesn't exist (i.e. it's a prediction)
+                particle_indices[:, t] = particle_indices[:, t + 1]
+                        
         if earliest_t > 0:
             prior_indices = None
         else:
-            prior_indices = track[0].resample_index[particle_indices[:, 0]]
+            try:
+                prior_indices = track[0].resample_index[particle_indices[:, 0]]
+            except AttributeError:
+                # Fallback when resample_index doesn't exist (i.e. it's a prediction)
+                 prior_indices = particle_indices[:, 0]
+            
         
         return particle_indices, prior_indices
 
@@ -189,36 +230,6 @@ class MarginalisedKalmanSmoother(ParticleSmoother, KalmanSmoother):
     .. [2] "The Levy state space model" (See section on conditional Gaussian
            modelling and smoothing)
     """
-
-    def _prediction(self, state):
-        """
-        A. Comments
-        -----------
-        Retrieves the prediction from the state if it is a prediction type or
-        from the hypothesis if the state is an update. This is used to find the
-        forward predictive distribution required in the backward recursion.
-
-        B. MATHS
-        --------
-        The forward prediction is p(x_k | x_{k-1}, ...) in a linear-Gaussian form,
-        typically :math:`\mathcal{N}(F_{k} x_{k-1}, Q_k)` if static, or from
-        conditional processes if dynamic.
-
-        """
-        if isinstance(state, MarginalisedParticleStatePrediction):
-            return state
-        elif isinstance(state, MarginalisedParticleStateUpdate):
-            if isinstance(state.hypothesis, MultipleHypothesis):
-                predictions = {hypothesis.prediction for hypothesis in state.hypothesis}
-                if len(predictions) == 1:
-                    return predictions.pop()
-                else:
-                    raise ValueError(
-                        "Track has MultipleHypothesis updates with multiple predictions.")
-            else:
-                return state.hypothesis.prediction
-        else:
-            raise TypeError("States must be MarginalisedParticlePredictions or MarginalisedParticleUpdates.")
 
     def _transition_matrix(self, prediction):
         """
@@ -312,10 +323,18 @@ class MarginalisedKalmanSmoother(ParticleSmoother, KalmanSmoother):
             )
 
             #Generate state with updated state vector and covariance
-            subsq_state = type(state).from_state(state, 
+            #clean up diff state type handling
+            hypothesis = getattr(state, 'hypothesis', None)
+            if hypothesis:
+                subsq_state = type(state).from_state(state, 
                                                 state_vector=smooth_mean, 
                                                 covariance=smooth_covar,
-                                                hypothesis=state.hypothesis,
+                                                hypothesis=hypothesis,
+                                                timestamp=state.timestamp)
+            else:
+                subsq_state = type(state).from_state(state, 
+                                                state_vector=smooth_mean, 
+                                                covariance=smooth_covar,
                                                 timestamp=state.timestamp)
             smoothed_states.insert(0, subsq_state)
 
@@ -464,14 +483,14 @@ class CarterKohnSmoother(MarginalisedKalmanSmoother):
             # Attempt to get the forward prediction
             # (If normal Stone Soup usage, this is in subsq_state.hypothesis.prediction)
             try:
-                prediction_t_1 = subsq_state.hypothesis.prediction
+                prediction_t_1 = self._prediction(subsq_state)
                 F_t_1 = prediction_t_1.linear_transition_matrix  # (M, M)
                 U_t_1 = prediction_t_1.process_covar            # (M, M, N)
                 S_t_given_t = current_state.covariance.copy()   # (M, M, N)
                 process_mean = prediction_t_1.process_mean       # (M, N)
             except:
                 # Fallback if it's a direct transition model
-                transition_model = subsq_state.hypothesis.prediction.transition_model
+                transition_model = self._prediction(subsq_state).transition_model
                 F_t_1 = np.atleast_2d(transition_model.matrix(time_interval=time_interval))
                 U_t_1 = np.atleast_3d(transition_model.covar(time_interval=time_interval))
                 S_t_given_t = np.atleast_3d(current_state.covar.copy())
