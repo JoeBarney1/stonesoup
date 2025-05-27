@@ -133,7 +133,7 @@ class ParticleSmoother(Smoother):
             if type(state_t)==MarginalisedParticleStatePrediction:
                 combined_track.append(reordered_prediction)
             else:
-                hypothesis = state_t.hypothesis
+                hypothesis = copy.copy(state_t.hypothesis)
                 hypothesis.prediction=reordered_prediction
 
                 combined_state = MarginalisedParticleStateUpdate(

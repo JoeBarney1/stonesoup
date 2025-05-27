@@ -233,7 +233,8 @@ class ConditionallyGaussianDriver(LevyDriver):
                 mu_W = np.atleast_2d(mu_W)# Ensure it's at least 2D, is 1xn or mxn
                 mu_W = np.atleast_2d(mu_W[0,:])  # take only the first component of the mean (the 'position')
                 # Multiply each mx1 section of 'e_ft' by its corresponding mu_W value (1xn)
-                r_mean = np.einsum("mk, kn->mn",e_ft, mu_W)
+                r_mean = np.einsum("mk, kn->mn",e_ft, mu_W) # (nxm)
+                return self._first_moment(truncation=truncation)* r_mean
         else:
             raise AttributeError("invalid noise case")
         return self._first_moment(truncation=truncation) * r_mean  # (m, 1)
@@ -254,9 +255,7 @@ class ConditionallyGaussianDriver(LevyDriver):
               and most recent one from which we start in next iteration
             - mu_W_state (M, N, J): mu_W values at time of each jump, for each sample path.
         """
-        #TODO: could add implementation which allows mu_W to be input as a track, which would enable us to pre-calculate the mu_W trajectories,
-        # potentially speeding up the process. would need to ensure coherency with time intervals which would likely be messy. 
-
+        
         #if no transition model, assume its time invariant and output mu unchanged, and Nonetype for the mu_state
         if self.mu_W_transition_model is None:
             return  mu_W, None
@@ -275,13 +274,12 @@ class ConditionallyGaussianDriver(LevyDriver):
             raise ValueError(f".shape[1] of mu and jtimes should be equal but shapes are {M,N} and {J, num_samples} respectively")
 
         prev_mu=mu_W  #(MxN) prev_mu is the most recent mu, so goes on the end of the intermediate ones
-        
         if self.mu_W_state is None: #explicitly set to None if you want to avoid varying within the interval
             matrix= self.mu_W_transition_model.matrix(timedelta(seconds=dt)) # MxM
             covar = self.mu_W_transition_model.covar(timedelta(seconds=dt)) #MxM
-            noise = multivariate_normal.rvs(mean=np.zeros(M), cov=covar,size=N) # MxN
-            last_mu_W = np.einsum("lm,mn->ln",matrix, prev_mu) + noise.T # MxN states added at 
-            self.mu_W=last_mu_W
+            noise= np.array(multivariate_normal.rvs(mean=np.zeros(M), cov=covar, size=N)).reshape(M,N)
+            last_mu_W = np.einsum("lm,mn->ln",matrix, prev_mu) + noise  # MxN states added 
+            self.mu_W=last_mu_W #MxN
             return last_mu_W, None
 
         else: #This is to update the mean at every single jump time. 
@@ -319,6 +317,7 @@ class ConditionallyGaussianDriver(LevyDriver):
             # Extract final state (MxN)
             last_mu_W = longer_mu_W_state[..., -1,:]
             self.mu_W=last_mu_W
+
             return last_mu_W, mu_W_state
 
     def mean(
@@ -368,8 +367,6 @@ class ConditionallyGaussianDriver(LevyDriver):
             # Multiply each mx1 section of 'series' by its corresponding mu_W value (nx1)
             # series will be NxM x 1 and mu_W will be Nx1x1, resulting in NxM x 1
             m = np.einsum('nmk, kn->nmk',series, mu_W) # nxmx1
-            
-
         elif self.mu_W_state is not None:
             mu_W = self.mu_W  if mu_W is None else mu_W
             mu_W = np.atleast_2d(mu_W)# Ensure it's at least 2D, is 1xn or mxn
@@ -381,10 +378,12 @@ class ConditionallyGaussianDriver(LevyDriver):
 
         e_ft = e_ft_func(dt=dt)  # (m, 1)       
             
-        residual_mean = self._residual_mean(e_ft=e_ft, mu_W=mu_W, truncation=truncation)[None, ...] 
+        residual_mean = self._residual_mean( #self.residual_mean expected mxn 
+            e_ft=e_ft, mu_W=mu_W, truncation=truncation).T[...,None] 
         centering = ( # centering is mx1 or mxn, so this is 1xmx1 or nxmx1
             dt * self._centering(e_ft=e_ft, mu_W=mu_W, truncation=truncation).T[...,None]
         )
+
         mean = m - centering + residual_mean
         if num_samples == 1:
             return mean[0].view(StateVector)
