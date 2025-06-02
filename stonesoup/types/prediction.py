@@ -2,6 +2,7 @@ import copy
 import datetime
 from typing import Sequence
 
+import numpy as np
 from .array import CovarianceMatrix, CovarianceMatrices
 from .base import Type
 from .state import (State, GaussianState, EnsembleState,
@@ -239,7 +240,9 @@ class MarginalisedParticleStatePrediction(Prediction, MarginalisedParticleState)
 
     This is a simple MarginalisedParticle state update object.
     """
-
+    linear_transition_matrix : np.ndarray = Property(default=None)
+    process_mean : np.ndarray = Property(default=None)
+    process_covar : np.ndarray = Property(default=None)
     pass
 
 

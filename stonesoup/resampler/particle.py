@@ -53,7 +53,24 @@ class SystematicResampler(Resampler):
 
         new_particles = particles[index]
         new_particles.log_weight = np.full((nparts, ), np.log(1/nparts))
+        new_particles.resample_index=index.astype(int)
+
+        # if resampling with a model with a time-varying driver, need to resample the mu values as well:
+        model=new_particles.hypothesis.prediction.transition_model
+        index=index.astype(int)
+        #TODO: change code to deal with combined transition model more succinctly.
+        if isinstance(model.mu_W_state, list):
+            for sub_model in model.model_list:
+                self.resample_mu_driver(sub_model,index)
+        else:
+            self.resample_mu_driver(model,index)
         return new_particles
+    
+    def resample_mu_driver(self, model,index):
+            if model.mu_W_transition_model is not None: 
+                model.mu_W=model.mu_W[...,index]
+                if model.mu_W_state is not None:
+                    model.mu_W_state=model.mu_W_state[...,index]
 
 
 class ESSResampler(Resampler):
