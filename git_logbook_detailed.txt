@@ -1,0 +1,529 @@
+d65b2cbea | 2025-05-27 | delete unneeded file
+IIB_project_notebooks/tracking_loop
+
+dbba87f7d | 2025-05-27 | changes for figure generation for project
+IIB_project_notebooks/.ipynb_checkpoints/Levy_Processes_Smoothing_Tutorial-checkpoint.ipynb
+IIB_project_notebooks/.ipynb_checkpoints/Levy_Processes_Time_varying_Skew_Simulation_and_Filtering_Tutorial-checkpoint.ipynb
+IIB_project_notebooks/FishTracker.ipynb
+IIB_project_notebooks/MosquitoTracker.ipynb
+IIB_project_notebooks/MultiObjectClutter.ipynb
+IIB_project_notebooks/TimeVaryingMean.ipynb
+
+10fb80a0f | 2025-05-27 | key changes to driver array logic to handle weird 1D case for both alpha situations, and M=1 situation
+stonesoup/models/base_driver.py
+stonesoup/smoother/particle.py
+
+921152cff | 2025-05-23 | many changes to notebooks for final report. also fix particle smooth logic to allow for prediction states. working on fix for hypotheis copying using excessive memory
+.ipynb_checkpoints/pyproject-checkpoint.toml
+IIB_project_notebooks/.ipynb_checkpoints/Levy_Processes_Smoothing_Tutorial-checkpoint.ipynb
+IIB_project_notebooks/.ipynb_checkpoints/Levy_Processes_Time_varying_Skew_Simulation_and_Filtering_Tutorial-checkpoint.ipynb
+IIB_project_notebooks/EURCHF_rate_tracker.ipynb
+IIB_project_notebooks/FinalReportPythonPlots.ipynb
+IIB_project_notebooks/FishTracker.ipynb
+IIB_project_notebooks/Levy_Processes_Smoothing_Tutorial.ipynb
+IIB_project_notebooks/Levy_Processes_Time_varying_Skew_Simulation_and_Filtering_Tutorial.ipynb
+IIB_project_notebooks/MosquitoTracker.ipynb
+IIB_project_notebooks/MultiObjectClutter.ipynb
+IIB_project_notebooks/TimeVaryingMean.ipynb
+IIB_project_notebooks/tracking_loop
+stonesoup/smoother/particle.py
+
+dd9b176f4 | 2025-03-23 | export tutorials as scripts
+docs/tutorials/12_LevyTransitionModels_with_TimeVaryingSkew.py
+docs/tutorials/13_LevyTransitionModels_&_ParticleSmoothers.py
+
+ce2ec3d26 | 2025-03-23 | add 'predictive' capabilities
+IIB_project_notebooks/EURCHF_rate_tracker.ipynb
+IIB_project_notebooks/MultiObjectClutter.ipynb
+
+2927afe51 | 2025-03-18 | "Removed redundant documentation workflow"
+.github/workflows/docs-link.yml
+
+e2a0b940b | 2025-03-18 | correct meas noise
+IIB_project_notebooks/Tutorial_TimevaryingMean.ipynb
+
+516cf1cee | 2025-03-18 | make plot smaller
+IIB_project_notebooks/EURCHF_rate_tracker.ipynb
+
+54cda1051 | 2025-03-18 | run relevant notebooks so start with some outputs
+IIB_project_notebooks/EURCHF_rate_tracker.ipynb
+IIB_project_notebooks/FishTracker.ipynb
+IIB_project_notebooks/TimeVaryingMean.ipynb
+IIB_project_notebooks/Tutorial_Smoother.ipynb
+IIB_project_notebooks/Tutorial_TimevaryingMean.ipynb
+
+bc0c9d57d | 2025-03-18 | change OSPA name
+IIB_project_notebooks/EURCHF_rate_tracker.ipynb
+
+c1902e9ae | 2025-03-18 | change name of likelihood printout
+IIB_project_notebooks/EURCHF_rate_tracker.ipynb
+
+7018bb4b6 | 2025-03-18 | finish update to smoother testing file
+stonesoup/smoother/tests/test_particle.py
+
+77150bf24 | 2025-03-13 | move folders so data accessible via binder
+IIB_project_notebooks/EURCHF_rate_tracker.ipynb
+IIB_project_notebooks/FishTracker.ipynb
+IIB_project_notebooks/MosquitoTracker.ipynb
+IIB_project_notebooks/TrackedDatasets/EURCHF_Ticks_03.02.2025-03.02.2025.csv
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-05/camF_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-05/camF_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-05/camT_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-05/camT_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-05/readme.txt
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-06/camF_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-06/camF_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-06/camT_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-06/camT_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-06/readme.txt
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-07/camF_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-07/camF_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-07/camT_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-07/camT_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-07/readme.txt
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-08/camF_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-08/camF_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-08/camT_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-08/camT_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/test/ZebraFish-08/readme.txt
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-01/camF_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-01/camF_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-01/camT_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-01/camT_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-01/gt/gt.txt
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-01/readme.txt
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-02/camF_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-02/camF_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-02/camT_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-02/camT_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-02/gt/gt.txt
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-02/readme.txt
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-03/camF_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-03/camF_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-03/camT_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-03/camT_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-03/gt/gt.txt
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-03/readme.txt
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-04/camF_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-04/camF_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-04/camT_intrinsic.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-04/camT_references.json
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-04/gt/gt.txt
+IIB_project_notebooks/TrackedDatasets/FishData/train/ZebraFish-04/readme.txt
+IIB_project_notebooks/TrackedDatasets/mosquito data/fly_1.csv
+IIB_project_notebooks/TrackedDatasets/mosquito data/fly_2.csv
+IIB_project_notebooks/TrackedDatasets/mosquito data/mosquito_1.csv
+IIB_project_notebooks/TrackedDatasets/mosquito data/mosquito_2.csv
+IIB_project_notebooks/TrackedDatasets/mosquito data/mosquito_3_with_velocity.csv
+IIB_project_notebooks/TrackedDatasets/mosquito data/mosquito_4_with_velocity.csv
+
+a5b194318 | 2025-03-13 | finalised tracking plots. need to optimise fish data params but others ok. mosquito very gaussian
+IIB_project_notebooks/EURCHF_rate_tracker.ipynb
+IIB_project_notebooks/FishDataTracker.ipynb
+IIB_project_notebooks/FishTracker.ipynb
+IIB_project_notebooks/MosquitoTracker.ipynb
+
+c448334bf | 2025-03-12 | start fish tracking, finalise EURCHF exchange tracker, remove old test, add smooth funct to particlesmoother and update particle smoothing test file
+IIB_project_notebooks/EURCHF_rate_tracker.ipynb
+IIB_project_notebooks/FishDataTracker.ipynb
+stonesoup/models/transition/tests/test_time_varying_driven_process.py
+stonesoup/smoother/particle.py
+stonesoup/smoother/tests/test_particle.py
+
+5662c2166 | 2025-03-12 | clean up all notebooks
+IIB_project_notebooks/EURUSD_rate_tracker.ipynb
+IIB_project_notebooks/MultiObjectClutter.ipynb
+IIB_project_notebooks/TimeVaryingMean.ipynb
+IIB_project_notebooks/TrackerSmoother.ipynb
+IIB_project_notebooks/Tutorial_Smoother.ipynb
+IIB_project_notebooks/Tutorial_TimevaryingMean.ipynb
+
+b17e2d672 | 2025-03-12 | add new test files
+stonesoup/models/transition/tests/test_time_varying_driven_process.py
+stonesoup/smoother/tests/test_particle.py
+
+3bd0b0a95 | 2025-03-12 | remove sys path
+IIB_project_notebooks/CarterKohn.ipynb
+IIB_project_notebooks/EURUSD_rate_tracker.ipynb
+IIB_project_notebooks/MultiObjectClutter.ipynb
+IIB_project_notebooks/TimeVaryingMean.ipynb
+IIB_project_notebooks/TrackerSmoother.ipynb
+IIB_project_notebooks/Tutorial_Smoother.ipynb
+IIB_project_notebooks/Tutorial_TimevaryingMean.ipynb
+
+19955c1a8 | 2025-03-12 | Working. Don't edit/ import any more unless fancy wasting a day
+.binder/environment.yml
+
+5924ba5b5 | 2025-03-12 | no stonesoup
+.binder/environment.yml
+
+5b956d108 | 2025-03-12 | remove conda classic solving line
+.binder/postBuild
+
+5673aeb9a | 2025-03-12 | Merge branch 'JB-Lms' of https://github.com/JoeBarney1/stonesoup into JB-Lms
+f5dd42085 | 2025-03-12 | add versions
+.binder/environment.yml
+
+47667c373 | 2025-03-12 | solve using conda classic not libmamba
+.binder/postBuild
+
+cb5a7d871 | 2025-03-12 | no tflow
+.binder/environment.yml
+
+84c0aea2d | 2025-03-12 | no scikit
+.binder/environment.yml
+
+8b6e2ebd5 | 2025-03-12 | versions
+.binder/environment.yml
+
+a61e887b1 | 2025-03-11 | tensorflow and scikit
+.binder/environment.yml
+
+bc026708e | 2025-03-11 | mamba back
+.binder/environment.yml
+
+cc7c2e360 | 2025-03-11 | no mamba
+.binder/environment.yml
+
+fc9caa1b9 | 2025-03-11 | undo hm
+.binder/environment.yml
+
+3650320f4 | 2025-03-11 | haily mary
+.binder/environment.yml
+
+9a8313f1b | 2025-03-11 | update python
+.binder/environment.yml
+
+8c7b6e711 | 2025-03-11 | move project folder
+IIB_project_notebooks/CarterKohn.ipynb
+IIB_project_notebooks/EURUSD_rate_tracker.ipynb
+IIB_project_notebooks/MultiObjectClutter.ipynb
+IIB_project_notebooks/TimeVaryingMean.ipynb
+IIB_project_notebooks/TrackerSmoother.ipynb
+IIB_project_notebooks/Tutorial_Smoother.ipynb
+IIB_project_notebooks/Tutorial_TimevaryingMean.ipynb
+
+0c0236d5a | 2025-03-11 | reorder
+.binder/environment.yml
+
+6373f2a45 | 2025-03-11 | more reintro
+.binder/environment.yml
+
+fa13b41c1 | 2025-03-11 | no pip
+.binder/environment.yml
+
+73f3ad7ea | 2025-03-11 | reintro
+.binder/environment.yml
+
+be35693b0 | 2025-03-11 | tflow reintro
+.binder/environment.yml
+
+6e3aedc13 | 2025-03-11 | reintro2
+.binder/environment.yml
+
+443ac8d6c | 2025-03-11 | undo last
+.binder/environment.yml
+
+59de0d641 | 2025-03-11 | reintro1
+.binder/environment.yml
+
+75225da7d | 2025-03-11 | remove deprecated warning thing
+.binder/postBuild
+
+b4d9634d2 | 2025-03-11 | down to almost no dependencies
+.binder/environment.yml
+
+2d47864b7 | 2025-03-11 | same again
+.binder/environment.yml
+
+47985794b | 2025-03-11 | add some stuff
+.binder/environment.yml
+
+a726d3b9c | 2025-03-11 | python and np versions
+.binder/environment.yml
+
+3ccbcb894 | 2025-03-11 | givne permission and disable deprecated pip warning
+.binder/postBuild
+
+0b561b8d0 | 2025-03-11 | remove versions
+.binder/environment.yml
+
+62ad11ba7 | 2025-03-11 | undo last
+.binder/postBuild
+
+594d6de04 | 2025-03-11 | Merge branch 'JB-Lms' of https://github.com/JoeBarney1/stonesoup into JB-Lms
+06b4b0db9 | 2025-03-11 | # Disable libmamba to avoid compatibility issues
+.binder/postBuild
+
+f3f43e2ab | 2025-03-11 | undo edit
+.binder/postBuild
+
+3b063e5a8 | 2025-03-11 | same
+.binder/environment.yml
+
+ff74d4947 | 2025-03-11 | remove unnecessary stuff
+.binder/environment.yml
+
+aae97a64b | 2025-03-11 | restore full environment
+.binder/environment.yml
+
+8fc899bb5 | 2025-03-11 | remove redundant imports
+stonesoup/models/transition/base.py
+
+34679afb1 | 2025-03-11 | update permissions
+.binder/postBuild
+
+d99e7c393 | 2025-03-11 | change file types
+.binder/environment.yml
+.binder/postBuild
+
+2755ca178 | 2025-03-11 | add command to see where binder building from
+.binder/postBuild.txt
+
+f9c060977 | 2025-03-11 | rename folder
+.binder/environment.yml.yml
+.binder/postBuild.txt
+
+32b07b85f | 2025-03-11 | move environment
+binder/environment.yml.yml
+
+a02b1922c | 2025-03-11 | environment
+.binder/environment.yml.yml
+
+cc4ad0da4 | 2025-03-11 | remove environment and requirement docs and rename binder folder
+.binder/environment.yml
+.binder/requirements.txt
+binder/postBuild.txt
+
+4e4ea21cb | 2025-03-11 | undo remove defaults
+.binder/environment.yml
+
+6e9fb4c22 | 2025-03-11 | remove defaults, only conda forge as channel in environemnt
+.binder/environment.yml
+
+7d744081f | 2025-03-11 | psotbuild
+.binder/postBuild.txt
+
+ad05f907d | 2025-03-11 | adding setup file from ZY's LMS branch
+setup.cfg
+
+da1f9f419 | 2025-03-11 | plot particle paths and import np into prediction
+stonesoup/plotter.py
+stonesoup/types/prediction.py
+
+353c32eb6 | 2025-03-11 | merge conflicts
+stonesoup/models/transition/base.py
+
+e31cf9a8c | 2025-03-11 | Resolved merge conflicts
+e2401fd5d | 2025-03-11 | updated requirements and environment files
+.binder/environment.yml
+requirements.txt
+
+e7c84a447 | 2025-03-11 | remove prefix
+.binder/environment.yml
+
+246eba5eb | 2025-03-11 | parameter optimisation grid over real data, time-varying mean, smoother and tvm tutorials
+stonesoup/project_directions/EURUSD_rate_tracker.ipynb
+stonesoup/project_directions/TimeVaryingMean.ipynb
+stonesoup/project_directions/TrackerSmoother.ipynb
+stonesoup/project_directions/Tutorial_Smoother.ipynb
+stonesoup/project_directions/Tutorial_TimevaryingMean.ipynb
+
+7dcf78adc | 2025-03-11 | comments for smoothing classes
+stonesoup/smoother/particle.py
+
+07cf17cb0 | 2025-03-11 | clean up mu_resample logic.
+stonesoup/resampler/particle.py
+
+d0f02d11d | 2025-03-11 | enable centering term in ASNSMDriver if mu not varying within interval
+stonesoup/models/driver.py
+
+a83a815b4 | 2025-03-11 | comment change
+stonesoup/models/base.py
+
+936cc7b99 | 2025-03-11 | correct mu_W array shape and enable input of mu_W as a State. In CG class ensure m is nxmx1 and centering is nxmx1. In NSMDriver and NVMDriver ensure correct mu_W array format for r_cov
+stonesoup/models/base_driver.py
+
+39cc3dd52 | 2025-03-11 | fine-tune path plotting code
+stonesoup/plotter.py
+
+d655df206 | 2025-03-11 | update requirements and environment folders
+.binder/environment.yml
+.binder/requirements.txt
+
+3f022db5c | 2025-03-11 | add binder link to readme
+README.md
+
+1b63e2d85 | 2025-03-11 | remove outdated postbuild file
+binder/postBuild
+
+d8ab7bc27 | 2025-03-10 | Tutorial for use of smoothing functions. Maths not yet added
+stonesoup/project_directions/Tutorial_Smoother.ipynb
+
+e65e1216d | 2025-03-06 | uploading all preliminary changes before mu.T conversion
+stonesoup/models/base_driver.py
+
+3b100cecb | 2025-03-01 | remove unnecessary imports and remove culled track input variable to simplify functionality.
+stonesoup/smoother/particle.py
+
+795a9825c | 2025-02-28 | remove unnecessary/confusing track property. Also change smoother input to always just take track variable (minimal computational saving of inputting pre-culled track not worth more confusing code structure).
+stonesoup/models/timevaryingbase.py
+stonesoup/project_directions/12_TimeVaryingLevyTransitionModels_&_MarginalisedParticleSmoother.ipynb
+stonesoup/smoother/particle.py
+
+ee39ff56e | 2025-02-23 | adjust loop logic for reordering transition model means
+stonesoup/resampler/particle.py
+
+5d83439d5 | 2025-02-23 | isolate smoothing functionality of CK sampler
+stonesoup/smoother/particle.py
+
+6becca49d | 2025-02-23 | Merge branch 'main' into JB-Lms
+c815baa2e | 2025-02-23 | start tutorial
+stonesoup/project_directions/12_TimeVaryingLevyTransitionModels_&_MarginalisedParticleSmoother.ipynb
+
+157cffecb | 2025-02-23 | slightly neaten mu_W resampling code. Changes to all jupyter notebooks.
+stonesoup/models/base_driver.py
+stonesoup/project_directions/EURUSD_rate_tracker.ipynb
+stonesoup/project_directions/TimeVaryingMean.ipynb
+stonesoup/project_directions/TrackerSmoother.ipynb
+stonesoup/resampler/particle.py
+stonesoup/smoother/particle.py
+
+cae021c89 | 2025-02-17 | changed mu_W function to align with f_t shape. Still need to change fundamental mishape of mu_W given that it is NxM not MxN by default.
+stonesoup/models/base_driver.py
+
+7cbc3a58a | 2025-02-12 | tweak logiv regarding mean index resampling. ensure mu_W also re-ordered
+stonesoup/resampler/particle.py
+
+31b7e1fc3 | 2025-02-12 | make mu_W_state a property
+stonesoup/models/base.py
+
+20897188b | 2025-02-12 | added functionality to skip subintervals, useful when particle tracking given difficulty vectorising
+stonesoup/models/base_driver.py
+
+310fc737f | 2025-02-12 | change function naming and all array to state for clarity. will name intermediate_mu_W_states in final version
+stonesoup/models/base.py
+
+1c66dd9f9 | 2025-02-12 | cleaned up time-varying mu update function, with vectorisation capability if uneven time interval problem solved.
+stonesoup/models/base_driver.py
+
+b0a876269 | 2025-02-12 | change notation of mu from array to state. on final commit should change to something clearer like intermediate_mu_states
+stonesoup/models/transition/base.py
+
+0481f518c | 2025-02-12 | added resampling of mu state for time-varying driver
+stonesoup/resampler/particle.py
+
+765f6e4c6 | 2025-02-12 | added potential to store/plot number of unique particles
+stonesoup/smoother/particle.py
+
+c30d5e509 | 2025-02-12 | initial modifications before adding resampling index and trying to vectorise
+stonesoup/models/base_driver.py
+
+be50f3b27 | 2025-02-12 | outdated file
+docs/tutorials/11_LevyTransitionModels_&_MarginalisedParticleFilter.ipynb
+
+e35164749 | 2025-02-12 | logbook. still need to check for completeness
+gitlens_logbook.txt
+
+42c265168 | 2025-02-11 | change requirement of track property in class, and allow it to be input into the smooth funct. Introduce culled_track variable to clarify inputs
+stonesoup/smoother/particle.py
+
+b3346d7a9 | 2025-02-07 | added CK sampler and demonstrations. vectorised all smoothing. added path plotting functionality. store F, mu and C. resample index integers for faster indexing. remove old tvm file.
+stonesoup/models/transition/time_varying_levy_linear.py
+stonesoup/plotter.py
+stonesoup/predictor/particle.py
+stonesoup/project_directions/CarterKohn.ipynb
+stonesoup/project_directions/MultiObjectClutter.ipynb
+stonesoup/project_directions/TimeVaryingMean.ipynb
+stonesoup/project_directions/TrackerSmoother.ipynb
+stonesoup/resampler/particle.py
+stonesoup/smoother/particle.py
+stonesoup/types/prediction.py
+
+f1e67d0ff | 2025-01-27 | restore kalman smoother to original format
+stonesoup/smoother/kalman.py
+
+3b6e4e30a | 2025-01-20 | enable access to kalman smoother for conditionally gaussian tracks
+stonesoup/smoother/kalman.py
+
+8d4bf810b | 2025-01-20 | changes made to facilitate time-varying skewness. first moment, centering, residuals not edited yet
+stonesoup/models/base.py
+stonesoup/models/base_driver.py
+stonesoup/models/driver.py
+stonesoup/models/timevaryingbase.py
+stonesoup/models/transition/base.py
+stonesoup/models/transition/levy_linear.py
+
+bccd4c28a | 2025-01-20 | enable plotting of 2std error margin in 1D and sync colours
+stonesoup/plotter.py
+
+5140e65c1 | 2025-01-15 | import module to allow storing of transition matrix in prediction state
+stonesoup/types/prediction.py
+
+95089a0df | 2025-01-15 | remove placeholder C-K sampler code
+stonesoup/smoother/particle.py
+
+69373c3b2 | 2025-01-15 | added to allow multi-object tracking
+stonesoup/predictor/particle.py
+
+4e8468645 | 2025-01-15 | file for time varying drivers before integration
+stonesoup/models/transition/time_varying_levy_linear.py
+
+6b0a3c9ca | 2025-01-15 | removed outdated file
+stonesoup/models/transition/levylinear.py
+
+0d50ae882 | 2025-01-15 | removed uncessary imports
+stonesoup/smoother/particle.py
+
+1840a38ea | 2025-01-11 | Merge remote-tracking branch 'zhenyuen/levy-models-slow' into JB-Lms
+d3f8cd80e | 2024-12-29 | TrackerSmoother Updated
+stonesoup/project_directions/TrackerSmoother.ipynb
+
+4ab4153f8 | 2024-12-29 | notebook for time-varying mean investigation
+stonesoup/project_directions/TimeVaryingMean.ipynb
+
+1a39f2c4f | 2024-12-29 | document showing all tracking visualisation and smoothing capabilities added
+stonesoup/project_directions/TrackerSmoother.ipynb
+
+4663b9520 | 2024-12-29 | basic notebook to show multi-object tracking capabilities
+stonesoup/project_directions/MultiObjectClutter.ipynb
+
+353d76b05 | 2024-12-29 | introduce 3 smoother classes. first culls particle not resampled. second is RTS smoother and third is CarterKohn smoother.
+stonesoup/smoother/particle.py
+
+573438971 | 2024-12-29 | no need to store extra data. removed from updater class, resample index added to update state during resampling
+stonesoup/resampler/particle.py
+stonesoup/types/update.py
+stonesoup/updater/particle.py
+
+819207e6f | 2024-12-26 | added linear transition matrix to MPSPrediction class to enable storage and use in smoothing.
+stonesoup/types/prediction.py
+
+5457e17ef | 2024-12-26 | implement the extra_data class enabled in the MPS update state, by creating the dictionary when the updater class is used.
+stonesoup/updater/particle.py
+
+114528d84 | 2024-12-26 | add extra_data property to MPS update class, to store data needed for smoothing
+stonesoup/types/update.py
+
+aa6160eab | 2024-12-26 | added storing of resample index, allowing retracement after filtering
+stonesoup/resampler/particle.py
+
+ed5a41e49 | 2024-12-26 | added ability to plot inference process in 1D, adding both error bars and particle scatter overlay.
+stonesoup/plotter.py
+
+5d8c3dccc | 2024-12-26 | added predict lru cache to allow multi-object tracking. added storage of linear transition matrix to MPPredictor class for RTS smoother and other functions going forward.
+stonesoup/predictor/particle.py
+
+2d70f0bd3 | 2024-12-26 | administrative changes over term, mainly deleting files
+.github/workflows/docs-link.yml
+.vscode/settings.json
+docs/tutorials/.ipynb_checkpoints/10_Simulation_&_Tracking_Components-checkpoint.py
+docs/tutorials/.ipynb_checkpoints/11_LevyTransitionModels_&_MarginalisedParticleFilter-checkpoint.ipynb
+docs/tutorials/.ipynb_checkpoints/Initial_model_extension_discussion-checkpoint.ipynb
+docs/tutorials/Initial_model_extension_discussion.ipynb
+
+ebb1ae217 | 2024-11-05 | Merge branch 'main' of https://github.com/dstl/Stone-Soup
+14f94c5c7 | 2024-11-05 | Merge branch 'main' of https://github.com/dstl/Stone-Soup
+65d2fa91a | 2024-10-29 | copy of tutorial, to add thoughts on extension
+docs/tutorials/.ipynb_checkpoints/Initial_model_extension_discussion-checkpoint.ipynb
+docs/tutorials/Initial_model_extension_discussion.ipynb
