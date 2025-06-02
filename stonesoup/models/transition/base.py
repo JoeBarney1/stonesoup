@@ -168,7 +168,19 @@ class CombinedLevyTransitionModel(TransitionModel, LevyModel):
     def mu_W(self):
         mu = [m.mu_W if m.mu_W is not None else m.driver.mu_W for m in self.model_list]
         return np.atleast_2d(mu).T
-
+    
+    @property
+    def mu_W_transition_model(self): 
+        mu_W_transition_model = [m.mu_W_transition_model if m.mu_W_transition_model is not None
+                                  else m.driver.mu_W_transition_model for m in self.model_list]
+        return mu_W_transition_model
+    
+    @property
+    def mu_W_state(self):
+        mu_W_state = [m.mu_W_state if m.mu_W_state is not None
+                                  else m.driver.mu_W_state for m in self.model_list]
+        return mu_W_state
+        
     @property
     def sigma_W2(self):
         sigma2 = [

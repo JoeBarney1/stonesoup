@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Union, Optional
+from typing import TYPE_CHECKING, Callable, Union, Optional
 from collections import namedtuple
 from datetime import timedelta
 import numpy as np
@@ -444,6 +444,10 @@ class LevyModel(Model):
     )
     mu_W: Optional[float] = Property(default=None, doc="Condtional Gaussian mean")
     sigma_W2: Optional[float] = Property(default=None, doc="Conditional Gaussian variance")
+    mu_W_transition_model: Optional[Callable] = Property(
+        default=None, doc="Optional transition model for mu_W"
+    )
+    mu_W_state: Optional[np.ndarray] = Property(default=None, doc="intermediate mu states over the sub interval") 
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -461,6 +465,22 @@ class LevyModel(Model):
             return self._integrand(dt, jtimes=np.zeros((1, 1)))[0, 0, :]  # currying
         return self._integrate(func, a=0, b=dt)
 
+    def _mu_W(self,latents:Latents, time_interval:timedelta, mu_W: Optional[float] = None,**kwargs) -> np.ndarray:
+        """Model means over each sub-interval"""
+        assert latents is not None
+        dt = time_interval.total_seconds()
+        if latents.exists(self.driver):
+            jsizes = latents.sizes(self.driver)
+            jtimes = latents.times(self.driver)
+        else:
+            jsizes, jtimes = None, None
+        return self.driver._mu_W(        
+            jtimes=jtimes,
+            dt=dt,
+            num_samples=latents.num_samples,
+            mu_W=mu_W
+        )
+    
     def mean(
         self, latents: Latents, time_interval: timedelta, **kwargs
     ) -> Union[StateVector, StateVectors]:
@@ -472,6 +492,11 @@ class LevyModel(Model):
             jtimes = latents.times(self.driver)
         else:
             jsizes, jtimes = None, None
+        #update the mu parameter in same way as latents
+        if self.driver.mu_W_transition_model is not None:
+            self.mu_W, self.mu_W_state=self._mu_W(latents=latents,
+                                                        time_interval=time_interval,
+                                                        mu_W=self.mu_W,)
         return self.driver.mean(
             jsizes=jsizes,
             jtimes=jtimes,
@@ -479,6 +504,7 @@ class LevyModel(Model):
             e_ft_func=self._integral,
             ft_func=self._integrand,
             mu_W=self.mu_W,
+            mu_W_state=self.mu_W_state,
             num_samples=latents.num_samples,
         )
 
@@ -493,6 +519,10 @@ class LevyModel(Model):
             jtimes = latents.times(self.driver)
         else:
             jsizes, jtimes = None, None
+        if self.driver.mu_W_transition_model is not None:
+            self.mu_W, self.mu_W_state=self._mu_W(latents=latents,
+                                                        time_interval=time_interval,
+                                                        mu_W=self.mu_W,)
         return self.driver.covar(
             jsizes=jsizes,
             jtimes=jtimes,
@@ -500,6 +530,7 @@ class LevyModel(Model):
             e_ft_func=self._integral,
             ft_func=self._integrand,
             mu_W=self.mu_W,
+            mu_W_state=self.mu_W_state,
             sigma_W2=self.sigma_W2,
             num_samples=latents.num_samples,
         )
