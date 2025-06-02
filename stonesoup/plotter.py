@@ -5,6 +5,7 @@ from enum import IntEnum
 from itertools import chain
 from typing import Collection, Iterable, Union, List, Optional, Tuple, Dict
 
+from matplotlib.colors import to_rgba
 import numpy as np
 from matplotlib import animation as animation
 from matplotlib import pyplot as plt
@@ -1031,7 +1032,7 @@ class Plotterly(_Plotter):
         elif len(mapping) != self.dimension:
             raise TypeError("Plotter dimension is not same as the mapping dimension.")
 
-    def plot_ground_truths(self, truths, mapping, truths_label="Ground Truth", **kwargs):
+    def plot_ground_truths(self, truths, mapping, label="Ground Truth", **kwargs):
         """Plots ground truth(s)
 
         Plots each ground truth path passed in to :attr:`truths` and generates a legend
@@ -1048,11 +1049,17 @@ class Plotterly(_Plotter):
             set to allow for iteration.
         mapping: list
             List of items specifying the mapping of the position components of the state space.
-        truths_label: str
+        label: str
             Label for truth data. Default is "Ground Truth"
         \\*\\*kwargs: dict
             Additional arguments to be passed to scatter function. Default is
             ``line=dict(dash="dash")``.
+
+
+        .. deprecated:: 1.5
+           ``label`` has replaced ``truths_label``. In the current implementation
+           ``truths_label`` overrides ``label``. However, use of ``truths_label``
+           may be removed in the future.
         """
         if not isinstance(truths, Collection) or isinstance(truths, StateMutableSequence):
             truths = {truths}
@@ -1060,8 +1067,8 @@ class Plotterly(_Plotter):
         self._check_mapping(mapping)  # ensure mapping is compatible with plotter dimension
 
         truths_kwargs = dict(
-            mode="lines", line=dict(dash="dash"), legendgroup=truths_label, legendrank=100,
-            name=truths_label)
+            mode="lines", line=dict(dash="dash"), legendgroup=label, legendrank=100,
+            name=label)
 
         if self.dimension == 3:  # make ground truth line thicker so easier to see in 3d plot
             truths_kwargs.update(dict(line=dict(width=8, dash="longdashdot")))
@@ -1248,8 +1255,8 @@ class Plotterly(_Plotter):
         color_index = figure_index % max_index
         return colorway[color_index]
 
-    def plot_tracks(self, tracks, mapping, uncertainty=False, particle=False, track_label="Tracks",
-                    ellipse_points=30, err_freq=1, same_color=False, **kwargs):
+    def plot_tracks(self, tracks, mapping, uncertainty=False, particle=False, label="Tracks",
+                    ellipse_points=30, err_freq=1, same_color=False,plot_particle_paths=False, **kwargs):
         """Plots track(s)
 
         Plots each track generated, generating a legend automatically. If ``uncertainty=True``
@@ -1283,7 +1290,12 @@ class Plotterly(_Plotter):
             Additional arguments to be passed to scatter function. Defaults are
             ``marker=dict(symbol='square')`` for :class:`~.Update` and
             ``marker=dict(symbol='circle')`` for other states.
+        .. deprecated:: 1.5
+           ``label`` has replaced ``track_label``. In the current implementation
+           ``track_label`` overrides ``label``. However, use of ``track_label``
+           may be removed in the future.
         """
+        label = kwargs.pop('track_label', None) or label
         if not isinstance(tracks, Collection) or isinstance(tracks, StateMutableSequence):
             tracks = {tracks}  # Make a set of length 1
 
@@ -1291,7 +1303,7 @@ class Plotterly(_Plotter):
 
         # Plot tracks
         track_colors = {}
-        track_kwargs = dict(mode='markers+lines', legendgroup=track_label, legendrank=300)
+        track_kwargs = dict(mode='markers+lines', legendgroup=label, legendrank=300)
 
         if self.dimension == 3:  # change visuals to work well in 3d
             track_kwargs.update(dict(line=dict(width=7)), marker=dict(size=4))
@@ -1312,7 +1324,7 @@ class Plotterly(_Plotter):
             scatter_kwargs = track_kwargs.copy()
             scatter_kwargs['name'] = track.id
             if add_legend:
-                scatter_kwargs['name'] = track_label
+                scatter_kwargs['name'] = label
                 scatter_kwargs['showlegend'] = True
                 add_legend = False
             else:
@@ -1330,9 +1342,6 @@ class Plotterly(_Plotter):
                 track_colors[track] = self.get_next_color()
 
             if self.dimension == 1:  # plot 1D tracks
-
-                if uncertainty or particle:
-                    raise NotImplementedError
 
                 self.fig.add_scatter(
                     x=[state.timestamp for state in track],
@@ -1413,6 +1422,60 @@ class Plotterly(_Plotter):
                         ellipse_kwargs['showlegend'] = False
 
                     self.fig.add_scatter(x=points[0, :], y=points[1, :], **ellipse_kwargs)
+        elif uncertainty and self.dimension==1:
+            name = track_kwargs['legendgroup'] + "<br>Uncertainty"
+            add_legend = name not in {trace.legendgroup for trace in self.fig.data}
+            for track in tracks:
+                track_color = to_rgba(track_colors[track], alpha=0.2) 
+                lighter_track_color = f"rgba({int(track_color[0]*255)},{int(track_color[1]*255)}, {int(track_color[2]*255)}, {0.2})"
+                error_area_kwargs = dict(
+                        mode='lines', 
+                        line=dict(width=0),
+                        fillcolor=lighter_track_color,
+                        opacity=1, hoverinfo='skip', 
+                        legendgroup=name, name=name,
+                        legendrank=track_kwargs['legendrank'] + 10,
+                        )
+                
+                # Arrays to hold the top and bottom error points
+                top_error_points = []
+                bottom_error_points = []
+                x_points = []
+                for i, state in enumerate(track):
+                    covar = state.covar[mapping[0], mapping[0]]  # Extract variance in the {x or y} -dir
+                    err = np.sqrt(covar)  # Use the standard deviation as the error bar
+                    
+                        # Calculate the top and bottom error bounds
+                    top_error = state.mean[mapping[0]] + err * 2
+                    bottom_error = state.mean[mapping[0]] - err * 2
+                    timestamp = state.timestamp
+
+                    # Store the x, top, and bottom error points
+                    x_points.append(timestamp)
+                    top_error_points.append(top_error)
+                    bottom_error_points.append(bottom_error)
+
+                
+                error_area_kwargs['showlegend'] = False
+                # After collecting all the points,plot the filled error margin
+                self.fig.add_scatter(
+                    x=x_points,  # The x points must be in order for both top and bottom
+                    y=top_error_points ,  # Top + reversed bottom points
+                    **error_area_kwargs  # Don't draw any line for the filled region
+                )
+
+                if add_legend:
+                        error_area_kwargs['showlegend'] = True
+                        add_legend = False
+                else:
+                        error_area_kwargs['showlegend'] = False
+
+                self.fig.add_scatter(
+                    x=x_points,  # The x points must be in order for both top and bottom
+                    y=bottom_error_points ,  # Top + reversed bottom points
+                    fill='tonexty',  # Fill the area between the two lines
+                    **error_area_kwargs  # Don't draw any line for the filled region
+                )
 
         if particle and self.dimension == 2:
             name = track_kwargs['legendgroup'] + "<br>(Particles)"
@@ -1431,7 +1494,81 @@ class Plotterly(_Plotter):
                         particle_kwargs['showlegend'] = False
                     data = state.state_vector[mapping[:2], :]
                     self.fig.add_scattergl(x=data[0], y=data[1], **particle_kwargs)
+        # Plot particles if requested
+        elif particle and self.dimension == 1:
+            name = track_kwargs['legendgroup'] + "<br>(Particles)"
+            add_legend = name not in {trace.legendgroup for trace in self.fig.data}
+            for track in tracks:
+                for state in track:
+                    particle_kwargs = dict(
+                    mode='markers', marker=dict(size=2, color=track_colors[track]),
+                    opacity=0.4, hoverinfo='skip',
+                    legendgroup=name, name=name,
+                    legendrank=track_kwargs['legendrank'] + 20)
+                    if add_legend:
+                        particle_kwargs['showlegend'] = True
+                        add_legend = False
+                    else:
+                        particle_kwargs['showlegend'] = False
+                    data = state.state_vector[mapping, :][0]
+                    self.fig.add_scatter(
+                        x=[state.timestamp] * len(data),
+                        y=data, **particle_kwargs
+                    )
+        if plot_particle_paths and self.dimension == 2:
+            name = track_kwargs['legendgroup'] + "<br>(Particle Paths)"
+            add_legend = name not in {trace.legendgroup for trace in self.fig.data}
+            for track in tracks:
+                num_particles=track[0].state_vector.shape[1]
+                data=np.zeros((len(track),2,num_particles))
+                for t, state in enumerate(track):
+                    paths_kwargs = dict(
+                    mode='lines', 
+                    line=dict(width=0.2,color=track_colors[track]),
+                    opacity=0.2, 
+                    hoverinfo='skip',
+                    legendgroup=name, name=name,
+                    legendrank=track_kwargs['legendrank'] + 20)
+                    data[t,0,:] = state.state_vector[mapping[0], :] 
+                    data[t,1,:] = state.state_vector[mapping[1], :]                
+                for i in range(num_particles):
+                    if add_legend:
+                        paths_kwargs['showlegend'] = True
+                        add_legend = False
+                    else:
+                        paths_kwargs['showlegend'] = False
+                    self.fig.add_scatter(x=data[:,0,i], y=data[:,1,i], **paths_kwargs)
 
+        elif plot_particle_paths and self.dimension == 1:
+            name = track_kwargs['legendgroup'] + "<br>(Particle Paths)"
+            add_legend = name not in {trace.legendgroup for trace in self.fig.data}
+            for track in tracks:
+                num_particles=track[0].state_vector.shape[1]
+                data=np.zeros((len(track),num_particles))
+                timestamps=[]
+                for t, state in enumerate(track):
+                    paths_kwargs = dict(
+                    mode='lines', 
+                    line=dict(width=0.3,color=track_colors[track]),
+                    opacity=0.4, 
+                    hoverinfo='skip',
+                    legendgroup=name, name=name,
+                    legendrank=track_kwargs['legendrank'] + 20)
+                    data[t,:] = state.state_vector[mapping[:1], :] 
+                    timestamps.append(state.timestamp)
+                
+                for i in range(num_particles):
+                    if add_legend:
+                        paths_kwargs['showlegend'] = True
+                        add_legend = False
+                    else:
+                        paths_kwargs['showlegend'] = False
+                    self.fig.add_scatter(
+                        x=timestamps,
+                        y=data[:,i], **paths_kwargs
+                    )
+
+        
     @staticmethod
     def _generate_ellipse_points(state, mapping, n_points=30):
         """Generate error ellipse points for given state and mapping"""
@@ -2433,7 +2570,7 @@ class AnimatedPlotterly(_Plotter):
 
             self.fig.update_yaxes(range=[ymin - yrange / 20, ymax + yrange / 20])
 
-    def plot_ground_truths(self, truths, mapping, truths_label="Ground Truth",
+    def plot_ground_truths(self, truths, mapping, label="Ground Truth",
                            resize=True, **kwargs):
 
         """Plots ground truth(s)
@@ -2452,7 +2589,7 @@ class AnimatedPlotterly(_Plotter):
             for iteration.
         mapping: list
             List of items specifying the mapping of the position components of the state space.
-        truths_label: str
+        label: str
             Name of ground truths in legend/plot
         resize: bool
             if True, will resize figure to ensure that ground truths are in view
@@ -2487,9 +2624,9 @@ class AnimatedPlotterly(_Plotter):
         # add a trace that keeps the legend up for the entire simulation (will remain
         # even if no truths are present), then add a trace for each truth in the simulation.
         # initialise keyword arguments, then add them to the traces
-        truth_kwargs = dict(x=[], y=[], mode="lines", hoverinfo='none', legendgroup=truths_label,
+        truth_kwargs = dict(x=[], y=[], mode="lines", hoverinfo='none', legendgroup=label,
                             line=dict(dash="dash", color=self.colorway[0]), legendrank=100,
-                            name=truths_label, showlegend=True)
+                            name=label, showlegend=True)
         merge(truth_kwargs, kwargs)
         # legend dummy trace
         self.fig.add_trace(go.Scatter(truth_kwargs))
@@ -2712,7 +2849,7 @@ class AnimatedPlotterly(_Plotter):
 
     def plot_tracks(self, tracks, mapping, uncertainty=False, resize=True,
                     particle=False, plot_history=False, ellipse_points=30,
-                    track_label="Tracks", **kwargs):
+                    label="Tracks", **kwargs):
         """
         Plots each track generated, generating a legend automatically. If 'uncertainty=True',
         error ellipses are plotted. Tracks are plotted as solid lines with point markers
@@ -2783,7 +2920,7 @@ class AnimatedPlotterly(_Plotter):
         # add dummy trace for legend for track
 
         track_kwargs = dict(x=[], y=[], mode="markers+lines", line=dict(color=self.colorway[2]),
-                            legendgroup=track_label, legendrank=400, name=track_label,
+                            legendgroup=label, legendrank=400, name=label,
                             showlegend=True)
         track_kwargs.update(kwargs)
         self.fig.add_trace(go.Scatter(track_kwargs))
@@ -2855,7 +2992,7 @@ class AnimatedPlotterly(_Plotter):
             self._resize(data, "tracks")
 
         if uncertainty:  # plot ellipses
-            name = f'{track_label}<br>Uncertainty'
+            name = f'{label}<br>Uncertainty'
             uncertainty_kwargs = dict(x=[], y=[], legendgroup=name, fill='toself',
                                       fillcolor=self.colorway[2],
                                       opacity=0.2, legendrank=500, name=name,
@@ -2880,7 +3017,7 @@ class AnimatedPlotterly(_Plotter):
         if particle:  # plot particles
 
             # initialise traces. One for legend and one per track
-            name = f'{track_label}<br>Particles'
+            name = f'{label}<br>Particles'
             particle_kwargs = dict(mode='markers', marker=dict(size=2, color=self.colorway[2]),
                                    opacity=0.4,
                                    hoverinfo='skip', legendgroup=name, name=name,
