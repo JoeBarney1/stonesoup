@@ -277,7 +277,7 @@ class ConditionallyGaussianDriver(LevyDriver):
         if self.mu_W_state is None: #explicitly set to None if you want to avoid varying within the interval
             matrix= self.mu_W_transition_model.matrix(timedelta(seconds=dt)) # MxM
             covar = self.mu_W_transition_model.covar(timedelta(seconds=dt)) #MxM
-            noise= np.array(multivariate_normal.rvs(mean=np.zeros(M), cov=covar, size=N)).reshape(M,N)
+            noise= np.array(multivariate_normal(mean=np.zeros(M), cov=covar).rvs(size=N)).reshape(M,N) #need to add seed=self.seed,
             last_mu_W = np.einsum("lm,mn->ln",matrix, prev_mu) + noise  # MxN states added 
             self.mu_W=last_mu_W #MxN
             return last_mu_W, None
@@ -304,7 +304,7 @@ class ConditionallyGaussianDriver(LevyDriver):
                 for i in range(num_samples):
                     matrices[..., j, i] = self.mu_W_transition_model.matrix(timedelta(seconds=intervals[j, i]))
                     covar[..., j, i] = self.mu_W_transition_model.covar(timedelta(seconds=intervals[j, i]))
-                    noise[..., j, i] = multivariate_normal.rvs(mean=np.zeros(M), cov=covar[..., j, i]) # Mx1 sample
+                    noise[..., j, i] = multivariate_normal(mean=np.zeros(M), cov=covar[..., j, i]).rvs() # Mx1 sample # need to add seed=self.seed,
 
                 # Update all states at once to hopefully save some computation
                 mu_W_state_at_j = np.einsum("lmn,mn->ln",matrices[...,j,:], prev_mu) + noise[...,j,:] # MxN states added at 
