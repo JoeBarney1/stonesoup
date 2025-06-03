@@ -171,11 +171,7 @@ class AlphaStableNSMDriver(NormalSigmaMeanDriver):
         return super()._residual_mean(e_ft=e_ft, mu_W=mu_W, truncation=truncation)
 
     def _centering(self, e_ft: np.ndarray, truncation: float, mu_W: float) -> StateVector:
-        if 0 < self.alpha < 1 or self.mu_W_state is not None: #paper doesn't cover centering terms so set to zero if time-varying within interval
-            m = e_ft.shape[0]
-            return np.zeros((m, 1))
-        elif 1 < self.alpha < 2:
-            #TODO: change this so that it works if mu_W is varying not within the subinterval!
+        if 1 < self.alpha < 2:
             if self.mu_W_transition_model is None:
                 term = e_ft * mu_W  # (m, 1) 
             else:
@@ -184,6 +180,9 @@ class AlphaStableNSMDriver(NormalSigmaMeanDriver):
                 mu_W = np.atleast_2d(mu_W[0,:])  # take only the first component of the mean (the 'position')
                 term= np.einsum('mk,kn->mn',e_ft, mu_W) # now (m,n)
             return -self._first_moment(truncation=truncation) * term 
+        elif 0 < self.alpha < 1 or self.mu_W_state is not None: #paper doesn't cover centering terms so set to zero if time-varying within interval
+            m = e_ft.shape[0]
+            return np.zeros((m, 1))
         else:
             raise AttributeError("alpha must be 0 < alpha < 2")
 
