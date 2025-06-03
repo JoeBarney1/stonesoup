@@ -5,7 +5,24 @@ from .base import Resampler
 from ..base import Property
 from ..types.state import ParticleState
 
+def resample_mu_driver(self, model,index):
+        if model.mu_W_transition_model is not None: 
+            model.mu_W=model.mu_W[...,index]
+            if model.mu_W_state is not None:
+                model.mu_W_state=model.mu_W_state[...,index]
 
+def update_resample_index(self,new_particles, index):
+    if hasattr(new_particles,'resample_index'):
+        index=index.astype(int)
+        new_particles.resample_index=index
+        # if resampling with a model with a time-varying driver, need to resample the mu values as well:
+        model=new_particles.hypothesis.prediction.transition_model
+        #TODO: change code to deal with combined transition model more reliably.
+        if isinstance(model.mu_W_state, list):
+            for sub_model in model.model_list:
+                self.resample_mu_driver(sub_model,index)
+        else:
+            self.resample_mu_driver(model,index)
 class SystematicResampler(Resampler):
     """
     Traditional style resampler for particle filter. Calculates first random point in
@@ -13,7 +30,6 @@ class SystematicResampler(Resampler):
     CDF. Complexity of order O(N) where N is the number of resampled particles.
 
     """
-
     def resample(self, particles, nparts=None):
         """
         Resample the particles
@@ -53,25 +69,8 @@ class SystematicResampler(Resampler):
 
         new_particles = particles[index]
         new_particles.log_weight = np.full((nparts, ), np.log(1/nparts))
-        new_particles.resample_index=index.astype(int)
-
-        # if resampling with a model with a time-varying driver, need to resample the mu values as well:
-        model=new_particles.hypothesis.prediction.transition_model
-        index=index.astype(int)
-        #TODO: change code to deal with combined transition model more succinctly.
-        if isinstance(model.mu_W_state, list):
-            for sub_model in model.model_list:
-                self.resample_mu_driver(sub_model,index)
-        else:
-            self.resample_mu_driver(model,index)
+        self.update_resample_index(new_particles,index)
         return new_particles
-    
-    def resample_mu_driver(self, model,index):
-            if model.mu_W_transition_model is not None: 
-                model.mu_W=model.mu_W[...,index]
-                if model.mu_W_state is not None:
-                    model.mu_W_state=model.mu_W_state[...,index]
-
 
 class ESSResampler(Resampler):
     """
@@ -166,8 +165,8 @@ class MultinomialResampler(Resampler):
 
         new_particles = particles[index]
         new_particles.log_weight = np.full((nparts, ), np.log(1/nparts))
+        self.update_resample_index(new_particles,index)
         return new_particles
-
 
 class StratifiedResampler(Resampler):
     """
@@ -216,8 +215,8 @@ class StratifiedResampler(Resampler):
 
         new_particles = particles[index]
         new_particles.log_weight = np.full((nparts, ), np.log(1/nparts))
+        self.update_resample_index(new_particles,index)
         return new_particles
-
 
 class ResidualMethod(Enum):
     MULTINOMIAL = 'multinomial'
@@ -336,5 +335,6 @@ class ResidualResampler(Resampler):
 
         new_particles = particles[index]
         new_particles.log_weight = np.full((nparts, ), np.log(1/nparts))
+        self.update_resample_index(new_particles,index)
 
         return new_particles
